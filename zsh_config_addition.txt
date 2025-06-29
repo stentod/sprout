@@ -1,0 +1,187 @@
+# ========================================
+# Professional Developer Configuration
+# ========================================
+
+# Enable useful options
+HYPHEN_INSENSITIVE="true"
+ENABLE_CORRECTION="true"
+COMPLETION_WAITING_DOTS="true"
+zstyle ':omz:update' mode auto
+zstyle ':omz:update' frequency 13
+
+# ========================================
+# Useful Aliases
+# ========================================
+
+# Navigation
+alias ..="cd .."
+alias ...="cd ../.."
+alias ....="cd ../../.."
+alias ~="cd ~"
+alias -- -="cd -"
+
+# Enhanced ls
+alias ll="ls -alF"
+alias la="ls -A"
+alias l="ls -CF"
+alias lt="ls -ltr"
+alias lh="ls -lh"
+
+# Git shortcuts (professional developer must-haves)
+alias g="git"
+alias ga="git add"
+alias gaa="git add --all"
+alias gc="git commit -v"
+alias gcm="git commit -m"
+alias gco="git checkout"
+alias gcb="git checkout -b"
+alias gd="git diff"
+alias gl="git pull"
+alias gp="git push"
+alias gs="git status"
+alias gb="git branch"
+alias gba="git branch -a"
+alias glg="git log --graph --oneline --decorate --all"
+alias glog="git log --oneline --decorate --graph"
+
+# Development shortcuts
+alias py="python3"
+alias pip="pip3"
+alias serve="python3 -m http.server 8000"
+alias myip="curl http://ipecho.net/plain; echo"
+alias ports="lsof -i -P -n | grep LISTEN"
+alias c="clear"
+alias h="history"
+alias path='echo -e ${PATH//:/\\n}'
+
+# Directory operations
+alias md="mkdir -p"
+alias rd="rmdir"
+
+# System shortcuts
+alias reload="source ~/.zshrc"
+alias zshrc="code ~/.zshrc"
+
+# Docker shortcuts
+alias d="docker"
+alias dc="docker-compose"
+alias dps="docker ps"
+alias dpsa="docker ps -a"
+alias di="docker images"
+alias dstop="docker stop \$(docker ps -q)"
+alias drm="docker rm \$(docker ps -aq)"
+
+# npm/yarn shortcuts
+alias ni="npm install"
+alias nid="npm install --save-dev"
+alias nrs="npm run start"
+alias nrb="npm run build"
+alias nrd="npm run dev"
+alias nrt="npm run test"
+alias yi="yarn install"
+alias ya="yarn add"
+alias yad="yarn add --dev"
+alias ys="yarn start"
+alias yb="yarn build"
+alias yd="yarn dev"
+
+# Network
+alias ping="ping -c 5"
+
+# ========================================
+# Custom Functions
+# ========================================
+
+# Create a new directory and enter it
+mkcd() {
+    mkdir -p "$@" && cd "$_";
+}
+
+# Extract most know archives with one command
+extract() {
+    if [ -f $1 ] ; then
+        case $1 in
+            *.tar.bz2)   tar xjf $1     ;;
+            *.tar.gz)    tar xzf $1     ;;
+            *.bz2)       bunzip2 $1     ;;
+            *.rar)       unrar e $1     ;;
+            *.gz)        gunzip $1      ;;
+            *.tar)       tar xf $1      ;;
+            *.tbz2)      tar xjf $1     ;;
+            *.tgz)       tar xzf $1     ;;
+            *.zip)       unzip $1       ;;
+            *.Z)         uncompress $1  ;;
+            *.7z)        7z x $1        ;;
+            *)     echo "'$1' cannot be extracted via extract()" ;;
+        esac
+    else
+        echo "'$1' is not a valid file"
+    fi
+}
+
+# Find a file with a pattern in name
+ff() { find . -type f -iname '*'"$*"'*' -ls ; }
+
+# Get current public IP
+publicip() {
+    curl -s http://ipecho.net/plain
+    echo
+}
+
+# Start a simple HTTP server from current directory
+server() {
+    local port="${1:-8000}"
+    echo "Starting server on port $port..."
+    python3 -m http.server "$port"
+}
+
+# ========================================
+# Environment Variables
+# ========================================
+
+# Add commonly used paths
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+# Homebrew (for Apple Silicon Macs)
+if [[ -d "/opt/homebrew/bin" ]]; then
+    export PATH="/opt/homebrew/bin:$PATH"
+fi
+
+# Preferred editor
+export EDITOR='code'
+
+# Language environment
+export LANG=en_US.UTF-8
+
+# ========================================
+# History Configuration
+# ========================================
+HISTFILE=~/.zsh_history
+HISTSIZE=10000
+SAVEHIST=10000
+setopt appendhistory
+setopt sharehistory
+setopt incappendhistory
+
+# ========================================
+# Key Bindings
+# ========================================
+# Use emacs key bindings
+bindkey -e
+
+# History search with arrow keys
+bindkey '^[[A' history-substring-search-up
+bindkey '^[[B' history-substring-search-down
+
+# ========================================
+# Powerlevel10k Configuration
+# ========================================
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+# ========================================
+# Welcome Message
+# ========================================
+echo "🌟 Professional ZSH Environment Loaded! 🌟"
+echo "💡 Type 'reload' to refresh this config"
+echo "⚡ Ready for serious development work!" 

@@ -1,0 +1,18 @@
+body {
+  background: #111;
+  color: #fff;
+  font-family: 'Inter', Arial, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+}
+.logo-container {
+  text-align: center;
+}
+sl-input, sl-button {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+sl-button[variant="primary"] {
+  background: #4caf50;
+  color: #fff;
+} 
