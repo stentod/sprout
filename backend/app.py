@@ -1,19 +1,63 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import os
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'db.sqlite3')
+# Database configuration
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://dstent@localhost/sprout_budget")
 BUDGET = 30.0  # Fixed daily budget
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    """Get a database connection with dict cursor for easy column access"""
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
+
+def run_query(sql, params=None, fetch_one=False, fetch_all=True):
+    """
+    Helper function to run database queries with proper connection handling
+    
+    Args:
+        sql (str): SQL query string
+        params (tuple): Query parameters  
+        fetch_one (bool): Return single row
+        fetch_all (bool): Return all rows (default)
+    
+    Returns:
+        dict or list: Query results as dictionaries
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, params or ())
+            
+            if sql.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE')):
+                conn.commit()
+                return cur.rowcount
+            elif fetch_one:
+                result = cur.fetchone()
+                return dict(result) if result else None
+            elif fetch_all:
+                results = cur.fetchall()
+                return [dict(row) for row in results]
+            else:
+                return None
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise e
+    finally:
+        if conn:
+            conn.close()
 
 # Helper: Get the start and end of the target day (using dayOffset)
 def get_day_bounds(day_offset=0):
@@ -25,13 +69,23 @@ def get_day_bounds(day_offset=0):
 
 # Helper: Get all expenses between two datetimes
 def get_expenses_between(start, end):
-    conn = get_db_connection()
-    cur = conn.execute(
-        'SELECT amount, description, timestamp FROM expenses WHERE user_id = 0 AND timestamp >= ? AND timestamp < ? ORDER BY timestamp DESC',
-        (start.isoformat(), end.isoformat())
-    )
-    expenses = [dict(row) for row in cur.fetchall()]
-    conn.close()
+    sql = '''
+        SELECT amount, description, timestamp 
+        FROM expenses 
+        WHERE user_id = 0 AND timestamp >= %s AND timestamp < %s 
+        ORDER BY timestamp DESC
+    '''
+    raw_expenses = run_query(sql, (start.isoformat(), end.isoformat()))
+    
+    # Convert data types for consistency
+    expenses = []
+    for e in raw_expenses:
+        expenses.append({
+            'amount': float(e['amount']),
+            'description': e['description'],
+            'timestamp': e['timestamp'].isoformat() if hasattr(e['timestamp'], 'isoformat') else str(e['timestamp'])
+        })
+    
     return expenses
 
 @app.route('/health')
@@ -43,13 +97,25 @@ def get_expenses():
     # Get dayOffset from query string (?dayOffset=N), default to 0 (today)
     day_offset = int(request.args.get('dayOffset', 0))
     start, end = get_day_bounds(day_offset)
-    conn = get_db_connection()
-    cur = conn.execute(
-        'SELECT id, amount, description, timestamp FROM expenses WHERE user_id = 0 AND timestamp >= ? AND timestamp < ? ORDER BY timestamp DESC',
-        (start.isoformat(), end.isoformat())
-    )
-    expenses = [dict(row) for row in cur.fetchall()]
-    conn.close()
+    
+    sql = '''
+        SELECT id, amount, description, timestamp 
+        FROM expenses 
+        WHERE user_id = 0 AND timestamp >= %s AND timestamp < %s 
+        ORDER BY timestamp DESC
+    '''
+    raw_expenses = run_query(sql, (start.isoformat(), end.isoformat()))
+    
+    # Convert data types for consistent API response
+    expenses = []
+    for e in raw_expenses:
+        expenses.append({
+            'id': e['id'],
+            'amount': float(e['amount']),
+            'description': e['description'],
+            'timestamp': e['timestamp'].isoformat() if hasattr(e['timestamp'], 'isoformat') else str(e['timestamp'])
+        })
+    
     return jsonify(expenses)
 
 @app.route('/api/expenses', methods=['POST'])
@@ -60,51 +126,51 @@ def add_expense():
     if amount is None:
         return jsonify({'error': 'Amount is required'}), 400
     timestamp = datetime.now().isoformat()
-    conn = get_db_connection()
-    conn.execute(
-        'INSERT INTO expenses (user_id, amount, description, timestamp) VALUES (?, ?, ?, ?)',
-        (0, amount, description, timestamp)
-    )
-    conn.commit()
-    conn.close()
+    
+    sql = '''
+        INSERT INTO expenses (user_id, amount, description, timestamp) 
+        VALUES (%s, %s, %s, %s)
+    '''
+    run_query(sql, (0, amount, description, timestamp), fetch_all=False)
     return jsonify({'success': True}), 201
 
 @app.route('/api/summary', methods=['GET'])
 def get_summary():
     day_offset = int(request.args.get('dayOffset', 0))
     today_start, today_end = get_day_bounds(day_offset)
+    
+    # Calculate daily surplus for the last 7 days
     deltas = []
-    days_counted = 0
     for i in range(7):
         offset = day_offset - i
         day_start, day_end = get_day_bounds(offset)
         expenses = get_expenses_between(day_start, day_end)
         total_spent = sum(e['amount'] for e in expenses)
-        delta = BUDGET - total_spent
-        deltas.append(delta)
-        days_counted += 1 if expenses or i == 0 else 0  # Always count today, even if no expenses
-    # Only average over days with data, or at least 1 day (today)
-    if days_counted == 0:
-        days_counted = 1
-    today_delta = deltas[0]
-    avg_7day = sum(deltas) / days_counted
-    projection_30 = avg_7day * 30
-    # Plant state logic
-    if avg_7day >= 2:
+        daily_surplus = BUDGET - total_spent
+        deltas.append(daily_surplus)
+    
+    # Today's balance and averages
+    today_balance = deltas[0]
+    avg_daily_surplus = sum(deltas) / 7  # Always divide by 7 days
+    projection_30 = avg_daily_surplus * 30  # 30-day projection based on average daily surplus
+    
+    # Plant state logic based on average daily surplus
+    if avg_daily_surplus >= 2:
         plant = 'thriving'
         plant_emoji = '🌳'
-    elif avg_7day >= -2:
+    elif avg_daily_surplus >= -2:
         plant = 'healthy'
         plant_emoji = '🌱'
-    elif avg_7day >= -5:
+    elif avg_daily_surplus >= -5:
         plant = 'wilting'
         plant_emoji = '🥀'
     else:
         plant = 'dead'
         plant_emoji = '☠️'
+    
     return jsonify({
-        'balance': round(today_delta, 2),
-        'avg_7day': round(avg_7day, 2),
+        'balance': round(today_balance, 2),
+        'avg_7day': round(avg_daily_surplus, 2),
         'projection_30': round(projection_30, 2),
         'plant_state': plant,
         'plant_emoji': plant_emoji
@@ -120,13 +186,13 @@ def get_history():
     # Group by date (YYYY-MM-DD)
     grouped = {}
     for e in expenses:
-        date = e['timestamp'][:10]  # 'YYYY-MM-DD'
+        date = e['timestamp'][:10]  # 'YYYY-MM-DD' (timestamp is already a string from helper)
         if date not in grouped:
             grouped[date] = []
         grouped[date].append({
-            'amount': e['amount'],
+            'amount': e['amount'],  # Already converted to float in helper
             'description': e['description'],
-            'timestamp': e['timestamp']
+            'timestamp': e['timestamp']  # Already converted to string in helper
         })
     # Sort by date descending
     grouped_sorted = [
@@ -148,4 +214,4 @@ def serve_static(filename):
     return send_from_directory('../frontend', filename)
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True, port=5001) 

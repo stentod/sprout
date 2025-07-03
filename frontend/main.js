@@ -54,7 +54,7 @@ function renderAddExpenseForm() {
     }
     document.getElementById('add-expense-error').textContent = '';
     // POST to API
-    const resp = await fetch(`http://localhost:5000/api/expenses`, {
+    const resp = await fetch(`http://localhost:5001/api/expenses`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount, description })
@@ -72,7 +72,7 @@ function renderAddExpenseForm() {
 
 // Load summary and render UI
 async function loadSummary() {
-  const resp = await fetch(`http://localhost:5000/api/summary?dayOffset=${dayOffset}`);
+  const resp = await fetch(`http://localhost:5001/api/summary?dayOffset=${dayOffset}`);
   const summary = await resp.json();
   renderMainUI(summary);
   renderAddExpenseForm();

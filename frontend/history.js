@@ -27,7 +27,7 @@ function renderHistory(days) {
 }
 
 async function loadHistory() {
-  const resp = await fetch(`http://localhost:5000/api/history?dayOffset=${dayOffset}`);
+  const resp = await fetch(`http://localhost:5001/api/history?dayOffset=${dayOffset}`);
   const days = await resp.json();
   renderHistory(days);
 }
