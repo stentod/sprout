@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Sprout Budget Tracker Development Server
-# This script starts both backend (Flask) and frontend (live-server) with auto-reload
+# Sprout Budget Tracker Production Server
+# This script starts both Flask backend and Nginx frontend server
 
 set -e  # Exit on any error
 
@@ -12,7 +12,45 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}🌱 Starting Sprout Budget Tracker Development Environment${NC}"
+# Check if we're in Docker/production environment
+if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
+    echo -e "${GREEN}🌱 Starting Sprout Budget Tracker Production Environment${NC}"
+    
+    # Production mode - start Flask and Nginx
+    echo -e "${BLUE}🔧 Starting Flask backend on port 5000${NC}"
+    
+    # Set Flask to production mode
+    export FLASK_ENV=production
+    export FLASK_DEBUG=false
+    
+    # Start Flask in background
+    cd /app/backend
+    python app.py &
+    FLASK_PID=$!
+    
+    # Wait for Flask to start
+    echo -e "${YELLOW}⏳ Waiting for Flask to start...${NC}"
+    sleep 5
+    
+    # Test Flask health
+    if curl -f http://localhost:5000/health >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ Flask backend is running${NC}"
+    else
+        echo -e "${RED}❌ Flask backend failed to start${NC}"
+        kill $FLASK_PID 2>/dev/null || true
+        exit 1
+    fi
+    
+    # Replace PORT placeholder in nginx.conf
+    sed -i "s/\${PORT:-10000}/${PORT:-10000}/g" /etc/nginx/nginx.conf
+    
+    # Start Nginx in foreground
+    echo -e "${GREEN}🌐 Starting Nginx on port ${PORT:-10000}${NC}"
+    exec nginx
+    
+else
+    # Development mode - use the existing development setup
+    echo -e "${GREEN}🌱 Starting Sprout Budget Tracker Development Environment${NC}"
 
 # Function to check if a command exists
 command_exists() {
@@ -125,4 +163,6 @@ echo -e "${YELLOW}💡 Both servers will auto-reload on file changes${NC}"
 echo -e "${YELLOW}🛑 Press Ctrl+C to stop both servers${NC}"
 
 # Wait for background processes
-wait $BACKEND_PID $FRONTEND_PID 
+wait $BACKEND_PID $FRONTEND_PID
+
+fi  # End of production/development mode check 
