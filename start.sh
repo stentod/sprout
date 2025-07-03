@@ -46,9 +46,15 @@ check_python_deps() {
         exit 1
     fi
     
-    # Check if Flask is installed
+    # Check if Flask is installed in virtual environment
     if ! python -c "import flask" 2>/dev/null; then
-        echo -e "${YELLOW}📦 Installing Python dependencies...${NC}"
+        echo -e "${YELLOW}📦 Installing Python dependencies in virtual environment...${NC}"
+        pip install -r requirements.txt
+    fi
+    
+    # Also check for psycopg2 specifically
+    if ! python -c "import psycopg2" 2>/dev/null; then
+        echo -e "${YELLOW}📦 Installing/reinstalling psycopg2...${NC}"
         pip install -r requirements.txt
     fi
     cd ..
@@ -69,6 +75,15 @@ cleanup() {
 # Set up signal handlers for cleanup
 trap cleanup SIGINT SIGTERM
 
+# Activate virtual environment
+echo -e "${BLUE}🔧 Activating virtual environment...${NC}"
+if [ ! -d ".venv" ]; then
+    echo -e "${YELLOW}📦 Creating virtual environment...${NC}"
+    python3 -m venv .venv
+fi
+
+source .venv/bin/activate
+
 # Check and install dependencies
 install_live_server
 check_python_deps
@@ -76,10 +91,12 @@ check_python_deps
 echo -e "${BLUE}🚀 Starting development servers...${NC}"
 
 # Start Flask backend with auto-reload
-echo -e "${GREEN}🔧 Starting Flask backend on http://localhost:5000${NC}"
+echo -e "${GREEN}🔧 Starting Flask backend on http://localhost:5001${NC}"
 cd backend
 export FLASK_ENV=development
 export FLASK_DEBUG=1
+export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"
+export DATABASE_URL='postgresql://dstent@localhost/sprout_budget'
 python app.py &
 BACKEND_PID=$!
 cd ..
@@ -96,7 +113,7 @@ cd ..
 
 echo -e "${GREEN}✅ Development environment is ready!${NC}"
 echo -e "${BLUE}📱 Frontend: http://localhost:8080${NC}"
-echo -e "${BLUE}🔧 Backend API: http://localhost:5000${NC}"
+echo -e "${BLUE}🔧 Backend API: http://localhost:5001${NC}"
 echo -e "${YELLOW}💡 Both servers will auto-reload on file changes${NC}"
 echo -e "${YELLOW}🛑 Press Ctrl+C to stop both servers${NC}"
 
