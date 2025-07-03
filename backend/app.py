@@ -6,15 +6,17 @@ import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables (for local development)
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Database configuration
+# Configuration from environment variables
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://dstent@localhost/sprout_budget")
-BUDGET = 30.0  # Fixed daily budget
+BUDGET = float(os.environ.get("DAILY_BUDGET", "30.0"))  # Daily budget amount
+PORT = int(os.environ.get("PORT", "5001"))  # Server port
+DEBUG = os.environ.get("FLASK_DEBUG", "False").lower() == "true"  # Debug mode
 
 def get_db_connection():
     """Get a database connection with dict cursor for easy column access"""
@@ -201,17 +203,20 @@ def get_history():
     ]
     return jsonify(grouped_sorted)
 
+# Get the frontend directory path relative to this file
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend')
+
 @app.route('/')
 def serve_index():
-    return send_from_directory('../frontend', 'index.html')
+    return send_from_directory(FRONTEND_DIR, 'index.html')
 
 @app.route('/history.html')
 def serve_history():
-    return send_from_directory('../frontend', 'history.html')
+    return send_from_directory(FRONTEND_DIR, 'history.html')
 
 @app.route('/<path:filename>')
 def serve_static(filename):
-    return send_from_directory('../frontend', filename)
+    return send_from_directory(FRONTEND_DIR, filename)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001) 
+    app.run(debug=DEBUG, port=PORT, host='0.0.0.0') 

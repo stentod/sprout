@@ -4,7 +4,25 @@ function getDayOffset() {
   return parseInt(params.get('dayOffset') || '0', 10);
 }
 
+// Get API base URL - works for both local development and production
+function getApiBaseUrl() {
+  // In production, API will be served from the same origin
+  // In development, detect if we're running on a different port than the API
+  const isDevelopment = window.location.hostname === 'localhost' && window.location.port !== '';
+  const isLivereload = window.location.port === '8080' || window.location.port === '3000'; // Common dev ports
+  
+  if (isDevelopment && isLivereload) {
+    // Use environment variable if available, otherwise default to 5001
+    const apiPort = window.ENV_API_PORT || '5001';
+    return `http://localhost:${apiPort}`;
+  }
+  
+  // In production, API is served from same origin
+  return '';
+}
+
 const dayOffset = getDayOffset();
+const API_BASE_URL = getApiBaseUrl();
 const historyRoot = document.getElementById('history');
 
 function renderHistory(days) {
@@ -27,7 +45,7 @@ function renderHistory(days) {
 }
 
 async function loadHistory() {
-  const resp = await fetch(`http://localhost:5001/api/history?dayOffset=${dayOffset}`);
+  const resp = await fetch(`${API_BASE_URL}/api/history?dayOffset=${dayOffset}`);
   const days = await resp.json();
   renderHistory(days);
 }
