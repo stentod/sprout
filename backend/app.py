@@ -219,4 +219,7 @@ def serve_static(filename):
     return send_from_directory(FRONTEND_DIR, filename)
 
 if __name__ == '__main__':
-    app.run(debug=DEBUG, port=PORT, host='0.0.0.0') 
+    # In production (Docker), Flask runs on port 5000 internally
+    # Nginx handles the external port
+    flask_port = 5000 if os.environ.get('FLASK_ENV') == 'production' else PORT
+    app.run(debug=DEBUG, port=flask_port, host='0.0.0.0') 
