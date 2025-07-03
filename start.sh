@@ -91,12 +91,18 @@ check_python_deps
 echo -e "${BLUE}🚀 Starting development servers...${NC}"
 
 # Start Flask backend with auto-reload
-echo -e "${GREEN}🔧 Starting Flask backend on http://localhost:5001${NC}"
+echo -e "${GREEN}🔧 Starting Flask backend (checking PORT from environment)${NC}"
 cd backend
+
+# Set development environment variables (will be overridden by .env file if present)
 export FLASK_ENV=development
-export FLASK_DEBUG=1
+export FLASK_DEBUG=${FLASK_DEBUG:-true}
 export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"
-export DATABASE_URL='postgresql://dstent@localhost/sprout_budget'
+
+# Get port from environment or default to 5001
+BACKEND_PORT=${PORT:-5001}
+echo -e "${GREEN}🔧 Backend will start on http://localhost:${BACKEND_PORT}${NC}"
+
 python app.py &
 BACKEND_PID=$!
 cd ..
@@ -105,15 +111,16 @@ cd ..
 sleep 2
 
 # Start frontend live-server
-echo -e "${GREEN}🌐 Starting frontend live-server on http://localhost:8080${NC}"
+FRONTEND_PORT=${FRONTEND_PORT:-8080}
+echo -e "${GREEN}🌐 Starting frontend live-server on http://localhost:${FRONTEND_PORT}${NC}"
 cd frontend
-live-server --port=8080 --host=localhost --no-browser --quiet &
+live-server --port=${FRONTEND_PORT} --host=localhost --no-browser --quiet &
 FRONTEND_PID=$!
 cd ..
 
 echo -e "${GREEN}✅ Development environment is ready!${NC}"
-echo -e "${BLUE}📱 Frontend: http://localhost:8080${NC}"
-echo -e "${BLUE}🔧 Backend API: http://localhost:5001${NC}"
+echo -e "${BLUE}📱 Frontend: http://localhost:${FRONTEND_PORT}${NC}"
+echo -e "${BLUE}🔧 Backend API: http://localhost:${BACKEND_PORT}${NC}"
 echo -e "${YELLOW}💡 Both servers will auto-reload on file changes${NC}"
 echo -e "${YELLOW}🛑 Press Ctrl+C to stop both servers${NC}"
 

@@ -17,8 +17,8 @@ def create_database():
     try:
         # Connect to default database to create our database
         conn = psycopg2.connect(
-            host="localhost",
-            database="dstent",
+            host=os.environ.get("DB_HOST", "localhost"),
+            database=os.environ.get("DB_DEFAULT_NAME", "dstent"),
             user=os.environ.get("DB_USER", "dstent"),
             password=os.environ.get("DB_PASSWORD", "")
         )
@@ -46,7 +46,8 @@ def create_tables():
         cur = conn.cursor()
         
         # Read and execute schema
-        with open('schema_postgres.sql', 'r') as f:
+        schema_path = os.path.join(os.path.dirname(__file__), 'schema_postgres.sql')
+        with open(schema_path, 'r') as f:
             schema = f.read()
         
         cur.execute(schema)
