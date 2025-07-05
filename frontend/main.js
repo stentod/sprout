@@ -187,3 +187,5 @@ if (document.readyState === 'loading') {
 } else {
   loadSummaryWithFallbacks();
 } 
+
+// Force deployment refresh - production fix for blank screen issue 
