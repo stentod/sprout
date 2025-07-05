@@ -117,23 +117,6 @@ function renderOfflineUI() {
   `;
 }
 
-// Load summary and render UI
-async function loadSummary() {
-  try {
-    const resp = await fetch(`${API_BASE_URL}/api/summary?dayOffset=${dayOffset}`);
-    if (!resp.ok) {
-      throw new Error(`API returned ${resp.status}`);
-    }
-    const summary = await resp.json();
-    renderMainUI(summary);
-    renderAddExpenseForm();
-  } catch (error) {
-    console.warn('API unavailable, showing offline UI:', error.message);
-    renderOfflineUI();
-    renderAddExpenseForm();
-  }
-}
-
 // Simple test to ensure JavaScript is running
 console.log('🌱 Sprout Budget Tracker JavaScript loaded');
 
