@@ -45,9 +45,38 @@ function renderHistory(days) {
 }
 
 async function loadHistory() {
-  const resp = await fetch(`${API_BASE_URL}/api/history?dayOffset=${dayOffset}`);
-  const days = await resp.json();
-  renderHistory(days);
+  try {
+    const resp = await fetch(`${API_BASE_URL}/api/history?dayOffset=${dayOffset}`);
+    if (!resp.ok) {
+      throw new Error(`API returned ${resp.status}`);
+    }
+    const days = await resp.json();
+    renderHistory(days);
+  } catch (error) {
+    console.warn('API unavailable, showing offline message:', error.message);
+    // Try to parse response as JSON to get demo mode info
+    let demoMode = false;
+    try {
+      const errorResponse = await fetch(`${API_BASE_URL}/api/history?dayOffset=${dayOffset}`);
+      if (errorResponse.status === 503) {
+        const errorJson = await errorResponse.json();
+        demoMode = errorJson.demo_mode;
+      }
+    } catch (e) {
+      // Ignore parsing errors
+    }
+    
+    historyRoot.innerHTML = `
+      <h2 style='text-align:center;'>Expenses - Last 7 Days</h2>
+      <div style='text-align:center; margin:2rem; padding:2rem; background:#333; border-radius:5px; color:#aaa;'>
+        <div>⚠️ ${demoMode ? 'Demo mode - Database connection unavailable' : 'Database connection unavailable'}</div>
+        <div style='font-size:0.9rem; margin-top:0.5rem;'>History will be available when deployed with a database.</div>
+        <div style='margin-top:1rem;'>
+          <a href='index.html${window.location.search}' style="background:#555;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">Back to Today</a>
+        </div>
+      </div>
+    `;
+  }
 }
 
 loadHistory(); 

@@ -12,6 +12,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+# Custom exception for database connection errors
+class DatabaseConnectionError(Exception):
+    pass
+
 # Configuration from environment variables
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://dstent@localhost/sprout_budget")
 BUDGET = float(os.environ.get("DAILY_BUDGET", "30.0"))  # Daily budget amount
@@ -53,6 +57,11 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
                 return [dict(row) for row in results]
             else:
                 return None
+    except psycopg2.Error as e:
+        if conn:
+            conn.rollback()
+        print(f"Database connection error: {e}")
+        raise DatabaseConnectionError(f"Database unavailable: {e}")
     except Exception as e:
         if conn:
             conn.rollback()
@@ -93,6 +102,26 @@ def get_expenses_between(start, end):
 @app.route('/health')
 def health():
     return {'status': 'ok'}
+
+# Error handlers for database connection issues
+@app.errorhandler(DatabaseConnectionError)
+def handle_database_error(e):
+    """Return JSON error response when database is unavailable"""
+    return jsonify({
+        'error': 'Database unavailable',
+        'message': 'The application is running but the database connection failed. This is normal in demo mode.',
+        'demo_mode': True
+    }), 503
+
+# Global error handler to ensure all errors return JSON
+@app.errorhandler(500)
+def handle_internal_error(e):
+    """Return JSON error response for internal server errors"""
+    return jsonify({
+        'error': 'Internal server error',
+        'message': 'An unexpected error occurred. Please try again.',
+        'demo_mode': True
+    }), 500
 
 @app.route('/api/expenses', methods=['GET'])
 def get_expenses():
