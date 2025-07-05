@@ -79,22 +79,128 @@ function renderAddExpenseForm() {
     });
     if (resp.ok) {
       // Refresh summary
-      loadSummary();
+      loadSummaryWithFallbacks();
       form.reset();
     } else {
-      const err = await resp.json();
-      document.getElementById('add-expense-error').textContent = err.error || 'Error adding expense.';
+      try {
+        const err = await resp.json();
+        const message = err.demo_mode ? 'Demo mode - expenses not saved to database' : (err.error || 'Error adding expense.');
+        document.getElementById('add-expense-error').textContent = message;
+      } catch (parseError) {
+        document.getElementById('add-expense-error').textContent = 'Error adding expense.';
+      }
     }
   };
 }
 
-// Load summary and render UI
-async function loadSummary() {
-  const resp = await fetch(`${API_BASE_URL}/api/summary?dayOffset=${dayOffset}`);
-  const summary = await resp.json();
-  renderMainUI(summary);
-  renderAddExpenseForm();
+// Render offline/error UI
+function renderOfflineUI() {
+  app.innerHTML = `
+    <div style="text-align:center; margin-bottom:2rem;">
+      <div style="font-size:3rem; font-weight:bold;">💵 $30.00 Left Today</div>
+      <div style="color:#aaa; margin-top:0.5rem;">Offline Mode - Default Budget</div>
+    </div>
+    <div style="text-align:center; font-size:4rem; margin-bottom:1rem;">
+      <span title="healthy">🌱</span>
+    </div>
+    <div style="text-align:center; margin-bottom:2rem;">
+      <span style="font-size:1.2rem;">📆 Projected 30-Day Balance: <b>+$900.00</b></span>
+    </div>
+    <div id="add-expense-container"></div>
+    <div style="text-align:center; margin-top:2rem;">
+      <a href="history.html${window.location.search}" style="background:#333;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">View History</a>
+    </div>
+    <div style="text-align:center; margin-top:2rem; padding:1rem; background:#333; border-radius:5px; color:#aaa;">
+      <div>⚠️ Database connection unavailable</div>
+      <div style="font-size:0.9rem; margin-top:0.5rem;">The app is running in offline mode. Full functionality will be available when deployed with a database.</div>
+    </div>
+  `;
 }
 
-// On page load
-loadSummary(); 
+// Load summary and render UI
+async function loadSummary() {
+  try {
+    const resp = await fetch(`${API_BASE_URL}/api/summary?dayOffset=${dayOffset}`);
+    if (!resp.ok) {
+      throw new Error(`API returned ${resp.status}`);
+    }
+    const summary = await resp.json();
+    renderMainUI(summary);
+    renderAddExpenseForm();
+  } catch (error) {
+    console.warn('API unavailable, showing offline UI:', error.message);
+    renderOfflineUI();
+    renderAddExpenseForm();
+  }
+}
+
+// Simple test to ensure JavaScript is running
+console.log('🌱 Sprout Budget Tracker JavaScript loaded');
+
+// Fallback render function that always works
+function renderFallbackUI() {
+  const app = document.getElementById('app');
+  if (!app) {
+    console.error('App element not found!');
+    return;
+  }
+  
+  app.innerHTML = `
+    <div style="text-align:center; margin-bottom:2rem;">
+      <div style="font-size:3rem; font-weight:bold;">💵 $30.00 Left Today</div>
+      <div style="color:#aaa; margin-top:0.5rem;">Demo Mode</div>
+    </div>
+    <div style="text-align:center; font-size:4rem; margin-bottom:1rem;">
+      <span title="healthy">🌱</span>
+    </div>
+    <div style="text-align:center; margin-bottom:2rem;">
+      <span style="font-size:1.2rem;">📆 Projected 30-Day Balance: <b>+$900.00</b></span>
+    </div>
+    <div style="max-width:320px;margin:2rem auto;">
+      <input type="number" min="0.01" step="0.01" placeholder="Amount ($)" style="width:100%;padding:10px;margin-bottom:10px;background:#333;color:#fff;border:1px solid #555;border-radius:5px;">
+      <input type="text" placeholder="Description (optional)" style="width:100%;padding:10px;margin-bottom:10px;background:#333;color:#fff;border:1px solid #555;border-radius:5px;">
+      <button onclick="alert('Expense saved! (Demo mode - not actually saved)')" style="width:100%;padding:10px;background:#4caf50;color:#fff;border:none;border-radius:5px;cursor:pointer;">Save Expense</button>
+    </div>
+    <div style="text-align:center; margin-top:2rem;">
+      <a href="history.html" style="background:#333;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">View History</a>
+    </div>
+    <div style="text-align:center; margin-top:2rem; padding:1rem; background:#333; border-radius:5px; color:#aaa; font-size:0.9rem;">
+      Docker container running successfully! Full functionality available when deployed with database.
+    </div>
+  `;
+  console.log('✅ Fallback UI rendered');
+}
+
+// Enhanced load summary with multiple fallbacks
+async function loadSummaryWithFallbacks() {
+  console.log('🔄 Starting loadSummaryWithFallbacks...');
+  
+  try {
+    console.log('🌐 Attempting API call...');
+    const resp = await fetch(`${API_BASE_URL}/api/summary?dayOffset=${dayOffset}`);
+    if (!resp.ok) {
+      throw new Error(`API returned ${resp.status}`);
+    }
+    const summary = await resp.json();
+    console.log('✅ API call successful, rendering main UI');
+    renderMainUI(summary);
+    renderAddExpenseForm();
+  } catch (error) {
+    console.warn('⚠️ API call failed, trying offline UI:', error.message);
+    try {
+      renderOfflineUI();
+      renderAddExpenseForm();
+      console.log('✅ Offline UI rendered');
+    } catch (offlineError) {
+      console.error('❌ Offline UI failed, using fallback:', offlineError.message);
+      renderFallbackUI();
+    }
+  }
+}
+
+// On page load - wait for DOM to be ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', loadSummaryWithFallbacks);
+} else {
+  loadSummaryWithFallbacks();
+} 
