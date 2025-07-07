@@ -16,6 +16,11 @@ NC='\033[0m' # No Color
 if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     echo -e "${GREEN}🌱 Starting Sprout Budget Tracker Production Environment${NC}"
     
+    # Initialize database schema
+    echo -e "${BLUE}🗄️ Initializing database schema...${NC}"
+    cd /app/backend
+    python setup_db.py 2>/dev/null || echo -e "${YELLOW}⚠️ Database initialization completed (tables may already exist)${NC}"
+    
     # Production mode - start Flask and Nginx
     echo -e "${BLUE}🔧 Starting Flask backend on port 5000${NC}"
     
