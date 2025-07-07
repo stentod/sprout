@@ -8,6 +8,8 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     envVars:
+      - key: DATABASE_URL
+        value: "postgresql://sprout_postgres_user:xclqRgQO0jBW6GQiLJfb744f8KZv6qVD@dpg-d1kj4a95pdvs73atrojg-a.oregon-postgres.render.com/sprout_postgres"
       - key: DAILY_BUDGET
         value: "30.0"
       - key: FLASK_ENV
