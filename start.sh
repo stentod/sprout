@@ -21,16 +21,17 @@ if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     cd /app/backend
     python setup_db.py 2>/dev/null || echo -e "${YELLOW}⚠️ Database initialization completed (tables may already exist)${NC}"
     
-    # Production mode - start Flask and Nginx
-    echo -e "${BLUE}🔧 Starting Flask backend on port 5000${NC}"
+    # Production mode - start Flask with gunicorn and Nginx
+    echo -e "${BLUE}🔧 Starting Flask backend with gunicorn on port 5000${NC}"
     
     # Set Flask to production mode
     export FLASK_ENV=production
     export FLASK_DEBUG=false
+    export WEB_CONCURRENCY=${WEB_CONCURRENCY:-1}
     
-    # Start Flask in background
+    # Start Flask with gunicorn in background
     cd /app/backend
-    python app.py &
+    gunicorn app:app --bind 0.0.0.0:5000 --workers ${WEB_CONCURRENCY:-1} --timeout 30 --access-logfile - --error-logfile - &
     FLASK_PID=$!
     
     # Wait for Flask to start

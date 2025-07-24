@@ -29,11 +29,11 @@ RUN chmod +x /app/start.sh
 RUN mkdir -p /var/log/nginx /var/cache/nginx /var/lib/nginx
 
 # Expose port (Render will set PORT environment variable)
-EXPOSE 10000
+EXPOSE $PORT
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:${PORT:-10000}/health || exit 1
 
-# Start both services
+# Start the application
 CMD ["/app/start.sh"] 
