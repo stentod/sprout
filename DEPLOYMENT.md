@@ -1,215 +1,201 @@
-# Deployment Guide - Sprout Budget Tracker
+# Deployment Guide
 
-This guide covers deploying your Sprout Budget Tracker as a single Docker container on Render, Heroku, or other cloud platforms.
+This guide explains how to deploy Sprout Budget Tracker to **Render** using Docker. The app runs as a single container with Nginx serving the frontend and proxying API requests to Flask.
 
-## 📋 Overview
-
-The deployment setup includes:
-- **Docker**: Single container running both Flask backend and Nginx frontend
-- **Nginx**: Serves static files and proxies API requests to Flask
-- **Flask**: Runs on port 5000 internally
-- **PostgreSQL**: Database (provided by cloud platform)
-
-## 🏗️ Architecture
+## Architecture
 
 ```
-Internet → Render (Port 10000) → Nginx → Flask (Port 5000)
-                                    ↓
-                               Static Files (Frontend)
+Internet → Render → Nginx (Port 10000) → Flask Backend (Port 5000)
+                         ↓
+                    Static Files
+                         ↓
+                  PostgreSQL Database
 ```
 
-## 📁 Files Created
+## Prerequisites
 
-- `Dockerfile` - Multi-stage build with Python and Nginx
-- `nginx.conf` - Nginx configuration for serving frontend + API proxy
-- `start.sh` - Modified to detect production vs development
-- `render.yaml` - Render deployment configuration
-- `docker-test.sh` - Local testing script
-- `.dockerignore` - Optimize Docker build
+- GitHub repository with your code
+- [Render account](https://render.com) (free tier available)
+- Docker installed locally (for testing)
 
-## 🚀 Deploy to Render
+## Environment Variables
 
-### Option 1: Using render.yaml (Recommended)
+Your app needs these environment variables in production:
 
-1. **Push to GitHub**:
-   ```bash
-   git add .
-   git commit -m "Add Docker deployment setup"
-   git push origin main
-   ```
+| Variable | Description | Example Value | Required |
+|----------|-------------|---------------|----------|
+| `DATABASE_URL` | PostgreSQL connection | `postgresql://user:pass@host:5432/db` | ✅ Yes |
+| `FLASK_ENV` | Flask environment | `production` | ✅ Yes |
+| `DAILY_BUDGET` | Default budget amount | `30.0` | ❌ No |
+| `PORT` | External port | `10000` | ❌ No (Render sets this) |
 
-2. **Connect to Render**:
-   - Go to [Render Dashboard](https://dashboard.render.com/)
-   - Click "New" → "Blueprint"
-   - Connect your GitHub repository
-   - Render will automatically detect `render.yaml`
+## Local Testing
 
-3. **Environment Variables** (automatically set by render.yaml):
-   - `DAILY_BUDGET=30.0`
-   - `FLASK_ENV=production`
-   - `DATABASE_URL` (provided by PostgreSQL service)
+Before deploying, test the Docker setup locally:
 
-### Option 2: Manual Setup
-
-1. **Create Web Service**:
-   - Go to Render Dashboard
-   - Click "New" → "Web Service"
-   - Connect your GitHub repository
-
-2. **Configure Service**:
-   - **Runtime**: Docker
-   - **Dockerfile Path**: `./Dockerfile`
-   - **Port**: Leave default (Render sets PORT env var)
-
-3. **Add PostgreSQL Database**:
-   - Click "New" → "PostgreSQL"
-   - Choose free plan
-   - Note the database URL
-
-4. **Environment Variables**:
-   - `DAILY_BUDGET=30.0`
-   - `FLASK_ENV=production`
-   - `DATABASE_URL` (copy from PostgreSQL service)
-
-## 🐳 Local Testing
-
-Test the Docker setup locally before deploying:
+### 1. Build the Docker Image
 
 ```bash
-# Run the test script
-./docker-test.sh
-
-# Or manually:
+# Build the production container
 docker build -t sprout-budget-tracker .
-docker run -d --name sprout-test -p 10000:10000 -e PORT=10000 -e DAILY_BUDGET=30.0 sprout-budget-tracker
 ```
 
-Access the app at: http://localhost:10000
+### 2. Run the Container
 
-Clean up:
 ```bash
-docker stop sprout-test
-docker rm sprout-test
+# Run with environment variables
+docker run -p 10000:10000 \
+  -e FLASK_ENV=production \
+  -e DAILY_BUDGET=30.0 \
+  sprout-budget-tracker
 ```
 
-## 🔧 How It Works
+### 3. Test the Application
 
-### 1. Container Startup
-- `start.sh` detects production environment
-- Starts Flask on port 5000 (internal)
-- Starts Nginx on PORT (external, usually 10000)
+```bash
+# Check health endpoint
+curl http://localhost:10000/health
 
-### 2. Request Routing
-- **Frontend files**: `nginx.conf` serves from `/app/frontend/`
-- **API requests**: `nginx.conf` proxies `/api/*` to Flask
-- **Health checks**: `/health` proxied to Flask
+# Should return: {"status":"ok"}
+```
 
-### 3. Environment Detection
-- **Production**: `/.dockerenv` exists OR `RENDER=true`
-- **Development**: Falls back to live-server setup
+**🌐 Open http://localhost:10000 in your browser to test the app**
 
-## 📊 Monitoring
+### 4. Cleanup
 
-### Health Checks
-- **Endpoint**: `/health`
-- **Docker**: Built-in health check every 30s
-- **Render**: Automatic health monitoring
+```bash
+# Stop and remove the container
+docker stop $(docker ps -q --filter ancestor=sprout-budget-tracker)
+docker rmi sprout-budget-tracker
+```
 
-### Logs
-- **Render**: Available in dashboard
-- **Docker**: `docker logs <container>`
+## Deploy to Render
 
-## 🛠️ Troubleshooting
+### Step 1: Push Code to GitHub
+
+```bash
+git add .
+git commit -m "Deploy to Render"
+git push origin main
+```
+
+### Step 2: Create PostgreSQL Database
+
+1. Go to [Render Dashboard](https://dashboard.render.com)
+2. Click **"New"** → **"PostgreSQL"**
+3. Choose a name (e.g., `sprout-database`)
+4. Select **Free** plan
+5. Click **"Create Database"**
+6. **Copy the DATABASE_URL** (you'll need this in Step 4)
+
+### Step 3: Create Web Service
+
+1. Click **"New"** → **"Web Service"**
+2. Connect your **GitHub repository**
+3. Configure the service:
+   - **Name**: `sprout-budget-tracker`
+   - **Runtime**: **Docker**
+   - **Plan**: **Free** (or higher)
+
+### Step 4: Set Environment Variables
+
+In the **Environment** section, add:
+
+```
+DATABASE_URL=<paste the URL from Step 2>
+FLASK_ENV=production
+DAILY_BUDGET=30.0
+```
+
+### Step 5: Deploy
+
+1. Click **"Create Web Service"**
+2. Render will automatically build and deploy your app
+3. Your app will be available at: `https://your-service-name.onrender.com`
+
+## Health Monitoring
+
+Your app includes automatic health checks:
+
+- **Health Endpoint**: `GET /health` returns `{"status": "ok"}`
+- **Docker Health Check**: Runs every 30 seconds
+- **Render Monitoring**: Automatic restart if health checks fail
+
+## Troubleshooting
+
+### Container Won't Start
+
+```bash
+# Test locally first
+docker build -t debug-app .
+docker run -it debug-app /bin/sh
+
+# Check logs
+docker logs <container-name>
+```
+
+### Database Connection Issues
+
+1. **Verify DATABASE_URL** is set correctly in Render
+2. **Check database status** in Render dashboard
+3. **Restart the service** if needed
+
+### App Shows 503 Error
+
+This usually means the database isn't connected:
+
+1. Check that PostgreSQL service is running
+2. Verify the DATABASE_URL environment variable
+3. Check logs in Render dashboard
 
 ### Common Issues
 
-1. **Port Conflicts**:
-   - Make sure no other services use port 10000
-   - Check `PORT` environment variable
+| Problem | Solution |
+|---------|----------|
+| Build fails | Check Dockerfile syntax and requirements.txt |
+| Health check fails | Verify Flask starts on port 5000 internally |
+| Static files not loading | Ensure files are in `frontend/` directory |
+| Database errors | Check PostgreSQL service status and DATABASE_URL |
 
-2. **Database Connection**:
-   - Verify `DATABASE_URL` is set correctly
-   - Check PostgreSQL service status
+## Updating Your Deployment
 
-3. **Static Files Not Loading**:
-   - Verify frontend files are in `/app/frontend/`
-   - Check nginx configuration
-
-### Debug Commands
+To deploy changes:
 
 ```bash
-# Check container status
-docker ps
-
-# View logs
-docker logs sprout-test
-
-# Enter container
-docker exec -it sprout-test /bin/bash
-
-# Test Flask directly
-curl http://localhost:5000/health
-
-# Test Nginx
-curl http://localhost:10000/health
+git add .
+git commit -m "Update application"
+git push origin main
 ```
 
-## 🔄 Updates
+Render will automatically rebuild and redeploy your app.
 
-To update your deployment:
+## Scaling and Performance
 
-1. **Make changes** to your code
-2. **Push to GitHub**:
-   ```bash
-   git add .
-   git commit -m "Update application"
-   git push origin main
-   ```
-3. **Render** will automatically rebuild and deploy
+### Free Tier Limitations
+- **Sleep after 15 minutes** of inactivity
+- **Limited CPU and memory**
+- **Shared resources**
 
-## 📈 Scaling
+### Upgrading
+- **Starter Plan**: Always-on service with more resources
+- **Pro Plan**: Auto-scaling and custom domains
 
-### Render
-- **Free Tier**: 1 instance, sleeps after 15 minutes
-- **Starter Plan**: Always on, more resources
-- **Pro Plan**: Auto-scaling, custom domains
+## Monitoring Your App
 
-### Performance Tips
-- Enable gzip compression (already configured)
-- Use CDN for static assets
-- Optimize database queries
-- Add caching headers (already configured)
+1. **Render Dashboard**: View logs, metrics, and deployments
+2. **Health Endpoint**: Monitor `/health` for uptime
+3. **Database Metrics**: Track PostgreSQL performance
 
-## 🔐 Security
+---
 
-The setup includes:
-- Security headers (X-Frame-Options, X-XSS-Protection, etc.)
-- HTTPS (handled by Render)
-- Database connection encryption
-- No sensitive data in logs
+## Summary
 
-## 📝 Environment Variables Reference
+Your Sprout Budget Tracker is now deployed! The key points:
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `PORT` | External port for Nginx | `10000` | No |
-| `DATABASE_URL` | PostgreSQL connection | - | Yes |
-| `DAILY_BUDGET` | Daily budget amount | `30.0` | No |
-| `FLASK_ENV` | Flask environment | `production` | No |
-| `FLASK_DEBUG` | Debug mode | `false` | No |
+- ✅ **Docker container** runs Nginx + Flask
+- ✅ **PostgreSQL database** for data persistence  
+- ✅ **Automatic health checks** for reliability
+- ✅ **Environment-based configuration** for flexibility
+- ✅ **Simple updates** via git push
 
-## 🎯 Next Steps
-
-1. **Test locally** with `./docker-test.sh`
-2. **Deploy to Render** using render.yaml
-3. **Configure custom domain** (optional)
-4. **Set up monitoring** and alerts
-5. **Add SSL certificate** (automatic with Render)
-
-## 📞 Support
-
-If you encounter issues:
-1. Check the troubleshooting section
-2. Review logs in Render dashboard
-3. Test locally with Docker
-4. Verify environment variables 
+**Need help?** Check the [Render Documentation](https://render.com/docs) or review the troubleshooting section above. 

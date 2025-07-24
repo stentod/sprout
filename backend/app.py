@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app) 
 
 # Custom exception for database connection errors
 class DatabaseConnectionError(Exception):
@@ -61,7 +61,7 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
         if conn:
             conn.rollback()
         print(f"Database connection error: {e}")
-        raise DatabaseConnectionError(f"Database unavailable: {e}")
+        raise (f"Database unavailable: {e}")
     except Exception as e:
         if conn:
             conn.rollback()
@@ -104,7 +104,7 @@ def health():
     return {'status': 'ok'}
 
 # Error handlers for database connection issues
-@app.errorhandler(DatabaseConnectionError)
+@app.errorhandler()
 def handle_database_error(e):
     """Return JSON error response when database is unavailable"""
     return jsonify({
@@ -146,7 +146,6 @@ def get_expenses():
             'description': e['description'],
             'timestamp': e['timestamp'].isoformat() if hasattr(e['timestamp'], 'isoformat') else str(e['timestamp'])
         })
-    
     return jsonify(expenses)
 
 @app.route('/api/expenses', methods=['POST'])
