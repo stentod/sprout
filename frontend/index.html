@@ -4,15 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sprout Budget Tracker</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="logo-container">
-    <img src="image.png" alt="Sprout Logo" style="width:120px;display:block;margin:2rem auto 1rem auto;">
+    <img src="image.png" alt="Sprout Logo">
   </div>
   <main id="app">
-    <!-- App content will go here -->
+    <!-- App content will be rendered here by JavaScript -->
+    <div class="container">
+      <div class="card loading">
+        <div class="card-content">
+          <div style="text-align: center; color: var(--color-text-secondary);">
+            Loading...
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
-  <script src="main.js?v=1.1"></script>
+  <script src="main.js?v=1.3"></script>
 </body>
 </html> 

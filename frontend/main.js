@@ -30,65 +30,145 @@ const app = document.getElementById('app');
 // Render main UI
 function renderMainUI(summary) {
   app.innerHTML = `
-    <div style="text-align:center; margin-bottom:2rem;">
-      <div style="font-size:3rem; font-weight:bold;">💵 $${summary.balance.toFixed(2)} Left Today</div>
-    </div>
-    <div style="text-align:center; font-size:4rem; margin-bottom:1rem;">
-      <span title="${summary.plant_state}">${summary.plant_emoji}</span>
-    </div>
-    <div style="text-align:center; margin-bottom:2rem;">
-      <span style="font-size:1.2rem;">📆 Projected 30-Day Balance: <b>${summary.projection_30 >= 0 ? '+' : ''}$${summary.projection_30.toFixed(2)}</b></span>
-    </div>
-    <div id="add-expense-container"></div>
-    <div style="text-align:center; margin-top:2rem;">
-      <a href="history.html${window.location.search}" style="background:#333;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">View History</a>
+    <div class="container">
+      <!-- Main Content Grid -->
+      <div class="main-grid">
+        <!-- Hero Section - Balance and Plant Status -->
+        <div class="hero-section">
+          <div class="hero-content">
+            <div class="balance-display">💵 $${summary.balance.toFixed(2)}</div>
+            <div class="balance-subtitle">Left Today</div>
+            
+            <div class="plant-status">
+              <div class="plant-emoji" title="${summary.plant_state}">${summary.plant_emoji}</div>
+              <div class="plant-text">${getPlantStatusText(summary.plant_state)}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats Sidebar -->
+        <div class="stats-sidebar">
+          <div class="projection-card">
+            <div class="projection-header">30-Day Projection</div>
+            <div class="projection-amount">${summary.projection_30 >= 0 ? '+' : ''}$${summary.projection_30.toFixed(2)}</div>
+          </div>
+          
+          <!-- Navigation in Sidebar -->
+          <div class="sidebar-nav">
+            <a href="history.html${window.location.search}" class="btn btn-secondary btn-full">📊 View History</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Expense Form -->
+      <div id="add-expense-container"></div>
     </div>
   `;
+}
+
+// Get plant status text based on state
+function getPlantStatusText(state) {
+  const statusMap = {
+    'healthy': 'Growing Strong',
+    'growing': 'Flourishing',
+    'struggling': 'Needs Care',
+    'wilting': 'Budget Stressed',
+    'dead': 'Overspent'
+  };
+  return statusMap[state] || 'Budget Status';
 }
 
 // Render add expense form
 function renderAddExpenseForm() {
   const container = document.getElementById('add-expense-container');
   if (dayOffset !== 0) {
-    container.innerHTML = `<div style="text-align:center; color:#aaa; margin:2rem 0;">Add Expense disabled for past days</div>`;
+    container.innerHTML = `
+      <div class="form-section">
+        <div class="disabled-message">Add Expense feature is disabled for past days</div>
+      </div>
+    `;
     return;
   }
+  
   container.innerHTML = `
-    <form id="add-expense-form" style="max-width:320px;margin:2rem auto;">
-      <input name="amount" type="number" min="0.01" step="0.01" placeholder="Amount ($)" required style="width:100%;padding:10px;margin-bottom:10px;background:#333;color:#fff;border:1px solid #555;border-radius:5px;">
-      <input name="description" type="text" placeholder="Description (optional)" style="width:100%;padding:10px;margin-bottom:10px;background:#333;color:#fff;border:1px solid #555;border-radius:5px;">
-      <button type="submit" style="width:100%;padding:10px;background:#4caf50;color:#fff;border:none;border-radius:5px;cursor:pointer;">Save Expense</button>
-    </form>
-    <div id="add-expense-error" style="color:#f55;text-align:center;margin-top:0.5rem;"></div>
+    <div class="form-section">
+      <div class="form-header">Add New Expense</div>
+      <form id="add-expense-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <input 
+              name="amount" 
+              type="number" 
+              min="0.01" 
+              step="0.01" 
+              placeholder="Amount ($)" 
+              required 
+              class="form-input"
+            >
+          </div>
+          <div class="form-group">
+            <input 
+              name="description" 
+              type="text" 
+              placeholder="Description (optional)" 
+              class="form-input"
+            >
+          </div>
+          <button type="submit" class="btn btn-primary">Save Expense</button>
+        </div>
+      </form>
+      <div id="add-expense-error"></div>
+    </div>
   `;
+  
   document.getElementById('add-expense-form').onsubmit = async (e) => {
     e.preventDefault();
     const form = e.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    const errorDiv = document.getElementById('add-expense-error');
+    
     const amount = parseFloat(form.amount.value);
     const description = form.description.value;
+    
     if (!amount || amount <= 0) {
-      document.getElementById('add-expense-error').textContent = 'Enter a valid amount.';
+      errorDiv.innerHTML = '<div class="status-message status-error">Enter a valid amount.</div>';
       return;
     }
-    document.getElementById('add-expense-error').textContent = '';
-    // POST to API
-    const resp = await fetch(`${API_BASE_URL}/api/expenses`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, description })
-    });
-    if (resp.ok) {
-      // Refresh summary
-      loadSummaryWithFallbacks();
-      form.reset();
-    } else {
-      try {
-        const err = await resp.json();
-        const message = err.demo_mode ? 'Demo mode - expenses not saved to database' : (err.error || 'Error adding expense.');
-        document.getElementById('add-expense-error').textContent = message;
-      } catch (parseError) {
-        document.getElementById('add-expense-error').textContent = 'Error adding expense.';
+    
+    // Show loading state
+    submitButton.textContent = 'Saving...';
+    submitButton.disabled = true;
+    errorDiv.innerHTML = '';
+    
+    try {
+      // POST to API
+      const resp = await fetch(`${API_BASE_URL}/api/expenses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, description })
+      });
+      
+      if (resp.ok) {
+        // Success - refresh summary and reset form
+        await loadSummaryWithFallbacks();
+        form.reset();
+        errorDiv.innerHTML = '<div class="status-message status-success">Expense saved successfully!</div>';
+        setTimeout(() => errorDiv.innerHTML = '', 3000);
+      } else {
+        try {
+          const err = await resp.json();
+          const message = err.demo_mode ? 'Demo mode - expenses not saved to database' : (err.error || 'Error adding expense.');
+          errorDiv.innerHTML = `<div class="status-message status-warning">${message}</div>`;
+        } catch (parseError) {
+          errorDiv.innerHTML = '<div class="status-message status-error">Error adding expense.</div>';
+        }
       }
+    } catch (networkError) {
+      errorDiv.innerHTML = '<div class="status-message status-error">Network error. Please try again.</div>';
+    } finally {
+      // Reset button state
+      submitButton.textContent = 'Save Expense';
+      submitButton.disabled = false;
     }
   };
 }
@@ -96,23 +176,47 @@ function renderAddExpenseForm() {
 // Render offline/error UI
 function renderOfflineUI() {
   app.innerHTML = `
-    <div style="text-align:center; margin-bottom:2rem;">
-      <div style="font-size:3rem; font-weight:bold;">💵 $30.00 Left Today</div>
-      <div style="color:#aaa; margin-top:0.5rem;">Offline Mode - Default Budget</div>
-    </div>
-    <div style="text-align:center; font-size:4rem; margin-bottom:1rem;">
-      <span title="healthy">🌱</span>
-    </div>
-    <div style="text-align:center; margin-bottom:2rem;">
-      <span style="font-size:1.2rem;">📆 Projected 30-Day Balance: <b>+$900.00</b></span>
-    </div>
-    <div id="add-expense-container"></div>
-    <div style="text-align:center; margin-top:2rem;">
-      <a href="history.html${window.location.search}" style="background:#333;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">View History</a>
-    </div>
-    <div style="text-align:center; margin-top:2rem; padding:1rem; background:#333; border-radius:5px; color:#aaa;">
-      <div>⚠️ Database connection unavailable</div>
-      <div style="font-size:0.9rem; margin-top:0.5rem;">The app is running in offline mode. Full functionality will be available when deployed with a database.</div>
+    <div class="container">
+      <!-- Status Bar -->
+      <div class="status-bar">
+        <div class="status-indicator">
+          <span class="status-dot offline"></span>
+          <span class="status-text">Offline Mode</span>
+        </div>
+      </div>
+
+      <!-- Main Content Grid -->
+      <div class="main-grid">
+        <!-- Hero Section - Balance and Plant Status -->
+        <div class="hero-section">
+          <div class="hero-content">
+            <div class="balance-display">💵 $30.00</div>
+            <div class="balance-subtitle">Left Today</div>
+            <div class="balance-mode">Default Budget</div>
+            
+            <div class="plant-status">
+              <div class="plant-emoji" title="healthy">🌱</div>
+              <div class="plant-text">Growing Strong</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats Sidebar -->
+        <div class="stats-sidebar">
+          <div class="projection-card">
+            <div class="projection-header">30-Day Projection</div>
+            <div class="projection-amount">+$900.00</div>
+          </div>
+          
+          <!-- Navigation in Sidebar -->
+          <div class="sidebar-nav">
+            <a href="history.html${window.location.search}" class="btn btn-secondary btn-full">📊 View History</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Expense Form -->
+      <div id="add-expense-container"></div>
     </div>
   `;
 }
@@ -129,29 +233,73 @@ function renderFallbackUI() {
   }
   
   app.innerHTML = `
-    <div style="text-align:center; margin-bottom:2rem;">
-      <div style="font-size:3rem; font-weight:bold;">💵 $30.00 Left Today</div>
-      <div style="color:#aaa; margin-top:0.5rem;">Demo Mode</div>
-    </div>
-    <div style="text-align:center; font-size:4rem; margin-bottom:1rem;">
-      <span title="healthy">🌱</span>
-    </div>
-    <div style="text-align:center; margin-bottom:2rem;">
-      <span style="font-size:1.2rem;">📆 Projected 30-Day Balance: <b>+$900.00</b></span>
-    </div>
-    <div style="max-width:320px;margin:2rem auto;">
-      <input type="number" min="0.01" step="0.01" placeholder="Amount ($)" style="width:100%;padding:10px;margin-bottom:10px;background:#333;color:#fff;border:1px solid #555;border-radius:5px;">
-      <input type="text" placeholder="Description (optional)" style="width:100%;padding:10px;margin-bottom:10px;background:#333;color:#fff;border:1px solid #555;border-radius:5px;">
-      <button onclick="alert('Expense saved! (Demo mode - not actually saved)')" style="width:100%;padding:10px;background:#4caf50;color:#fff;border:none;border-radius:5px;cursor:pointer;">Save Expense</button>
-    </div>
-    <div style="text-align:center; margin-top:2rem;">
-      <a href="history.html" style="background:#333;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;">View History</a>
-    </div>
-    <div style="text-align:center; margin-top:2rem; padding:1rem; background:#333; border-radius:5px; color:#aaa; font-size:0.9rem;">
-      Docker container running successfully! Full functionality available when deployed with database.
+    <div class="container">
+      <!-- Status Bar -->
+      <div class="status-bar">
+        <div class="status-indicator">
+          <span class="status-dot demo"></span>
+          <span class="status-text">Demo Mode</span>
+        </div>
+      </div>
+
+      <!-- Main Content Grid -->
+      <div class="main-grid">
+        <!-- Hero Section - Balance and Plant Status -->
+        <div class="hero-section">
+          <div class="hero-content">
+            <div class="balance-display">💵 $30.00</div>
+            <div class="balance-subtitle">Left Today</div>
+            
+            <div class="plant-status">
+              <div class="plant-emoji" title="healthy">🌱</div>
+              <div class="plant-text">Growing Strong</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats Sidebar -->
+        <div class="stats-sidebar">
+          <div class="projection-card">
+            <div class="projection-header">30-Day Projection</div>
+            <div class="projection-amount">+$900.00</div>
+          </div>
+          
+          <!-- Navigation in Sidebar -->
+          <div class="sidebar-nav">
+            <a href="history.html" class="btn btn-secondary btn-full">📊 View History</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Demo Form -->
+      <div class="form-section">
+        <div class="form-header">Add New Expense</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <input type="number" min="0.01" step="0.01" placeholder="Amount ($)" class="form-input">
+          </div>
+          <div class="form-group">
+            <input type="text" placeholder="Description (optional)" class="form-input">
+          </div>
+          <button onclick="showDemoMessage()" class="btn btn-primary">Save Expense</button>
+        </div>
+      </div>
     </div>
   `;
   console.log('✅ Fallback UI rendered');
+}
+
+// Demo message function for fallback UI
+function showDemoMessage() {
+  const event = document.createElement('div');
+  event.innerHTML = '<div class="status-message status-warning">Expense saved! (Demo mode - not actually saved)</div>';
+  event.style.position = 'fixed';
+  event.style.top = '20px';
+  event.style.left = '50%';
+  event.style.transform = 'translateX(-50%)';
+  event.style.zIndex = '1000';
+  document.body.appendChild(event);
+  setTimeout(() => event.remove(), 3000);
 }
 
 // Enhanced load summary with multiple fallbacks
