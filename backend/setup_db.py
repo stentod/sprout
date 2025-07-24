@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Database setup script for Sprout Budget Tracker
-Creates PostgreSQL database and tables
+Creates PostgreSQL tables in existing database
 """
 
 import psycopg2
@@ -12,36 +12,13 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-def create_database():
-    """Create the database if it doesn't exist"""
-    try:
-        # Connect to default database to create our database
-        conn = psycopg2.connect(
-            host=os.environ.get("DB_HOST", "localhost"),
-            database=os.environ.get("DB_DEFAULT_NAME", "dstent"),
-            user=os.environ.get("DB_USER", "dstent"),
-            password=os.environ.get("DB_PASSWORD", "")
-        )
-        conn.autocommit = True
-        cur = conn.cursor()
-        
-        # Create database
-        cur.execute("CREATE DATABASE sprout_budget")
-        print("✅ Database 'sprout_budget' created successfully")
-        
-        cur.close()
-        conn.close()
-        
-    except psycopg2.errors.DuplicateDatabase:
-        print("📝 Database 'sprout_budget' already exists")
-    except Exception as e:
-        print(f"❌ Error creating database: {e}")
-
 def create_tables():
-    """Create the expenses table"""
+    """Create the expenses table in the existing database"""
     try:
         # Connect to our application database
         DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://dstent@localhost/sprout_budget")
+        print(f"🔌 Connecting to database...")
+        
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         
@@ -50,6 +27,7 @@ def create_tables():
         with open(schema_path, 'r') as f:
             schema = f.read()
         
+        print("📋 Creating tables...")
         cur.execute(schema)
         conn.commit()
         
@@ -58,11 +36,15 @@ def create_tables():
         cur.close()
         conn.close()
         
+    except psycopg2.OperationalError as e:
+        print(f"🔌 Database connection error: {e}")
+        print("⚠️  This is expected in demo mode or if database is not available")
     except Exception as e:
         print(f"❌ Error creating tables: {e}")
+        # Don't exit with error code - let the app start in demo mode
+        print("⚠️  App will continue in demo mode")
 
 if __name__ == "__main__":
     print("🌱 Setting up Sprout Budget Tracker database...")
-    create_database()
     create_tables()
     print("🎉 Database setup complete!") 

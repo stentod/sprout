@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app) 
+CORS(app)
 
 # Custom exception for database connection errors
 class DatabaseConnectionError(Exception):
@@ -61,7 +61,7 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
         if conn:
             conn.rollback()
         print(f"Database connection error: {e}")
-        raise (f"Database unavailable: {e}")
+        raise DatabaseConnectionError(f"Database unavailable: {e}")
     except Exception as e:
         if conn:
             conn.rollback()
@@ -104,7 +104,7 @@ def health():
     return {'status': 'ok'}
 
 # Error handlers for database connection issues
-@app.errorhandler()
+@app.errorhandler(DatabaseConnectionError)
 def handle_database_error(e):
     """Return JSON error response when database is unavailable"""
     return jsonify({
@@ -146,6 +146,7 @@ def get_expenses():
             'description': e['description'],
             'timestamp': e['timestamp'].isoformat() if hasattr(e['timestamp'], 'isoformat') else str(e['timestamp'])
         })
+    
     return jsonify(expenses)
 
 @app.route('/api/expenses', methods=['POST'])
@@ -247,7 +248,6 @@ def serve_static(filename):
     return send_from_directory(FRONTEND_DIR, filename)
 
 if __name__ == '__main__':
-    # In production (Docker), Flask runs on port 5000 internally
-    # Nginx handles the external port
-    flask_port = 5000 if os.environ.get('FLASK_ENV') == 'production' else PORT
-    app.run(debug=DEBUG, port=flask_port, host='0.0.0.0') 
+    # Only run the development server if this file is run directly
+    # In production, gunicorn will import and run the app
+    app.run(debug=DEBUG, port=PORT, host='0.0.0.0') 

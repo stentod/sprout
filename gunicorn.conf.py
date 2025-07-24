@@ -2,12 +2,12 @@
 
 import os
 
-# Server socket
-bind = f"0.0.0.0:{os.environ.get('PORT', '5001')}"
+# Server socket - bind to port 5000 internally (nginx proxies external PORT)
+bind = "0.0.0.0:5000"
 backlog = 2048
 
 # Worker processes
-workers = int(os.environ.get('WEB_CONCURRENCY', '2'))
+workers = int(os.environ.get('WEB_CONCURRENCY', '1'))
 worker_class = "sync"
 worker_connections = 1000
 timeout = 30
