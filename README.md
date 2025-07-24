@@ -1,25 +1,126 @@
 # Sprout Budget Tracker
 
-Sprout is a minimalist personal budget tracker designed to help you stay financially aware on a daily basis. Built with Flask and SQLite on the backend and styled with Shoelace Web Components on the frontend, Sprout offers a clean interface and visual feedback to help users build better spending habits.
+A minimalist personal budget tracker designed to help you stay financially aware on a daily basis. Built with Flask and PostgreSQL on the backend and vanilla JavaScript on the frontend, Sprout offers a clean interface and visual feedback to help users build better spending habits.
 
-## Getting Started
+![Sprout Budget Tracker](frontend/image.png)
 
-Once the app is running:
+## Features
 
-1. Open `index.html` in your browser
-2. Set your daily budget (shown at the top)
-3. Add expenses as they occur throughout the day
-4. Watch your plant grow (or wilt) based on spending habits!
-5. Use the history page to review your last 7 days
-
-The app resets your available budget every midnight.
+- 💰 **Daily Budget Tracking** - Set and track your daily spending limit
+- 🌱 **Visual Plant Status** - Watch your financial plant grow or wilt based on spending habits
+- 📱 **Responsive Design** - Works seamlessly on desktop and mobile devices
+- 📈 **7-Day History** - Review your spending patterns over the last week
+- 🌙 **Automatic Reset** - Budget resets daily at midnight
+- 🎨 **Dark Mode Support** - Easy on the eyes for daily use
+- 🔒 **Production Ready** - Containerized with Docker for deployment
 
 ## Tech Stack
 
-- **Backend:** Python (Flask), PostgreSQL (production) / SQLite (development)
-- **Frontend:** HTML, CSS, Vanilla JavaScript
-- **Styling:** Custom CSS with Dark Mode
-- **Deployment:** Ready for Render, Heroku, or similar platforms
+### Backend
+- **Python 3.x** - Core backend language
+- **Flask** - Lightweight web framework
+- **PostgreSQL** - Production database
+- **SQLite** - Development database
+- **Gunicorn** - WSGI HTTP Server
+
+### Frontend
+- **HTML5/CSS3** - Modern web standards
+- **Vanilla JavaScript** - No framework dependencies
+- **Responsive Design** - Mobile-first approach
+
+### DevOps
+- **Docker** - Containerization
+- **Nginx** - Production web server
+- **Render** - Cloud deployment platform
+
+## Docker Quickstart
+
+### Production Build & Run
+
+Build and run the production version using Docker:
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/sprout-budget-tracker.git
+cd sprout-budget-tracker
+
+# Build the Docker image (creates production container with Nginx + Flask)
+docker build -t sprout-budget-tracker .
+
+# Run the production container
+docker run -p 10000:10000 \
+  -e FLASK_ENV=production \
+  -e DAILY_BUDGET=30.0 \
+  sprout-budget-tracker
+```
+
+**🌐 Access your app at: http://localhost:10000**
+
+### How It Works
+- **Port 10000** (External): Nginx serves frontend files and handles incoming requests
+- **Port 5000** (Internal): Flask backend API running with Gunicorn WSGI server
+- **Request Flow**: Browser → Nginx (10000) → Flask API (5000) → PostgreSQL
+
+> **Note:** This Docker setup mirrors the exact production environment used on Render.
+
+## Want to Deploy Online?
+
+**Ready to deploy to production?** This app is designed for **Render** deployment using Docker containers.
+
+👉 **See [DEPLOYMENT.md](DEPLOYMENT.md) for complete step-by-step instructions including:**
+- Local Docker testing
+- Render account setup
+- PostgreSQL database creation
+- Environment variable configuration
+- Health monitoring and troubleshooting
+
+## Local Development Setup
+
+### Quick Start (Recommended)
+
+For development with auto-reload and debugging:
+
+```bash
+# Clone and navigate to project
+git clone https://github.com/yourusername/sprout-budget-tracker.git
+cd sprout-budget-tracker
+
+# Start development servers (uses ./start.sh)
+./start.sh
+```
+
+**🌐 Access your app at: http://localhost:8080**
+
+### Development vs Production
+
+| Aspect | Development (`./start.sh`) | Production (Docker) |
+|--------|---------------------------|-------------------|
+| **Frontend** | live-server on port 8080 | Nginx on port 10000 |
+| **Backend** | Flask dev server on port 5001 | Gunicorn + Flask on port 5000 |
+| **Database** | SQLite (local file) | PostgreSQL (Render managed) |
+| **Environment** | `.env` file or local vars | Render environment variables |
+| **Auto-reload** | ✅ Yes (both frontend/backend) | ❌ No (production stability) |
+| **Debug Mode** | ✅ Yes (detailed errors) | ❌ No (security) |
+
+### Manual Development Setup
+
+If you prefer not to use `./start.sh`:
+
+#### Backend Setup
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python app.py  # Starts on http://localhost:5001
+```
+
+#### Frontend Setup
+```bash
+npm install -g live-server
+cd frontend
+live-server --port=8080  # Starts on http://localhost:8080
+```
 
 ## Project Structure
 
@@ -30,174 +131,108 @@ Sprout/
 │   ├── setup_db.py             # Database setup script
 │   ├── schema_postgres.sql     # PostgreSQL schema
 │   ├── requirements.txt        # Python dependencies
-│   └── POSTGRESQL_SETUP.md     # Database setup guide
+│   ├── POSTGRESQL_SETUP.md     # Database setup guide
+│   └── db_init.sql             # SQLite schema (development)
 ├── frontend/
 │   ├── index.html              # Main page
 │   ├── history.html            # History page
 │   ├── main.js                 # Main app logic
 │   ├── history.js              # History page logic
 │   ├── style.css              # Styling
-│   └── logo.svg               # App logo
-├── start.sh                    # Development server script
-├── .env.example               # Environment variables template
+│   ├── logo.svg               # App logo
+│   └── image.png              # Screenshot for README
+├── Dockerfile                  # Docker configuration
+├── nginx.conf                 # Nginx configuration
+├── start.sh                   # Development server script
+├── render.yaml                # Render deployment config
+├── gunicorn.conf.py           # Gunicorn WSGI config
+├── DEPLOYMENT.md              # Production deployment guide
 └── README.md                  # This file
 ```
 
-## Quick Start (Recommended)
-
-### Prerequisites
-- Python 3.x
-- Node.js and npm (for live-server)
-
-### One-Command Development Setup
-```sh
-./start.sh
-```
-
-This script will:
-- ✅ Check and install all dependencies automatically
-- 🔧 Start Flask backend on http://localhost:5000 (with auto-reload)
-- 🌐 Start frontend live-server on http://localhost:8080 (with auto-reload)
-- 🔄 Auto-restart both servers when files change
-- 🛑 Clean shutdown with Ctrl+C
-
-**Access your app at: http://localhost:8080**
-
----
-
-## Manual Setup (Alternative)
-
-### Backend
-1. Navigate to the `backend` folder:
-   ```sh
-   cd backend
-   ```
-2. (Optional) Create a virtual environment:
-   ```sh
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-3. Install dependencies:
-   ```sh
-   pip install -r requirements.txt
-   ```
-4. Run the Flask app:
-   ```sh
-   python app.py
-   ```
-
-### Frontend
-1. Install live-server globally:
-   ```sh
-   npm install -g live-server
-   ```
-2. Navigate to frontend folder and start:
-   ```sh
-   cd frontend
-   live-server --port=8080
-   ```
-
----
-
-## Features
-- 💰 Daily balance display ($30 budget)
-- ➕ Add expense (amount + optional description)
-- 🔄 Real-time subtraction from balance
-- 🌱 Plant graphic based on 7-day average (🌳🌱🥀☠️)
-- 📈 30-day projection
-- 📜 7-day history view
-- 🌙 Daily reset at midnight
-- 🧪 Dev tool: `?dayOffset=N` to simulate other days
-
----
-
-## Development
-- Backend auto-reloads on Python file changes
-- Frontend auto-reloads on HTML/JS/CSS changes
-- Both servers run concurrently with `./start.sh`
-
----
-
-## License
-MIT
 ## Environment Variables
 
-The application supports the following environment variables:
+### Development (Local)
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `DAILY_BUDGET` | Daily budget amount | `30.0` | No |
+| `PORT` | Flask server port | `5001` | No |
+| `FLASK_ENV` | Flask environment | `development` | No |
+| `FLASK_DEBUG` | Enable debug mode | `true` | No |
 
-- `DATABASE_URL` - PostgreSQL connection string (required for production)
-- `DAILY_BUDGET` - Daily budget amount (default: 30.0)
-- `PORT` - Server port (default: 5001)
-- `FLASK_DEBUG` - Enable debug mode (default: false)
-- `DB_HOST` - Database host (default: localhost)
-- `DB_USER` - Database username (default: dstent)
-- `DB_PASSWORD` - Database password (default: empty)
+### Production (Render)
+| Variable | Description | Example | Required |
+|----------|-------------|---------|----------|
+| `DATABASE_URL` | PostgreSQL connection | `postgresql://user:pass@host:5432/db` | ✅ Yes |
+| `FLASK_ENV` | Flask environment | `production` | ✅ Yes |
+| `DAILY_BUDGET` | Daily budget amount | `30.0` | No |
+| `PORT` | External port | `10000` | No (Render sets this) |
 
-## Local Development
+## Testing Your Setup
 
-1. Copy the environment template:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit `.env` with your local configuration
-
-3. Run the development server:
-   ```bash
-   ./start.sh
-   ```
-
-## Production Deployment
-
-### Deploy to Render
-
-1. Fork this repository
-2. Create a new Web Service on Render
-3. Connect your forked repository
-4. Set environment variables:
-   - `DAILY_BUDGET` (e.g., "30.0")
-   - Any other custom configuration
-5. Render will automatically provide `DATABASE_URL` for PostgreSQL
-
-### Deploy to Heroku
-
-1. Install Heroku CLI and create an app
-2. Add PostgreSQL addon:
-   ```bash
-   heroku addons:create heroku-postgresql:hobby-dev
-   ```
-3. Set environment variables:
-   ```bash
-   heroku config:set DAILY_BUDGET=30.0
-   ```
-4. Deploy:
-   ```bash
-   git push heroku main
-   ```
-
-### Deploy to Railway
-
-1. Connect your GitHub repository
-2. Railway will auto-detect the Flask app
-3. Add PostgreSQL database
-4. Set environment variables in Railway dashboard
-
-## Database Setup
-
-The application will automatically create the necessary database tables on first run. For manual setup:
-
+### Test Development Environment
 ```bash
-python backend/setup_db.py
+# Start development servers
+./start.sh
+
+# Test backend API (in a new terminal)
+curl http://localhost:5001/health
+# Expected: {"status":"ok"}
+
+# Open frontend
+open http://localhost:8080
 ```
 
-## Features
+### Test Production Docker Build
+```bash
+# Build and test production container
+docker build -t sprout-test .
+docker run -d -p 10000:10000 -e FLASK_ENV=production --name sprout-container sprout-test
 
-- 📊 **Daily Budget Tracking** - Set and track your daily spending limit
-- 🌱 **Visual Plant Status** - Watch your financial plant grow or wilt based on spending habits
-- 📱 **Responsive Design** - Works on desktop and mobile devices
-- 📈 **7-Day History** - Review your spending patterns over the last week
-- 🔒 **Production Ready** - Environment-based configuration for easy deployment
-- 🎨 **Dark Mode** - Easy on the eyes for daily use
+# Test production health
+curl http://localhost:10000/health
+# Expected: {"status":"ok"}
+
+# Test frontend
+open http://localhost:10000
+
+# Cleanup
+docker stop sprout-container && docker rm sprout-container
+```
+
+## Usage
+
+1. **Set Your Budget**: Enter your daily spending limit at the top of the page
+2. **Track Expenses**: Add expenses throughout the day with optional descriptions
+3. **Monitor Progress**: Watch your plant visual change based on spending habits
+4. **Review History**: Use the history page to analyze your last 7 days
+5. **Daily Reset**: Your budget automatically resets at midnight
+
+### Development Features
+- **Day Simulation**: Use `?dayOffset=N` in URL to test different days
+- **Auto-reload**: Both frontend and backend restart on file changes
+- **Debug Mode**: Detailed error messages and stack traces
+- **Local Database**: SQLite file for easy development testing
+
+## About This Project
+
+This is a **personal portfolio project** demonstrating modern web development practices including containerization, cloud deployment, and responsive design.
+
+### For Learning & Reference
+- 📚 **Educational Use**: Feel free to study the code and architecture
+- 🔧 **Personal Use**: Clone and modify for your own budget tracking needs
+- 💡 **Learning Resource**: Demonstrates Flask, Docker, PostgreSQL, and Render deployment
+
+### Reporting Issues
+If you encounter bugs or have suggestions:
+- 🐛 Open an issue on GitHub with details
+- 💬 Describe the problem and steps to reproduce
+- 🔍 Include browser/environment information
 
 ## License
 
-MIT License - feel free to use this project for your own budgeting needs!
+MIT License - see [LICENSE](LICENSE) file for details.
+
+---
+
+**Built with ❤️ for better financial awareness**
