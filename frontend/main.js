@@ -86,6 +86,7 @@ function renderMainUI(summary) {
           <!-- Navigation in Sidebar -->
           <div class="sidebar-nav">
             <a href="history.html${window.location.search}" class="btn btn-secondary btn-full">📊 View History</a>
+            <a href="settings.html" class="btn btn-secondary btn-full">⚙️ Settings</a>
           </div>
         </div>
       </div>
@@ -278,6 +279,7 @@ function renderOfflineUI() {
           <!-- Navigation in Sidebar -->
           <div class="sidebar-nav">
             <a href="history.html${window.location.search}" class="btn btn-secondary btn-full">📊 View History</a>
+            <a href="settings.html" class="btn btn-secondary btn-full">⚙️ Settings</a>
           </div>
         </div>
       </div>
@@ -334,6 +336,7 @@ function renderFallbackUI() {
           <!-- Navigation in Sidebar -->
           <div class="sidebar-nav">
             <a href="history.html" class="btn btn-secondary btn-full">📊 View History</a>
+            <a href="settings.html" class="btn btn-secondary btn-full">⚙️ Settings</a>
           </div>
         </div>
       </div>

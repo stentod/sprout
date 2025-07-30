@@ -48,7 +48,18 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
             
             if sql.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE')):
                 conn.commit()
-                return cur.rowcount
+                # Check if query has RETURNING clause
+                if 'RETURNING' in sql.upper():
+                    if fetch_one:
+                        result = cur.fetchone()
+                        return dict(result) if result else None
+                    elif fetch_all:
+                        results = cur.fetchall()
+                        return [dict(row) for row in results]
+                    else:
+                        return cur.fetchone()
+                else:
+                    return cur.rowcount
             elif fetch_one:
                 result = cur.fetchone()
                 return dict(result) if result else None
@@ -293,7 +304,7 @@ def get_summary():
         day_start, day_end = get_day_bounds(offset)
         expenses = get_expenses_between(day_start, day_end)
         total_spent = sum(e['amount'] for e in expenses)
-        daily_surplus = BUDGET - total_spent
+        daily_surplus = get_user_daily_limit(0) - total_spent # Use user's daily limit
         deltas.append(daily_surplus)
     
     # Today's balance and averages
@@ -359,6 +370,100 @@ def get_history():
     ]
     return jsonify(grouped_sorted)
 
+# Helper function to get user's daily spending limit
+def get_user_daily_limit(user_id=0):
+    """Get the user's daily spending limit from preferences"""
+    try:
+        sql = 'SELECT daily_spending_limit FROM user_preferences WHERE user_id = %s'
+        result = run_query(sql, (user_id,), fetch_one=True)
+        if result:
+            return float(result['daily_spending_limit'])
+        else:
+            # If no preference found, create default and return it
+            sql = '''
+                INSERT INTO user_preferences (user_id, daily_spending_limit)
+                VALUES (%s, %s)
+                RETURNING daily_spending_limit
+            '''
+            result = run_query(sql, (user_id, 30.0), fetch_one=True)
+            return float(result['daily_spending_limit']) if result else 30.0
+    except Exception as e:
+        print(f"Error getting user daily limit: {e}")
+        return 30.0  # Fallback to default
+
+@app.route('/api/preferences/daily-limit', methods=['GET'])
+def get_daily_limit():
+    """Get the user's current daily spending limit"""
+    try:
+        user_id = 0  # Default user for now
+        daily_limit = get_user_daily_limit(user_id)
+        return jsonify({
+            'daily_limit': daily_limit,
+            'success': True
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@app.route('/api/preferences/daily-limit', methods=['POST', 'PUT'])
+def set_daily_limit():
+    """Set the user's daily spending limit"""
+    try:
+        data = request.get_json()
+        daily_limit = data.get('daily_limit')
+        
+        if daily_limit is None:
+            return jsonify({
+                'error': 'daily_limit is required',
+                'success': False
+            }), 400
+        
+        try:
+            daily_limit = float(daily_limit)
+            if daily_limit < 0:
+                return jsonify({
+                    'error': 'daily_limit must be positive',
+                    'success': False
+                }), 400
+        except (ValueError, TypeError):
+            return jsonify({
+                'error': 'daily_limit must be a valid number',
+                'success': False
+            }), 400
+        
+        user_id = 0  # Default user for now
+        
+        # Update or insert user preference
+        sql = '''
+            INSERT INTO user_preferences (user_id, daily_spending_limit, updated_at)
+            VALUES (%s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) DO UPDATE SET
+                daily_spending_limit = EXCLUDED.daily_spending_limit,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING daily_spending_limit
+        '''
+        result = run_query(sql, (user_id, daily_limit), fetch_one=True)
+        
+        if result:
+            return jsonify({
+                'daily_limit': float(result['daily_spending_limit']),
+                'success': True,
+                'message': 'Daily spending limit updated successfully'
+            })
+        else:
+            return jsonify({
+                'error': 'Failed to update daily spending limit',
+                'success': False
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
 # Get the frontend directory path relative to this file
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend')
 
@@ -369,6 +474,10 @@ def serve_index():
 @app.route('/history.html')
 def serve_history():
     return send_from_directory(FRONTEND_DIR, 'history.html')
+
+@app.route('/settings.html')
+def serve_settings():
+    return send_from_directory(FRONTEND_DIR, 'settings.html')
 
 @app.route('/<path:filename>')
 def serve_static(filename):
