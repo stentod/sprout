@@ -78,24 +78,54 @@ def get_day_bounds(day_offset=0):
     end = target_day + timedelta(days=1)
     return start, end
 
-# Helper: Get all expenses between two datetimes
-def get_expenses_between(start, end):
-    sql = '''
-        SELECT amount, description, timestamp 
-        FROM expenses 
-        WHERE user_id = 0 AND timestamp >= %s AND timestamp < %s 
-        ORDER BY timestamp DESC
-    '''
-    raw_expenses = run_query(sql, (start.isoformat(), end.isoformat()))
+# Helper: Get all expenses between two datetimes with optional category filtering
+def get_expenses_between(start, end, category_id=None):
+    if category_id:
+        # Filter by specific category
+        sql = '''
+            SELECT e.amount, e.description, e.timestamp, e.category_id,
+                   c.name as category_name, c.icon as category_icon, c.color as category_color
+            FROM expenses e
+            LEFT JOIN categories c ON e.category_id = c.id
+            WHERE e.user_id = 0 AND e.timestamp >= %s AND e.timestamp < %s AND e.category_id = %s
+            ORDER BY e.timestamp DESC
+        '''
+        params = (start.isoformat(), end.isoformat(), category_id)
+    else:
+        # Get all expenses with category information
+        sql = '''
+            SELECT e.amount, e.description, e.timestamp, e.category_id,
+                   c.name as category_name, c.icon as category_icon, c.color as category_color
+            FROM expenses e
+            LEFT JOIN categories c ON e.category_id = c.id
+            WHERE e.user_id = 0 AND e.timestamp >= %s AND e.timestamp < %s
+            ORDER BY e.timestamp DESC
+        '''
+        params = (start.isoformat(), end.isoformat())
+    
+    raw_expenses = run_query(sql, params)
     
     # Convert data types for consistency
     expenses = []
     for e in raw_expenses:
-        expenses.append({
+        expense_data = {
             'amount': float(e['amount']),
             'description': e['description'],
             'timestamp': e['timestamp'].isoformat() if hasattr(e['timestamp'], 'isoformat') else str(e['timestamp'])
-        })
+        }
+        
+        # Add category information if present
+        if e['category_id']:
+            expense_data['category'] = {
+                'id': e['category_id'],
+                'name': e['category_name'],
+                'icon': e['category_icon'],
+                'color': e['category_color']
+            }
+        else:
+            expense_data['category'] = None
+            
+        expenses.append(expense_data)
     
     return expenses
 
@@ -149,20 +179,106 @@ def get_expenses():
     
     return jsonify(expenses)
 
+@app.route('/api/categories', methods=['GET'])
+def get_categories():
+    """Get all categories"""
+    try:
+        sql = '''
+            SELECT id, name, icon, color, is_default, daily_budget, created_at
+            FROM categories 
+            ORDER BY is_default DESC, name ASC
+        '''
+        categories = run_query(sql, fetch_all=True)
+        
+        # Convert data types for consistent API response
+        result = []
+        for cat in categories:
+            result.append({
+                'id': cat['id'],
+                'name': cat['name'],
+                'icon': cat['icon'],
+                'color': cat['color'],
+                'is_default': bool(cat['is_default']),
+                'daily_budget': float(cat['daily_budget']) if cat['daily_budget'] else 0.0,
+                'created_at': cat['created_at'].isoformat() if hasattr(cat['created_at'], 'isoformat') else str(cat['created_at'])
+            })
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/categories', methods=['POST'])
+def create_category():
+    """Create a new category"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        icon = data.get('icon', '📝').strip()
+        color = data.get('color', '#6B7280').strip()
+        
+        if not name:
+            return jsonify({'error': 'Category name is required'}), 400
+        
+        # Check if category name already exists
+        check_sql = 'SELECT id FROM categories WHERE name = %s'
+        existing = run_query(check_sql, (name,), fetch_one=True)
+        if existing:
+            return jsonify({'error': 'Category name already exists'}), 409
+        
+        # Insert new category
+        sql = '''
+            INSERT INTO categories (name, icon, color, is_default, daily_budget)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, name, icon, color, is_default, daily_budget, created_at
+        '''
+        new_category = run_query(sql, (name, icon, color, False, 0.0), fetch_one=True)
+        
+        result = {
+            'id': new_category['id'],
+            'name': new_category['name'],
+            'icon': new_category['icon'],
+            'color': new_category['color'],
+            'is_default': bool(new_category['is_default']),
+            'daily_budget': float(new_category['daily_budget']),
+            'created_at': new_category['created_at'].isoformat() if hasattr(new_category['created_at'], 'isoformat') else str(new_category['created_at'])
+        }
+        
+        return jsonify(result), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/expenses', methods=['POST'])
 def add_expense():
     data = request.get_json()
     amount = data.get('amount')
     description = data.get('description', '')
+    category_id = data.get('category_id')  # New: category selection
+    
     if amount is None:
         return jsonify({'error': 'Amount is required'}), 400
-    timestamp = datetime.now().isoformat()
+    
+    # Validate category_id is required
+    if not category_id:
+        return jsonify({'error': 'Category is required'}), 400
+    
+    try:
+        category_id = int(category_id)
+        # Check if category exists
+        check_sql = 'SELECT id FROM categories WHERE id = %s'
+        category_exists = run_query(check_sql, (category_id,), fetch_one=True)
+        if not category_exists:
+            return jsonify({'error': 'Invalid category'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid category ID'}), 400
+    
+    # Use local timezone-aware timestamp to ensure consistent date handling
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     sql = '''
-        INSERT INTO expenses (user_id, amount, description, timestamp) 
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
+        VALUES (%s, %s, %s, %s, %s)
     '''
-    run_query(sql, (0, amount, description, timestamp), fetch_all=False)
+    run_query(sql, (0, amount, description, category_id, timestamp), fetch_all=False)
     return jsonify({'success': True}), 201
 
 @app.route('/api/summary', methods=['GET'])
@@ -211,20 +327,31 @@ def get_summary():
 def get_history():
     # Get all expenses from the last 7 days (including today)
     day_offset = int(request.args.get('dayOffset', 0))
-    start_7days, _ = get_day_bounds(day_offset - 6)
-    _, end_today = get_day_bounds(day_offset)
-    expenses = get_expenses_between(start_7days, end_today)
+    period = int(request.args.get('period', 7))  # Default to 7 days
+    category_id = request.args.get('category_id')  # Optional category filter
+    
+    start_date, _ = get_day_bounds(day_offset - (period - 1))
+    _, end_date = get_day_bounds(day_offset)
+    expenses = get_expenses_between(start_date, end_date, category_id)
     # Group by date (YYYY-MM-DD)
     grouped = {}
     for e in expenses:
         date = e['timestamp'][:10]  # 'YYYY-MM-DD' (timestamp is already a string from helper)
         if date not in grouped:
             grouped[date] = []
-        grouped[date].append({
+        expense_data = {
             'amount': e['amount'],  # Already converted to float in helper
             'description': e['description'],
             'timestamp': e['timestamp']  # Already converted to string in helper
-        })
+        }
+        
+        # Add category information if present
+        if e.get('category'):
+            expense_data['category'] = e['category']
+        else:
+            expense_data['category'] = None
+            
+        grouped[date].append(expense_data)
     # Sort by date descending
     grouped_sorted = [
         {'date': date, 'expenses': grouped[date]}

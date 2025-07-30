@@ -27,6 +27,36 @@ const API_BASE_URL = getApiBaseUrl();
 // DOM Elements
 const app = document.getElementById('app');
 
+// Category management
+let categories = [];
+let isLoadingCategories = false;
+
+// Load categories from API
+async function loadCategories() {
+  if (isLoadingCategories || categories.length > 0) return;
+  
+  console.log('🔄 Loading categories...');
+  isLoadingCategories = true;
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/categories`);
+    console.log('📡 Categories API response:', response.status, response.ok);
+    if (response.ok) {
+      categories = await response.json();
+      console.log('✅ Categories loaded:', categories.length, 'categories');
+      console.log('📋 Categories data:', categories);
+    } else {
+      console.error('❌ Categories API failed:', response.status);
+    }
+  } catch (error) {
+    console.error('❌ Error loading categories:', error);
+    categories = []; // Fallback to empty array
+  } finally {
+    isLoadingCategories = false;
+  }
+}
+
+
+
 // Render main UI
 function renderMainUI(summary) {
   app.innerHTML = `
@@ -79,9 +109,13 @@ function getPlantStatusText(state) {
 }
 
 // Render add expense form
-function renderAddExpenseForm() {
+async function renderAddExpenseForm() {
+  console.log('🏗️ Rendering add expense form...');
   const container = document.getElementById('add-expense-container');
+  console.log('📊 dayOffset:', dayOffset);
+  
   if (dayOffset !== 0) {
+    console.log('⚠️ Form disabled for past days');
     container.innerHTML = `
       <div class="form-section">
         <div class="disabled-message">Add Expense feature is disabled for past days</div>
@@ -89,6 +123,17 @@ function renderAddExpenseForm() {
     `;
     return;
   }
+  
+  // Load categories first
+  console.log('📂 Loading categories for form...');
+  await loadCategories();
+  console.log('📂 Categories after loading:', categories.length);
+  
+  // Build category options
+  const categoryOptions = categories.map(cat => 
+    `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`
+  ).join('');
+  console.log('🔧 Built category options:', categoryOptions);
   
   container.innerHTML = `
     <div class="form-section">
@@ -114,13 +159,22 @@ function renderAddExpenseForm() {
               class="form-input"
             >
           </div>
+          <div class="form-group category-group">
+            <select name="category" class="form-input category-select" required>
+              <option value="">Select Category (Required)</option>
+              ${categoryOptions}
+            </select>
+          </div>
           <button type="submit" class="btn btn-primary">Save Expense</button>
         </div>
       </form>
+      
       <div id="add-expense-error"></div>
     </div>
   `;
   
+
+
   document.getElementById('add-expense-form').onsubmit = async (e) => {
     e.preventDefault();
     const form = e.target;
@@ -129,9 +183,15 @@ function renderAddExpenseForm() {
     
     const amount = parseFloat(form.amount.value);
     const description = form.description.value;
+    const categoryId = form.category.value ? parseInt(form.category.value) : null;
     
     if (!amount || amount <= 0) {
       errorDiv.innerHTML = '<div class="status-message status-error">Enter a valid amount.</div>';
+      return;
+    }
+    
+    if (!categoryId) {
+      errorDiv.innerHTML = '<div class="status-message status-error">Please select a category for this expense.</div>';
       return;
     }
     
@@ -141,11 +201,18 @@ function renderAddExpenseForm() {
     errorDiv.innerHTML = '';
     
     try {
+      // Prepare request body
+      const requestBody = { 
+        amount, 
+        description,
+        category_id: categoryId
+      };
+      
       // POST to API
       const resp = await fetch(`${API_BASE_URL}/api/expenses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, description })
+        body: JSON.stringify(requestBody)
       });
       
       if (resp.ok) {
@@ -328,6 +395,8 @@ async function loadSummaryWithFallbacks() {
     }
   }
 }
+
+
 
 // On page load - wait for DOM to be ready
 if (document.readyState === 'loading') {
