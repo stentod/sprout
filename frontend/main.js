@@ -30,6 +30,7 @@ const app = document.getElementById('app');
 // Category management
 let categories = [];
 let isLoadingCategories = false;
+let categoryBudgets = null;
 
 // Load categories from API
 async function loadCategories() {
@@ -48,19 +49,69 @@ async function loadCategories() {
       console.error('❌ Categories API failed:', response.status);
     }
   } catch (error) {
-    console.error('❌ Error loading categories:', error);
-    categories = []; // Fallback to empty array
+    console.error('💥 Categories load error:', error);
   } finally {
     isLoadingCategories = false;
   }
+}
+
+// Load category budget tracking data
+async function loadCategoryBudgets() {
+  try {
+    console.log('🔄 Loading category budgets...');
+    const response = await fetch(`${API_BASE_URL}/api/categories/budget-tracking?dayOffset=${dayOffset}`);
+    if (response.ok) {
+      categoryBudgets = await response.json();
+      console.log('✅ Category budgets loaded:', categoryBudgets);
+    } else {
+      console.error('❌ Category budgets API failed:', response.status);
+      categoryBudgets = null;
+    }
+  } catch (error) {
+    console.error('💥 Category budgets load error:', error);
+    categoryBudgets = null;
+  }
+}
+
+// Render compact category budget indicators for hero section
+function renderCompactCategoryBudgets() {
+  if (!categoryBudgets || !categoryBudgets.budgeted_categories || categoryBudgets.budgeted_categories.length === 0) {
+    return ''; // No budgeted categories to show
+  }
+
+  const budgetedCategories = categoryBudgets.budgeted_categories;
+  const categoryItems = budgetedCategories.map(cat => {
+    const isOverBudget = cat.is_over_budget;
+    
+    return `
+      <div class="compact-budget-item ${isOverBudget ? 'over-budget' : ''}">
+        <span class="compact-icon">${cat.category_icon}</span>
+        <span class="compact-name">${cat.category_name}</span>
+        <span class="compact-amount ${isOverBudget ? 'negative' : ''}">${isOverBudget ? '-' : ''}$${Math.abs(cat.remaining_today).toFixed(0)}</span>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="compact-budgets">
+      ${categoryItems}
+    </div>
+  `;
 }
 
 
 
 // Render main UI
 function renderMainUI(summary) {
+  const compactBudgetsHtml = renderCompactCategoryBudgets();
+  
   app.innerHTML = `
     <div class="container">
+      <!-- Logo Header -->
+      <div class="logo-container">
+        <img src="image.png" alt="Sprout Logo" class="logo">
+      </div>
+      
       <!-- Main Content Grid -->
       <div class="main-grid">
         <!-- Hero Section - Balance and Plant Status -->
@@ -68,6 +119,8 @@ function renderMainUI(summary) {
           <div class="hero-content">
             <div class="balance-display">💵 $${summary.balance.toFixed(2)}</div>
             <div class="balance-subtitle">Left Today</div>
+            
+            ${compactBudgetsHtml ? `<div class="balance-breakdown">${compactBudgetsHtml}</div>` : ''}
             
             <div class="plant-status">
               <div class="plant-emoji" title="${summary.plant_state}">${summary.plant_emoji}</div>
@@ -245,6 +298,11 @@ async function renderAddExpenseForm() {
 function renderOfflineUI() {
   app.innerHTML = `
     <div class="container">
+      <!-- Logo Header -->
+      <div class="logo-container">
+        <img src="image.png" alt="Sprout Logo" class="logo">
+      </div>
+      
       <!-- Status Bar -->
       <div class="status-bar">
         <div class="status-indicator">
@@ -303,6 +361,11 @@ function renderFallbackUI() {
   
   app.innerHTML = `
     <div class="container">
+      <!-- Logo Header -->
+      <div class="logo-container">
+        <img src="image.png" alt="Sprout Logo" class="logo">
+      </div>
+      
       <!-- Status Bar -->
       <div class="status-bar">
         <div class="status-indicator">
@@ -383,9 +446,15 @@ async function loadSummaryWithFallbacks() {
       throw new Error(`API returned ${resp.status}`);
     }
     const summary = await resp.json();
-    console.log('✅ API call successful, rendering main UI');
+    console.log('✅ API call successful');
+    
+    // Load category budgets first
+    await loadCategoryBudgets();
+    
+    // Now render the main UI with budget data
     renderMainUI(summary);
     renderAddExpenseForm();
+    
   } catch (error) {
     console.warn('⚠️ API call failed, trying offline UI:', error.message);
     try {
