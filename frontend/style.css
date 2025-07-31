@@ -1385,20 +1385,125 @@ body {
     gap: var(--spacing-sm);
   }
   
-  .category-info {
-    width: 100%;
-  }
-  
-  .budget-input-group {
-    width: 100%;
-    justify-content: flex-end;
+  .budget-input-wrapper {
+    min-width: 120px;
   }
   
   .category-budget-actions {
-    flex-direction: column;
+    justify-content: center;
+  }
+}
+
+/* Compact Category Budget Indicators for Hero Section */
+.balance-breakdown {
+  margin-top: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.compact-budgets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  justify-content: center;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+.compact-budget-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  transition: all 0.2s ease;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.compact-budget-item:hover {
+  background: var(--color-bg-card-hover);
+  border-color: var(--color-accent-primary);
+  transform: translateY(-1px);
+}
+
+.compact-budget-item.over-budget {
+  border-color: var(--color-error);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.compact-icon {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.compact-name {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  flex-shrink: 0;
+}
+
+.compact-amount {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-accent-primary);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.compact-amount.negative {
+  color: var(--color-error);
+}
+
+/* Mobile responsive for compact budgets */
+@media (max-width: 768px) {
+  .compact-budgets {
+    max-width: 300px;
+    gap: 8px;
   }
   
-  .category-budget-actions .btn {
-    width: 100%;
+  .compact-budget-item {
+    padding: 5px 8px;
+    font-size: var(--font-size-xs);
+    gap: 4px;
+  }
+  
+  .compact-icon {
+    font-size: 12px;
+  }
+  
+  .compact-name {
+    font-size: 10px;
+  }
+} 
+
+/* Logo Styling */
+.logo-container {
+  text-align: center;
+  padding: var(--spacing-lg) 0 var(--spacing-md) 0;
+  margin-bottom: var(--spacing-md);
+}
+
+.logo {
+  max-width: 200px;
+  height: auto;
+  transition: transform 0.2s ease;
+}
+
+.logo:hover {
+  transform: scale(1.05);
+}
+
+/* Mobile responsive for logo */
+@media (max-width: 768px) {
+  .logo-container {
+    padding: var(--spacing-md) 0 var(--spacing-sm) 0;
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .logo {
+    max-width: 150px;
   }
 } 
