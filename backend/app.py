@@ -256,7 +256,230 @@ def create_category():
         
         return jsonify(result), 201
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@app.route('/api/categories/<int:category_id>/budget', methods=['PUT', 'POST'])
+def update_category_budget(category_id):
+    """Update daily budget for a specific category"""
+    try:
+        data = request.get_json()
+        daily_budget = data.get('daily_budget')
+        
+        if daily_budget is None:
+            return jsonify({
+                'error': 'daily_budget is required',
+                'success': False
+            }), 400
+        
+        try:
+            daily_budget = float(daily_budget)
+            if daily_budget < 0:
+                return jsonify({
+                    'error': 'daily_budget must be positive or zero',
+                    'success': False
+                }), 400
+        except (ValueError, TypeError):
+            return jsonify({
+                'error': 'daily_budget must be a valid number',
+                'success': False
+            }), 400
+        
+        # Check if category exists
+        check_sql = 'SELECT id, name FROM categories WHERE id = %s'
+        category = run_query(check_sql, (category_id,), fetch_one=True)
+        if not category:
+            return jsonify({
+                'error': 'Category not found',
+                'success': False
+            }), 404
+        
+        # Update category budget
+        sql = '''
+            UPDATE categories 
+            SET daily_budget = %s 
+            WHERE id = %s
+            RETURNING id, name, daily_budget
+        '''
+        result = run_query(sql, (daily_budget, category_id), fetch_one=True)
+        
+        if result:
+            return jsonify({
+                'category_id': result['id'],
+                'category_name': result['name'],
+                'daily_budget': float(result['daily_budget']),
+                'success': True,
+                'message': f"Budget for {result['name']} updated to ${float(result['daily_budget']):.2f}/day"
+            })
+        else:
+            return jsonify({
+                'error': 'Failed to update category budget',
+                'success': False
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@app.route('/api/categories/budgets', methods=['PUT', 'POST'])
+def update_multiple_category_budgets():
+    """Update daily budgets for multiple categories at once"""
+    try:
+        data = request.get_json()
+        budgets = data.get('budgets', {})
+        
+        if not budgets or not isinstance(budgets, dict):
+            return jsonify({
+                'error': 'budgets object is required (format: {"category_id": daily_budget})',
+                'success': False
+            }), 400
+        
+        updated_categories = []
+        errors = []
+        
+        for category_id_str, daily_budget in budgets.items():
+            try:
+                category_id = int(category_id_str)
+                daily_budget = float(daily_budget)
+                
+                if daily_budget < 0:
+                    errors.append(f"Category {category_id}: budget must be positive or zero")
+                    continue
+                
+                # Check if category exists and update
+                sql = '''
+                    UPDATE categories 
+                    SET daily_budget = %s 
+                    WHERE id = %s
+                    RETURNING id, name, daily_budget
+                '''
+                result = run_query(sql, (daily_budget, category_id), fetch_one=True)
+                
+                if result:
+                    updated_categories.append({
+                        'category_id': result['id'],
+                        'category_name': result['name'],
+                        'daily_budget': float(result['daily_budget'])
+                    })
+                else:
+                    errors.append(f"Category {category_id}: not found")
+                    
+            except (ValueError, TypeError):
+                errors.append(f"Category {category_id_str}: invalid budget value")
+            except Exception as e:
+                errors.append(f"Category {category_id_str}: {str(e)}")
+        
+        if updated_categories:
+            response = {
+                'updated_categories': updated_categories,
+                'success': True,
+                'message': f"Updated budgets for {len(updated_categories)} categories"
+            }
+            if errors:
+                response['warnings'] = errors
+            return jsonify(response)
+        else:
+            return jsonify({
+                'error': 'No categories were updated',
+                'errors': errors,
+                'success': False
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@app.route('/api/categories/budget-tracking', methods=['GET'])
+def get_category_budget_tracking():
+    """Get category budget tracking for today - spending vs. budget for each category"""
+    try:
+        day_offset = int(request.args.get('dayOffset', 0))
+        today_start, today_end = get_day_bounds(day_offset)
+        
+        # Get all categories with their budgets
+        categories_sql = '''
+            SELECT id, name, icon, color, daily_budget
+            FROM categories 
+            ORDER BY is_default DESC, name ASC
+        '''
+        categories = run_query(categories_sql, fetch_all=True)
+        
+        # Get today's spending by category
+        spending_sql = '''
+            SELECT e.category_id, SUM(e.amount) as total_spent
+            FROM expenses e
+            WHERE e.user_id = 0 AND e.timestamp >= %s AND e.timestamp < %s
+            GROUP BY e.category_id
+        '''
+        spending_data = run_query(spending_sql, (today_start.isoformat(), today_end.isoformat()))
+        
+        # Create spending lookup
+        spending_by_category = {row['category_id']: float(row['total_spent']) for row in spending_data}
+        
+        # Separate budgeted and unbedgeted categories
+        budgeted_categories = []
+        unbedgeted_categories = []
+        total_budget = 0
+        total_spent_budgeted = 0
+        total_spent_unbedgeted = 0
+        
+        for cat in categories:
+            budget = float(cat['daily_budget']) if cat['daily_budget'] else 0.0
+            spent = spending_by_category.get(cat['id'], 0.0)
+            
+            category_data = {
+                'category_id': cat['id'],
+                'category_name': cat['name'],
+                'category_icon': cat['icon'],
+                'category_color': cat['color'],
+                'spent_today': spent
+            }
+            
+            if budget > 0:
+                # This category has a budget
+                remaining = budget - spent
+                total_budget += budget
+                total_spent_budgeted += spent
+                
+                category_data.update({
+                    'daily_budget': budget,
+                    'remaining_today': remaining,
+                    'percentage_used': (spent / budget * 100),
+                    'is_over_budget': spent > budget
+                })
+                budgeted_categories.append(category_data)
+            else:
+                # This category has no budget
+                total_spent_unbedgeted += spent
+                unbedgeted_categories.append(category_data)
+        
+        return jsonify({
+            'budgeted_categories': budgeted_categories,
+            'unbedgeted_categories': unbedgeted_categories,
+            'summary': {
+                'total_budget': total_budget,
+                'total_spent_budgeted': total_spent_budgeted,
+                'total_spent_unbedgeted': total_spent_unbedgeted,
+                'total_spent_all': total_spent_budgeted + total_spent_unbedgeted,
+                'total_remaining': total_budget - total_spent_budgeted,
+                'overall_percentage_used': (total_spent_budgeted / total_budget * 100) if total_budget > 0 else 0,
+                'budgeted_categories_count': len(budgeted_categories),
+                'unbedgeted_categories_count': len(unbedgeted_categories)
+            },
+            'success': True
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
 
 @app.route('/api/expenses', methods=['POST'])
 def add_expense():
