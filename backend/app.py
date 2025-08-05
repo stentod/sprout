@@ -192,14 +192,17 @@ def get_expenses():
 
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
-    """Get all categories"""
+    """Get all categories for the current user"""
     try:
+        user_id = 0  # Default user for now - will be updated when auth is fully implemented
+        
         sql = '''
             SELECT id, name, icon, color, is_default, daily_budget, created_at
             FROM categories 
+            WHERE user_id = %s
             ORDER BY is_default DESC, name ASC
         '''
-        categories = run_query(sql, fetch_all=True)
+        categories = run_query(sql, (user_id,), fetch_all=True)
         
         # Convert data types for consistent API response
         result = []
@@ -220,29 +223,30 @@ def get_categories():
 
 @app.route('/api/categories', methods=['POST'])
 def create_category():
-    """Create a new category"""
+    """Create a new category for the current user"""
     try:
         data = request.get_json()
         name = data.get('name', '').strip()
         icon = data.get('icon', '📝').strip()
         color = data.get('color', '#6B7280').strip()
+        user_id = 0  # Default user for now - will be updated when auth is fully implemented
         
         if not name:
             return jsonify({'error': 'Category name is required'}), 400
         
-        # Check if category name already exists
-        check_sql = 'SELECT id FROM categories WHERE name = %s'
-        existing = run_query(check_sql, (name,), fetch_one=True)
+        # Check if category name already exists for this user
+        check_sql = 'SELECT id FROM categories WHERE name = %s AND user_id = %s'
+        existing = run_query(check_sql, (name, user_id), fetch_one=True)
         if existing:
             return jsonify({'error': 'Category name already exists'}), 409
         
         # Insert new category
         sql = '''
-            INSERT INTO categories (name, icon, color, is_default, daily_budget)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO categories (name, icon, color, is_default, daily_budget, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id, name, icon, color, is_default, daily_budget, created_at
         '''
-        new_category = run_query(sql, (name, icon, color, False, 0.0), fetch_one=True)
+        new_category = run_query(sql, (name, icon, color, False, 0.0, user_id), fetch_one=True)
         
         result = {
             'id': new_category['id'],
@@ -267,6 +271,7 @@ def update_category_budget(category_id):
     try:
         data = request.get_json()
         daily_budget = data.get('daily_budget')
+        user_id = 0  # Default user for now - will be updated when auth is fully implemented
         
         if daily_budget is None:
             return jsonify({
@@ -287,9 +292,9 @@ def update_category_budget(category_id):
                 'success': False
             }), 400
         
-        # Check if category exists
-        check_sql = 'SELECT id, name FROM categories WHERE id = %s'
-        category = run_query(check_sql, (category_id,), fetch_one=True)
+        # Check if category exists and belongs to the user
+        check_sql = 'SELECT id, name FROM categories WHERE id = %s AND user_id = %s'
+        category = run_query(check_sql, (category_id, user_id), fetch_one=True)
         if not category:
             return jsonify({
                 'error': 'Category not found',
@@ -401,14 +406,16 @@ def get_category_budget_tracking():
     try:
         day_offset = int(request.args.get('dayOffset', 0))
         today_start, today_end = get_day_bounds(day_offset)
+        user_id = 0  # Default user for now - will be updated when auth is fully implemented
         
-        # Get all categories with their budgets
+        # Get all categories with their budgets for the current user
         categories_sql = '''
             SELECT id, name, icon, color, daily_budget
             FROM categories 
+            WHERE user_id = %s
             ORDER BY is_default DESC, name ASC
         '''
-        categories = run_query(categories_sql, fetch_all=True)
+        categories = run_query(categories_sql, (user_id,), fetch_all=True)
         
         # Get today's spending by category
         spending_sql = '''
