@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprout Budget - Authentication</title>
+    <link rel="stylesheet" href="style.css?v=auth_v1">
+    <link rel="icon" href="logo.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="auth-container">
+        <!-- Logo Header -->
+        <div class="logo-container">
+            <img src="image.png" alt="Sprout Logo" class="logo">
+        </div>
+        
+        <!-- Auth Forms -->
+        <div class="auth-forms">
+            <!-- Login Form -->
+            <div class="auth-form" id="login-form">
+                <h2>Welcome Back</h2>
+                <p class="auth-subtitle">Sign in to your Sprout account</p>
+                
+                <form id="loginForm">
+                    <div class="form-group">
+                        <input type="text" id="loginUsername" placeholder="Username" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="loginPassword" placeholder="Password" required class="form-input">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+                </form>
+                
+                <div class="auth-switch">
+                    <p>Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
+                </div>
+            </div>
+            
+            <!-- Signup Form -->
+            <div class="auth-form hidden" id="signup-form">
+                <h2>Create Account</h2>
+                <p class="auth-subtitle">Start your budgeting journey</p>
+                
+                <form id="signupForm">
+                    <div class="form-group">
+                        <input type="text" id="signupUsername" placeholder="Username" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <input type="email" id="signupEmail" placeholder="Email" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="signupPassword" placeholder="Password" required class="form-input">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+                </form>
+                
+                <div class="auth-switch">
+                    <p>Already have an account? <a href="#" id="showLogin">Sign in</a></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Messages -->
+        <div id="authStatus" class="auth-status"></div>
+    </div>
+    
+    <script src="auth.js?v=auth_debug_v1"></script>
+</body>
+</html> 
