@@ -153,11 +153,11 @@ function renderMainUI(summary) {
 // Get plant status text based on state
 function getPlantStatusText(state) {
   const statusMap = {
-    'healthy': 'Growing Strong',
-    'growing': 'Flourishing',
+    'thriving': 'Growing Strong',
+    'healthy': 'Flourishing',
     'struggling': 'Needs Care',
-    'wilting': 'Budget Stressed',
-    'dead': 'Overspent'
+    'wilting': 'Over Budget Today',
+    'dead': 'Way Over Budget'
   };
   return statusMap[state] || 'Budget Status';
 }

@@ -542,19 +542,33 @@ def get_summary():
     avg_daily_surplus = sum(deltas) / 7  # Always divide by 7 days
     projection_30 = avg_daily_surplus * 30  # 30-day projection based on average daily surplus
     
-    # Plant state logic based on average daily surplus
-    if avg_daily_surplus >= 2:
+    # Plant state logic - prioritize today's spending over 7-day average
+    print(f"DEBUG: today_balance={today_balance}, avg_daily_surplus={avg_daily_surplus}")
+    
+    if today_balance < 0:
+        # Today's spending exceeded the daily limit
+        if today_balance >= -5:
+            plant = 'wilting'
+            plant_emoji = '🥀'
+            print(f"DEBUG: Plant set to wilting (today_balance={today_balance})")
+        else:
+            plant = 'dead'
+            plant_emoji = '☠️'
+            print(f"DEBUG: Plant set to dead (today_balance={today_balance})")
+    elif today_balance >= 10 and avg_daily_surplus >= 2:
         plant = 'thriving'
         plant_emoji = '🌳'
-    elif avg_daily_surplus >= -2:
+        print(f"DEBUG: Plant set to thriving")
+    elif today_balance >= 0 and avg_daily_surplus >= -2:
         plant = 'healthy'
         plant_emoji = '🌱'
-    elif avg_daily_surplus >= -5:
-        plant = 'wilting'
-        plant_emoji = '🥀'
+        print(f"DEBUG: Plant set to healthy")
     else:
-        plant = 'dead'
-        plant_emoji = '☠️'
+        plant = 'struggling'
+        plant_emoji = '🌿'
+        print(f"DEBUG: Plant set to struggling")
+    
+    print(f"DEBUG: Final plant state={plant}, emoji={plant_emoji}")
     
     return jsonify({
         'balance': round(today_balance, 2),
