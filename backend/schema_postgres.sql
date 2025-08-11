@@ -4,10 +4,8 @@
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username VARCHAR(50) UNIQUE NOT NULL,
-  email VARCHAR(100) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Categories table for expense categorization (removed UNIQUE constraint on name)
@@ -24,8 +22,8 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 -- Insert default user if not exists
-INSERT INTO users (id, username, email, password_hash) 
-VALUES (0, 'default', 'default@example.com', 'dummy_hash') 
+INSERT INTO users (id, username, password_hash) 
+VALUES (0, 'default', 'dummy_hash') 
 ON CONFLICT (id) DO NOTHING;
 
 -- Insert default categories for user 0

@@ -27,6 +27,53 @@ const API_BASE_URL = getApiBaseUrl();
 // DOM Elements
 const app = document.getElementById('app');
 
+// Authentication Functions
+function checkAuthentication() {
+  // For session-based auth, we'll make an API call to verify the session
+  return fetch(`${API_BASE_URL}/api/auth/me`, {
+    credentials: 'include'
+  }).then(response => {
+    if (response.ok) {
+      return response.json().then(data => {
+        // Store user info in localStorage for UI display
+        localStorage.setItem('sprout_user', JSON.stringify(data.user));
+        return true;
+      });
+    } else {
+      // Clear any stale user data
+      localStorage.removeItem('sprout_user');
+      // Redirect to auth page
+      window.location.href = '/auth.html';
+      return false;
+    }
+  }).catch(() => {
+    // Network error or server down
+    console.warn('Unable to verify authentication, redirecting to auth page');
+    localStorage.removeItem('sprout_user');
+    window.location.href = '/auth.html';
+    return false;
+  });
+}
+
+function logout() {
+  fetch(`${API_BASE_URL}/api/auth/logout`, {
+    method: 'POST',
+    credentials: 'include'
+  }).then(() => {
+    localStorage.removeItem('sprout_user');
+    window.location.href = '/auth.html';
+  }).catch(() => {
+    // Even if the API call fails, clear local storage and redirect
+    localStorage.removeItem('sprout_user');
+    window.location.href = '/auth.html';
+  });
+}
+
+function getCurrentUser() {
+  const userData = localStorage.getItem('sprout_user');
+  return userData ? JSON.parse(userData) : null;
+}
+
 // Category management
 let categories = [];
 let isLoadingCategories = false;
@@ -39,7 +86,9 @@ async function loadCategories() {
   console.log('🔄 Loading categories...');
   isLoadingCategories = true;
   try {
-    const response = await fetch(`${API_BASE_URL}/api/categories`);
+    const response = await fetch(`${API_BASE_URL}/api/categories`, {
+      credentials: 'include'
+    });
     console.log('📡 Categories API response:', response.status, response.ok);
     if (response.ok) {
       categories = await response.json();
@@ -59,7 +108,9 @@ async function loadCategories() {
 async function loadCategoryBudgets() {
   try {
     console.log('🔄 Loading category budgets...');
-    const response = await fetch(`${API_BASE_URL}/api/categories/budget-tracking?dayOffset=${dayOffset}`);
+    const response = await fetch(`${API_BASE_URL}/api/categories/budget-tracking?dayOffset=${dayOffset}`, {
+      credentials: 'include'
+    });
     if (response.ok) {
       categoryBudgets = await response.json();
       console.log('✅ Category budgets loaded:', categoryBudgets);
@@ -104,12 +155,19 @@ function renderCompactCategoryBudgets() {
 // Render main UI
 function renderMainUI(summary) {
   const compactBudgetsHtml = renderCompactCategoryBudgets();
+  const currentUser = getCurrentUser();
   
   app.innerHTML = `
     <div class="container">
       <!-- Logo Header -->
       <div class="logo-container">
         <img src="image.png" alt="Sprout Logo" class="logo">
+        ${currentUser ? `
+          <div class="user-info">
+            <span class="username">Welcome, ${currentUser.username}!</span>
+            <button onclick="logout()" class="btn btn-small">Logout</button>
+          </div>
+        ` : ''}
       </div>
       
       <!-- Main Content Grid -->
@@ -262,12 +320,13 @@ async function renderAddExpenseForm() {
         category_id: categoryId
       };
       
-      // POST to API
+          // POST to API
       const resp = await fetch(`${API_BASE_URL}/api/expenses`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
         body: JSON.stringify(requestBody)
-      });
+    });
       
       if (resp.ok) {
         // Success - refresh summary and reset form
@@ -439,10 +498,29 @@ function showDemoMessage() {
 async function loadSummaryWithFallbacks() {
   console.log('🔄 Starting loadSummaryWithFallbacks...');
   
+  // First check authentication
+  try {
+    const isAuthenticated = await checkAuthentication();
+    if (!isAuthenticated) {
+      console.log('🔒 Authentication failed, redirecting...');
+      return; // Will redirect to auth page
+    }
+  } catch (error) {
+    console.error('🔒 Authentication check failed:', error);
+    return;
+  }
+  
   try {
     console.log('🌐 Attempting API call...');
-    const resp = await fetch(`${API_BASE_URL}/api/summary?dayOffset=${dayOffset}`);
+    const resp = await fetch(`${API_BASE_URL}/api/summary?dayOffset=${dayOffset}`, {
+      credentials: 'include'
+    });
     if (!resp.ok) {
+      if (resp.status === 401) {
+        console.log('🔒 Session expired, redirecting to login...');
+        logout();
+        return;
+      }
       throw new Error(`API returned ${resp.status}`);
     }
     const summary = await resp.json();

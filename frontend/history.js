@@ -25,6 +25,53 @@ const dayOffset = getDayOffset();
 const API_BASE_URL = getApiBaseUrl();
 const historyRoot = document.getElementById('history');
 
+// Authentication Functions
+function checkAuthentication() {
+  // For session-based auth, we'll make an API call to verify the session
+  return fetch(`${API_BASE_URL}/api/auth/me`, {
+    credentials: 'include'
+  }).then(response => {
+    if (response.ok) {
+      return response.json().then(data => {
+        // Store user info in localStorage for UI display
+        localStorage.setItem('sprout_user', JSON.stringify(data.user));
+        return true;
+      });
+    } else {
+      // Clear any stale user data
+      localStorage.removeItem('sprout_user');
+      // Redirect to auth page
+      window.location.href = '/auth.html';
+      return false;
+    }
+  }).catch(() => {
+    // Network error or server down
+    console.warn('Unable to verify authentication, redirecting to auth page');
+    localStorage.removeItem('sprout_user');
+    window.location.href = '/auth.html';
+    return false;
+  });
+}
+
+function logout() {
+  fetch(`${API_BASE_URL}/api/auth/logout`, {
+    method: 'POST',
+    credentials: 'include'
+  }).then(() => {
+    localStorage.removeItem('sprout_user');
+    window.location.href = '/auth.html';
+  }).catch(() => {
+    // Even if the API call fails, clear local storage and redirect
+    localStorage.removeItem('sprout_user');
+    window.location.href = '/auth.html';
+  });
+}
+
+function getCurrentUser() {
+  const userData = localStorage.getItem('sprout_user');
+  return userData ? JSON.parse(userData) : null;
+}
+
 // Global state
 let categories = [];
 let currentPeriod = 7;
@@ -35,7 +82,14 @@ async function loadCategories() {
   if (categories.length > 0) return;
   
   try {
-    const response = await fetch(`${API_BASE_URL}/api/categories`);
+    const response = await fetch(`${API_BASE_URL}/api/categories`, {
+      credentials: 'include'
+    });
+    if (response.status === 401) {
+      console.log('🔒 Session expired, redirecting to login...');
+      logout();
+      return;
+    }
     if (response.ok) {
       categories = await response.json();
     }
@@ -231,7 +285,14 @@ async function loadHistory() {
       url += `&category_id=${currentCategoryId}`;
     }
     
-    const resp = await fetch(url);
+    const resp = await fetch(url, {
+      credentials: 'include'
+    });
+    if (resp.status === 401) {
+      console.log('🔒 Session expired, redirecting to login...');
+      logout();
+      return;
+    }
     if (!resp.ok) {
       throw new Error(`API returned ${resp.status}`);
     }
@@ -258,5 +319,17 @@ async function loadHistory() {
   }
 }
 
-// Initialize the page
-loadHistory(); 
+// Initialize the page with authentication check
+async function initializePage() {
+  try {
+    const isAuthenticated = await checkAuthentication();
+    if (isAuthenticated) {
+      loadHistory();
+    }
+  } catch (error) {
+    console.error('Authentication check failed:', error);
+    window.location.href = '/auth.html';
+  }
+}
+
+initializePage(); 

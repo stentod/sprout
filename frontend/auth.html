@@ -1,72 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sprout Budget - Authentication</title>
-    <link rel="stylesheet" href="style.css?v=auth_v1">
-    <link rel="icon" href="logo.svg" type="image/svg+xml">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Sprout Budget</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
 </head>
 <body>
-    <div class="auth-container">
-        <!-- Logo Header -->
-        <div class="logo-container">
-            <img src="image.png" alt="Sprout Logo" class="logo">
-        </div>
-        
-        <!-- Auth Forms -->
-        <div class="auth-forms">
-            <!-- Login Form -->
-            <div class="auth-form" id="login-form">
-                <h2>Welcome Back</h2>
-                <p class="auth-subtitle">Sign in to your Sprout account</p>
-                
-                <form id="loginForm">
-                    <div class="form-group">
-                        <input type="text" id="loginUsername" placeholder="Username" required class="form-input">
-                    </div>
-                    <div class="form-group">
-                        <input type="password" id="loginPassword" placeholder="Password" required class="form-input">
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-full">Sign In</button>
-                </form>
-                
-                <div class="auth-switch">
-                    <p>Don't have an account? <a href="#" id="showSignup">Sign up</a></p>
-                </div>
-            </div>
-            
-            <!-- Signup Form -->
-            <div class="auth-form hidden" id="signup-form">
-                <h2>Create Account</h2>
-                <p class="auth-subtitle">Start your budgeting journey</p>
-                
-                <form id="signupForm">
-                    <div class="form-group">
-                        <input type="text" id="signupUsername" placeholder="Username" required class="form-input">
-                    </div>
-                    <div class="form-group">
-                        <input type="email" id="signupEmail" placeholder="Email" required class="form-input">
-                    </div>
-                    <div class="form-group">
-                        <input type="password" id="signupPassword" placeholder="Password" required class="form-input">
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-full">Create Account</button>
-                </form>
-                
-                <div class="auth-switch">
-                    <p>Already have an account? <a href="#" id="showLogin">Sign in</a></p>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Status Messages -->
-        <div id="authStatus" class="auth-status"></div>
+  <div class="auth-container">
+    <div class="auth-header">
+      <img src="image.png" alt="Sprout Logo" class="auth-logo">
+      <h1 class="auth-title">Sprout Budget Tracker</h1>
+      <p class="auth-description">Track your daily expenses and grow your savings</p>
     </div>
     
-    <script src="auth.js?v=auth_debug_v1"></script>
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="switchTab('login')">Login</div>
+      <div class="auth-tab" onclick="switchTab('signup')">Sign Up</div>
+    </div>
+    
+    <!-- Login Form -->
+    <form id="loginForm" class="auth-form active">
+      <div class="form-group">
+        <input type="text" id="loginUsername" placeholder="Username" required class="form-input">
+      </div>
+      <div class="form-group">
+        <input type="password" id="loginPassword" placeholder="Password" required class="form-input">
+      </div>
+      <button type="submit" class="btn-auth">Login</button>
+    </form>
+    
+    <!-- Signup Form -->
+    <form id="signupForm" class="auth-form">
+      <div class="form-group">
+        <input type="text" id="signupUsername" placeholder="Username (min 3 characters)" required class="form-input">
+      </div>
+      <div class="form-group">
+        <input type="password" id="signupPassword" placeholder="Password (min 6 characters)" required class="form-input">
+      </div>
+      <div class="form-group">
+        <input type="password" id="confirmPassword" placeholder="Confirm Password" required class="form-input">
+      </div>
+      <button type="submit" class="btn-auth">Sign Up</button>
+    </form>
+    
+    <div id="authMessage"></div>
+  </div>
+
+  <script src="auth.js"></script>
 </body>
-</html> 
+</html>
