@@ -1,16 +1,19 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
 import psycopg2
 import psycopg2.extras
 import os
+import bcrypt
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from functools import wraps
 
 # Load environment variables (for local development)
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
+CORS(app, supports_credentials=True)
 
 # Custom exception for database connection errors
 class DatabaseConnectionError(Exception):
@@ -81,6 +84,77 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
         if conn:
             conn.close()
 
+# Authentication Helper Functions
+def hash_password(password):
+    """Hash a password using bcrypt"""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password, hashed):
+    """Verify a password against its hash"""
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def require_auth(f):
+    """Decorator to require authentication for protected routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'error': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+def get_current_user_id():
+    """Get the current user's ID from session"""
+    return session.get('user_id')
+
+def create_default_categories(user_id):
+    """Create default categories for a new user"""
+    # First check if user already has categories
+    existing_count = run_query(
+        'SELECT COUNT(*) as count FROM categories WHERE user_id = %s',
+        (user_id,),
+        fetch_one=True
+    )
+    
+    if existing_count and existing_count['count'] > 0:
+        print(f"User {user_id} already has {existing_count['count']} categories, skipping default creation")
+        return
+    
+    print(f"Creating default categories for new user {user_id}")
+    default_categories = [
+        ('Food & Dining', '🍽️', '#FF6B6B'),
+        ('Transportation', '🚗', '#4ECDC4'),
+        ('Shopping', '🛒', '#45B7D1'),
+        ('Health & Fitness', '💪', '#96CEB4'),
+        ('Entertainment', '🎬', '#FECA57'),
+        ('Bills & Utilities', '⚡', '#FF9FF3'),
+        ('Other', '📝', '#6B7280')
+    ]
+    
+    for name, icon, color in default_categories:
+        # Check if this category already exists for this user
+        existing = run_query(
+            'SELECT id FROM categories WHERE user_id = %s AND name = %s',
+            (user_id, name),
+            fetch_one=True
+        )
+        
+        if not existing:
+            sql = '''
+                INSERT INTO categories (user_id, name, icon, color, is_default)
+                VALUES (%s, %s, %s, %s, TRUE)
+            '''
+            run_query(sql, (user_id, name, icon, color), fetch_all=False)
+        else:
+            print(f"Category '{name}' already exists for user {user_id}, skipping")
+    
+    # Create default user preferences (use ON CONFLICT to handle duplicates)
+    sql = '''
+        INSERT INTO user_preferences (user_id, daily_spending_limit)
+        VALUES (%s, 30.00)
+        ON CONFLICT (user_id) DO NOTHING
+    '''
+    run_query(sql, (user_id,), fetch_all=False)
+
 # Helper: Get the start and end of the target day (using dayOffset)
 def get_day_bounds(day_offset=0):
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -90,7 +164,7 @@ def get_day_bounds(day_offset=0):
     return start, end
 
 # Helper: Get all expenses between two datetimes with optional category filtering
-def get_expenses_between(start, end, category_id=None):
+def get_expenses_between(start, end, user_id, category_id=None):
     if category_id:
         # Filter by specific category
         sql = '''
@@ -98,10 +172,10 @@ def get_expenses_between(start, end, category_id=None):
                    c.name as category_name, c.icon as category_icon, c.color as category_color
             FROM expenses e
             LEFT JOIN categories c ON e.category_id = c.id
-            WHERE e.user_id = 0 AND e.timestamp >= %s AND e.timestamp < %s AND e.category_id = %s
+            WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s AND e.category_id = %s
             ORDER BY e.timestamp DESC
         '''
-        params = (start.isoformat(), end.isoformat(), category_id)
+        params = (user_id, start.isoformat(), end.isoformat(), category_id)
     else:
         # Get all expenses with category information
         sql = '''
@@ -109,10 +183,10 @@ def get_expenses_between(start, end, category_id=None):
                    c.name as category_name, c.icon as category_icon, c.color as category_color
             FROM expenses e
             LEFT JOIN categories c ON e.category_id = c.id
-            WHERE e.user_id = 0 AND e.timestamp >= %s AND e.timestamp < %s
+            WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
             ORDER BY e.timestamp DESC
         '''
-        params = (start.isoformat(), end.isoformat())
+        params = (user_id, start.isoformat(), end.isoformat())
     
     raw_expenses = run_query(sql, params)
     
@@ -165,18 +239,20 @@ def handle_internal_error(e):
     }), 500
 
 @app.route('/api/expenses', methods=['GET'])
+@require_auth
 def get_expenses():
     # Get dayOffset from query string (?dayOffset=N), default to 0 (today)
     day_offset = int(request.args.get('dayOffset', 0))
     start, end = get_day_bounds(day_offset)
     
+    user_id = get_current_user_id()
     sql = '''
         SELECT id, amount, description, timestamp 
         FROM expenses 
-        WHERE user_id = 0 AND timestamp >= %s AND timestamp < %s 
+        WHERE user_id = %s AND timestamp >= %s AND timestamp < %s 
         ORDER BY timestamp DESC
     '''
-    raw_expenses = run_query(sql, (start.isoformat(), end.isoformat()))
+    raw_expenses = run_query(sql, (user_id, start.isoformat(), end.isoformat()))
     
     # Convert data types for consistent API response
     expenses = []
@@ -191,10 +267,11 @@ def get_expenses():
     return jsonify(expenses)
 
 @app.route('/api/categories', methods=['GET'])
+@require_auth
 def get_categories():
     """Get all categories for the current user"""
     try:
-        user_id = 0  # Default user for now - will be updated when auth is fully implemented
+        user_id = get_current_user_id()
         
         sql = '''
             SELECT id, name, icon, color, is_default, daily_budget, created_at
@@ -222,6 +299,7 @@ def get_categories():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/categories', methods=['POST'])
+@require_auth
 def create_category():
     """Create a new category for the current user"""
     try:
@@ -229,7 +307,7 @@ def create_category():
         name = data.get('name', '').strip()
         icon = data.get('icon', '📝').strip()
         color = data.get('color', '#6B7280').strip()
-        user_id = 0  # Default user for now - will be updated when auth is fully implemented
+        user_id = get_current_user_id()
         
         if not name:
             return jsonify({'error': 'Category name is required'}), 400
@@ -266,12 +344,13 @@ def create_category():
         }), 500
 
 @app.route('/api/categories/<int:category_id>/budget', methods=['PUT', 'POST'])
+@require_auth
 def update_category_budget(category_id):
     """Update daily budget for a specific category"""
     try:
         data = request.get_json()
         daily_budget = data.get('daily_budget')
-        user_id = 0  # Default user for now - will be updated when auth is fully implemented
+        user_id = get_current_user_id()
         
         if daily_budget is None:
             return jsonify({
@@ -331,6 +410,7 @@ def update_category_budget(category_id):
         }), 500
 
 @app.route('/api/categories/budgets', methods=['PUT', 'POST'])
+@require_auth
 def update_multiple_category_budgets():
     """Update daily budgets for multiple categories at once"""
     try:
@@ -401,12 +481,13 @@ def update_multiple_category_budgets():
         }), 500
 
 @app.route('/api/categories/budget-tracking', methods=['GET'])
+@require_auth
 def get_category_budget_tracking():
     """Get category budget tracking for today - spending vs. budget for each category"""
     try:
         day_offset = int(request.args.get('dayOffset', 0))
         today_start, today_end = get_day_bounds(day_offset)
-        user_id = 0  # Default user for now - will be updated when auth is fully implemented
+        user_id = get_current_user_id()
         
         # Get all categories with their budgets for the current user
         categories_sql = '''
@@ -421,10 +502,10 @@ def get_category_budget_tracking():
         spending_sql = '''
             SELECT e.category_id, SUM(e.amount) as total_spent
             FROM expenses e
-            WHERE e.user_id = 0 AND e.timestamp >= %s AND e.timestamp < %s
+            WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
             GROUP BY e.category_id
         '''
-        spending_data = run_query(spending_sql, (today_start.isoformat(), today_end.isoformat()))
+        spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()))
         
         # Create spending lookup
         spending_by_category = {row['category_id']: float(row['total_spent']) for row in spending_data}
@@ -489,6 +570,7 @@ def get_category_budget_tracking():
         }), 500
 
 @app.route('/api/expenses', methods=['POST'])
+@require_auth
 def add_expense():
     data = request.get_json()
     amount = data.get('amount')
@@ -502,11 +584,13 @@ def add_expense():
     if not category_id:
         return jsonify({'error': 'Category is required'}), 400
     
+    user_id = get_current_user_id()
+    
     try:
         category_id = int(category_id)
-        # Check if category exists
-        check_sql = 'SELECT id FROM categories WHERE id = %s'
-        category_exists = run_query(check_sql, (category_id,), fetch_one=True)
+        # Check if category exists and belongs to the user
+        check_sql = 'SELECT id FROM categories WHERE id = %s AND user_id = %s'
+        category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
         if not category_exists:
             return jsonify({'error': 'Invalid category'}), 400
     except (ValueError, TypeError):
@@ -519,22 +603,25 @@ def add_expense():
         INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
         VALUES (%s, %s, %s, %s, %s)
     '''
-    run_query(sql, (0, amount, description, category_id, timestamp), fetch_all=False)
+    run_query(sql, (user_id, amount, description, category_id, timestamp), fetch_all=False)
     return jsonify({'success': True}), 201
 
 @app.route('/api/summary', methods=['GET'])
+@require_auth
 def get_summary():
     day_offset = int(request.args.get('dayOffset', 0))
     today_start, today_end = get_day_bounds(day_offset)
+    
+    user_id = get_current_user_id()
     
     # Calculate daily surplus for the last 7 days
     deltas = []
     for i in range(7):
         offset = day_offset - i
         day_start, day_end = get_day_bounds(offset)
-        expenses = get_expenses_between(day_start, day_end)
+        expenses = get_expenses_between(day_start, day_end, user_id)
         total_spent = sum(e['amount'] for e in expenses)
-        daily_surplus = get_user_daily_limit(0) - total_spent # Use user's daily limit
+        daily_surplus = get_user_daily_limit(user_id) - total_spent # Use user's daily limit
         deltas.append(daily_surplus)
     
     # Today's balance and averages
@@ -579,15 +666,17 @@ def get_summary():
     })
 
 @app.route('/api/history', methods=['GET'])
+@require_auth
 def get_history():
     # Get all expenses from the last 7 days (including today)
     day_offset = int(request.args.get('dayOffset', 0))
     period = int(request.args.get('period', 7))  # Default to 7 days
     category_id = request.args.get('category_id')  # Optional category filter
     
+    user_id = get_current_user_id()
     start_date, _ = get_day_bounds(day_offset - (period - 1))
     _, end_date = get_day_bounds(day_offset)
-    expenses = get_expenses_between(start_date, end_date, category_id)
+    expenses = get_expenses_between(start_date, end_date, user_id, category_id)
     # Group by date (YYYY-MM-DD)
     grouped = {}
     for e in expenses:
@@ -636,10 +725,11 @@ def get_user_daily_limit(user_id=0):
         return 30.0  # Fallback to default
 
 @app.route('/api/preferences/daily-limit', methods=['GET'])
+@require_auth
 def get_daily_limit():
     """Get the user's current daily spending limit"""
     try:
-        user_id = 0  # Default user for now
+        user_id = get_current_user_id()
         daily_limit = get_user_daily_limit(user_id)
         return jsonify({
             'daily_limit': daily_limit,
@@ -652,6 +742,7 @@ def get_daily_limit():
         }), 500
 
 @app.route('/api/preferences/daily-limit', methods=['POST', 'PUT'])
+@require_auth
 def set_daily_limit():
     """Set the user's daily spending limit"""
     try:
@@ -677,7 +768,7 @@ def set_daily_limit():
                 'success': False
             }), 400
         
-        user_id = 0  # Default user for now
+        user_id = get_current_user_id()
         
         # Update or insert user preference
         sql = '''
@@ -708,12 +799,142 @@ def set_daily_limit():
             'success': False
         }), 500
 
+# Authentication Routes
+@app.route('/api/auth/signup', methods=['POST'])
+def signup():
+    """User registration"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({'error': 'Username and password are required'}), 400
+        
+        if len(username) < 3:
+            return jsonify({'error': 'Username must be at least 3 characters'}), 400
+        
+        if len(password) < 6:
+            return jsonify({'error': 'Password must be at least 6 characters'}), 400
+        
+        # Check if user already exists
+        sql = 'SELECT id FROM users WHERE username = %s'
+        existing_user = run_query(sql, (username,), fetch_one=True)
+        if existing_user:
+            return jsonify({'error': 'Username already exists'}), 409
+        
+        # Hash password and create user
+        password_hash = hash_password(password)
+        sql = '''
+            INSERT INTO users (username, password_hash)
+            VALUES (%s, %s)
+            RETURNING id
+        '''
+        result = run_query(sql, (username, password_hash), fetch_one=True)
+        
+        if result:
+            user_id = result['id']
+            
+            # Create default categories and preferences for new user
+            try:
+                create_default_categories(user_id)
+            except Exception as cat_error:
+                # If categories creation fails, delete the user to maintain consistency
+                print(f"Failed to create default categories for user {user_id}: {cat_error}")
+                delete_sql = 'DELETE FROM users WHERE id = %s'
+                run_query(delete_sql, (user_id,), fetch_all=False)
+                raise cat_error
+            
+            return jsonify({
+                'message': 'Account created successfully',
+                'user_id': user_id
+            }), 201
+        else:
+            return jsonify({'error': 'Failed to create account'}), 500
+            
+    except Exception as e:
+        print(f"Signup error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """User login"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({'error': 'Username and password are required'}), 400
+        
+        # Get user by username
+        sql = 'SELECT id, username, password_hash FROM users WHERE username = %s'
+        user = run_query(sql, (username,), fetch_one=True)
+        
+        if not user:
+            return jsonify({'error': 'Invalid username or password'}), 401
+        
+        if not verify_password(password, user['password_hash']):
+            return jsonify({'error': 'Invalid username or password'}), 401
+        
+        # Set session
+        session['user_id'] = user['id']
+        session['username'] = user['username']
+        
+        return jsonify({
+            'message': 'Login successful',
+            'user': {
+                'id': user['id'],
+                'username': user['username']
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Login error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+@require_auth
+def logout():
+    """User logout"""
+    session.clear()
+    return jsonify({'message': 'Logged out successfully'}), 200
+
+@app.route('/api/auth/me', methods=['GET'])
+@require_auth
+def get_current_user():
+    """Get current user information"""
+    try:
+        sql = 'SELECT id, username, created_at FROM users WHERE id = %s'
+        user = run_query(sql, (session['user_id'],), fetch_one=True)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({
+            'user': {
+                'id': user['id'],
+                'username': user['username'],
+                'created_at': user['created_at'].isoformat() if user['created_at'] else None
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Get current user error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 # Get the frontend directory path relative to this file
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend')
 
 @app.route('/')
 def serve_index():
     return send_from_directory(FRONTEND_DIR, 'index.html')
+
+@app.route('/auth.html')
+def serve_auth():
+    return send_from_directory(FRONTEND_DIR, 'auth.html')
 
 @app.route('/history.html')
 def serve_history():

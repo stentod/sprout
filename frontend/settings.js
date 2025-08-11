@@ -1,6 +1,41 @@
 // Settings page JavaScript
 const API_BASE = 'http://localhost:5001/api';
 
+// Authentication Functions
+function checkAuthentication() {
+  return fetch(`${API_BASE}/auth/me`, {
+    credentials: 'include'
+  }).then(response => {
+    if (response.ok) {
+      return response.json().then(data => {
+        localStorage.setItem('sprout_user', JSON.stringify(data.user));
+        return true;
+      });
+    } else {
+      localStorage.removeItem('sprout_user');
+      window.location.href = '/auth.html';
+      return false;
+    }
+  }).catch(() => {
+    localStorage.removeItem('sprout_user');
+    window.location.href = '/auth.html';
+    return false;
+  });
+}
+
+function logout() {
+  fetch(`${API_BASE}/auth/logout`, {
+    method: 'POST',
+    credentials: 'include'
+  }).then(() => {
+    localStorage.removeItem('sprout_user');
+    window.location.href = '/auth.html';
+  }).catch(() => {
+    localStorage.removeItem('sprout_user');
+    window.location.href = '/auth.html';
+  });
+}
+
 // DOM elements
 let dailyLimitForm;
 let dailyLimitInput;
@@ -23,8 +58,20 @@ let originalBudgets = {};
 let currentBudgets = {};
 
 // Initialize the settings page
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     console.log('Settings page loaded');
+    
+    // Check authentication first
+    try {
+        const isAuthenticated = await checkAuthentication();
+        if (!isAuthenticated) {
+            console.log('🔒 Authentication failed, redirecting...');
+            return; // Will redirect to auth page
+        }
+    } catch (error) {
+        console.error('🔒 Authentication check failed:', error);
+        return;
+    }
     
     // Get DOM elements
     dailyLimitForm = document.getElementById('daily-limit-form');
@@ -69,7 +116,9 @@ async function loadCurrentDailyLimit() {
         clearStatusMessage();
         
         console.log('Loading current daily limit...');
-        const response = await fetch(`${API_BASE}/preferences/daily-limit`);
+        const response = await fetch(`${API_BASE}/preferences/daily-limit`, {
+            credentials: 'include'
+        });
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -123,6 +172,7 @@ async function handleFormSubmit(event) {
             headers: {
                 'Content-Type': 'application/json',
             },
+            credentials: 'include',
             body: JSON.stringify({
                 daily_limit: newLimit
             })
@@ -228,7 +278,9 @@ async function loadCategories() {
         console.log('Loading categories...');
         categoryBudgetsContainer.innerHTML = '<div class="loading-message">Loading categories...</div>';
         
-        const response = await fetch(`${API_BASE}/categories`);
+        const response = await fetch(`${API_BASE}/categories`, {
+            credentials: 'include'
+        });
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -395,6 +447,7 @@ async function handleSaveAllBudgets() {
             headers: {
                 'Content-Type': 'application/json',
             },
+            credentials: 'include',
             body: JSON.stringify({
                 budgets: currentBudgets
             })
