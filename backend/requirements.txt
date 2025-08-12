@@ -1,5 +1,8 @@
 Flask
 Flask-Cors
+Flask-Mail
 psycopg2-binary
 python-dotenv
 gunicorn
+bcrypt==4.0.1
+sendgrid

@@ -1,16 +1,35 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
+from flask_mail import Mail, Message
+import sendgrid
+from sendgrid.helpers.mail import Mail as SendGridMail
 import psycopg2
 import psycopg2.extras
 import os
+import bcrypt
+import secrets
+import re
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from functools import wraps
 
 # Load environment variables (for local development)
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
+CORS(app, supports_credentials=True)
+
+# Email configuration
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
+app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL', 'False').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
+
+mail = Mail(app)
 
 # Custom exception for database connection errors
 class DatabaseConnectionError(Exception):
@@ -48,7 +67,18 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
             
             if sql.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE')):
                 conn.commit()
-                return cur.rowcount
+                # Check if query has RETURNING clause
+                if 'RETURNING' in sql.upper():
+                    if fetch_one:
+                        result = cur.fetchone()
+                        return dict(result) if result else None
+                    elif fetch_all:
+                        results = cur.fetchall()
+                        return [dict(row) for row in results]
+                    else:
+                        return cur.fetchone()
+                else:
+                    return cur.rowcount
             elif fetch_one:
                 result = cur.fetchone()
                 return dict(result) if result else None
@@ -70,6 +100,194 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
         if conn:
             conn.close()
 
+# Authentication Helper Functions
+def hash_password(password):
+    """Hash a password using bcrypt"""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password, hashed):
+    """Verify a password against its hash"""
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def validate_email(email):
+    """Validate email format using regex"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def generate_reset_token():
+    """Generate a secure random token for password reset"""
+    return secrets.token_urlsafe(32)
+
+def send_password_reset_email_sendgrid(user_email, username, reset_token):
+    """Send password reset email using SendGrid (Professional)"""
+    try:
+        # Get SendGrid API key from environment
+        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+        if not sendgrid_api_key:
+            print("SendGrid API key not configured, falling back to Gmail")
+            return send_password_reset_email_gmail(user_email, username, reset_token)
+        
+        # Create the reset URL
+        reset_url = f"http://localhost:5001/reset-password.html?token={reset_token}"
+        
+        # Create SendGrid client
+        sg = sendgrid.SendGridAPIClient(api_key=sendgrid_api_key)
+        
+        # Create HTML email content
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: #4CAF50; color: white; padding: 20px; text-align: center; }}
+                .content {{ padding: 20px; background: #f9f9f9; }}
+                .button {{ background: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; }}
+                .footer {{ color: #666; font-size: 12px; text-align: center; margin-top: 30px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🌱 Sprout Budget Tracker</h1>
+                </div>
+                <div class="content">
+                    <h2>Password Reset Request</h2>
+                    <p>Hello {username},</p>
+                    <p>You requested a password reset for your Sprout Budget Tracker account.</p>
+                    <p><a href="{reset_url}" class="button">Reset Your Password</a></p>
+                    <p><strong>This link will expire in 1 hour</strong> for security reasons.</p>
+                    <p>If you didn't request this password reset, please ignore this email.</p>
+                </div>
+                <div class="footer">
+                    <p>Best regards,<br>The Sprout Team</p>
+                    <p>This is an automated message. Please do not reply to this email.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Create email message
+        message = SendGridMail(
+            from_email=os.environ.get('FROM_EMAIL', 'noreply@sproutbudget.com'),
+            to_emails=user_email,
+            subject="🌱 Reset Your Sprout Budget Password",
+            html_content=html_content
+        )
+        
+        # Send email
+        response = sg.send(message)
+        print(f"✅ SendGrid: Password reset email sent to {user_email}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ SendGrid failed: {e}")
+        print("🔄 Falling back to Gmail...")
+        return send_password_reset_email_gmail(user_email, username, reset_token)
+
+def send_password_reset_email_gmail(user_email, username, reset_token):
+    """Send password reset email using Gmail (Fallback)"""
+    try:
+        # Create the reset URL (adjust domain for production)
+        reset_url = f"http://localhost:5001/reset-password.html?token={reset_token}"
+        
+        # Create email message
+        msg = Message(
+            subject="Sprout Budget Tracker - Password Reset",
+            recipients=[user_email],
+            body=f"""Hello {username},
+
+You requested a password reset for your Sprout Budget Tracker account.
+
+Click the link below to reset your password:
+{reset_url}
+
+This link will expire in 1 hour for security reasons.
+
+If you didn't request this password reset, please ignore this email.
+
+Best regards,
+The Sprout Team
+
+--
+This is an automated message. Please do not reply to this email."""
+        )
+        
+        mail.send(msg)
+        print(f"📧 Gmail: Password reset email sent to {user_email}")
+        return True
+    except Exception as e:
+        print(f"❌ Gmail failed: {e}")
+        return False
+
+def send_password_reset_email(user_email, username, reset_token):
+    """Send password reset email (tries SendGrid first, falls back to Gmail)"""
+    return send_password_reset_email_sendgrid(user_email, username, reset_token)
+
+def require_auth(f):
+    """Decorator to require authentication for protected routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({'error': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+def get_current_user_id():
+    """Get the current user's ID from session"""
+    return session.get('user_id')
+
+def create_default_categories(user_id):
+    """Create default categories for a new user"""
+    # First check if user already has categories
+    existing_count = run_query(
+        'SELECT COUNT(*) as count FROM categories WHERE user_id = %s',
+        (user_id,),
+        fetch_one=True
+    )
+    
+    if existing_count and existing_count['count'] > 0:
+        print(f"User {user_id} already has {existing_count['count']} categories, skipping default creation")
+        return
+    
+    print(f"Creating default categories for new user {user_id}")
+    default_categories = [
+        ('Food & Dining', '🍽️', '#FF6B6B'),
+        ('Transportation', '🚗', '#4ECDC4'),
+        ('Shopping', '🛒', '#45B7D1'),
+        ('Health & Fitness', '💪', '#96CEB4'),
+        ('Entertainment', '🎬', '#FECA57'),
+        ('Bills & Utilities', '⚡', '#FF9FF3'),
+        ('Other', '📝', '#6B7280')
+    ]
+    
+    for name, icon, color in default_categories:
+        # Check if this category already exists for this user
+        existing = run_query(
+            'SELECT id FROM categories WHERE user_id = %s AND name = %s',
+            (user_id, name),
+            fetch_one=True
+        )
+        
+        if not existing:
+            sql = '''
+                INSERT INTO categories (user_id, name, icon, color, is_default)
+                VALUES (%s, %s, %s, %s, TRUE)
+            '''
+            run_query(sql, (user_id, name, icon, color), fetch_all=False)
+        else:
+            print(f"Category '{name}' already exists for user {user_id}, skipping")
+    
+    # Create default user preferences (use ON CONFLICT to handle duplicates)
+    sql = '''
+        INSERT INTO user_preferences (user_id, daily_spending_limit)
+        VALUES (%s, 30.00)
+        ON CONFLICT (user_id) DO NOTHING
+    '''
+    run_query(sql, (user_id,), fetch_all=False)
+
 # Helper: Get the start and end of the target day (using dayOffset)
 def get_day_bounds(day_offset=0):
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -78,24 +296,54 @@ def get_day_bounds(day_offset=0):
     end = target_day + timedelta(days=1)
     return start, end
 
-# Helper: Get all expenses between two datetimes
-def get_expenses_between(start, end):
-    sql = '''
-        SELECT amount, description, timestamp 
-        FROM expenses 
-        WHERE user_id = 0 AND timestamp >= %s AND timestamp < %s 
-        ORDER BY timestamp DESC
-    '''
-    raw_expenses = run_query(sql, (start.isoformat(), end.isoformat()))
+# Helper: Get all expenses between two datetimes with optional category filtering
+def get_expenses_between(start, end, user_id, category_id=None):
+    if category_id:
+        # Filter by specific category
+        sql = '''
+            SELECT e.amount, e.description, e.timestamp, e.category_id,
+                   c.name as category_name, c.icon as category_icon, c.color as category_color
+            FROM expenses e
+            LEFT JOIN categories c ON e.category_id = c.id
+            WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s AND e.category_id = %s
+            ORDER BY e.timestamp DESC
+        '''
+        params = (user_id, start.isoformat(), end.isoformat(), category_id)
+    else:
+        # Get all expenses with category information
+        sql = '''
+            SELECT e.amount, e.description, e.timestamp, e.category_id,
+                   c.name as category_name, c.icon as category_icon, c.color as category_color
+            FROM expenses e
+            LEFT JOIN categories c ON e.category_id = c.id
+            WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
+            ORDER BY e.timestamp DESC
+        '''
+        params = (user_id, start.isoformat(), end.isoformat())
+    
+    raw_expenses = run_query(sql, params)
     
     # Convert data types for consistency
     expenses = []
     for e in raw_expenses:
-        expenses.append({
+        expense_data = {
             'amount': float(e['amount']),
             'description': e['description'],
             'timestamp': e['timestamp'].isoformat() if hasattr(e['timestamp'], 'isoformat') else str(e['timestamp'])
-        })
+        }
+        
+        # Add category information if present
+        if e['category_id']:
+            expense_data['category'] = {
+                'id': e['category_id'],
+                'name': e['category_name'],
+                'icon': e['category_icon'],
+                'color': e['category_color']
+            }
+        else:
+            expense_data['category'] = None
+            
+        expenses.append(expense_data)
     
     return expenses
 
@@ -124,18 +372,20 @@ def handle_internal_error(e):
     }), 500
 
 @app.route('/api/expenses', methods=['GET'])
+@require_auth
 def get_expenses():
     # Get dayOffset from query string (?dayOffset=N), default to 0 (today)
     day_offset = int(request.args.get('dayOffset', 0))
     start, end = get_day_bounds(day_offset)
     
+    user_id = get_current_user_id()
     sql = '''
         SELECT id, amount, description, timestamp 
         FROM expenses 
-        WHERE user_id = 0 AND timestamp >= %s AND timestamp < %s 
+        WHERE user_id = %s AND timestamp >= %s AND timestamp < %s 
         ORDER BY timestamp DESC
     '''
-    raw_expenses = run_query(sql, (start.isoformat(), end.isoformat()))
+    raw_expenses = run_query(sql, (user_id, start.isoformat(), end.isoformat()))
     
     # Convert data types for consistent API response
     expenses = []
@@ -149,35 +399,362 @@ def get_expenses():
     
     return jsonify(expenses)
 
+@app.route('/api/categories', methods=['GET'])
+@require_auth
+def get_categories():
+    """Get all categories for the current user"""
+    try:
+        user_id = get_current_user_id()
+        
+        sql = '''
+            SELECT id, name, icon, color, is_default, daily_budget, created_at
+            FROM categories 
+            WHERE user_id = %s
+            ORDER BY is_default DESC, name ASC
+        '''
+        categories = run_query(sql, (user_id,), fetch_all=True)
+        
+        # Convert data types for consistent API response
+        result = []
+        for cat in categories:
+            result.append({
+                'id': cat['id'],
+                'name': cat['name'],
+                'icon': cat['icon'],
+                'color': cat['color'],
+                'is_default': bool(cat['is_default']),
+                'daily_budget': float(cat['daily_budget']) if cat['daily_budget'] else 0.0,
+                'created_at': cat['created_at'].isoformat() if hasattr(cat['created_at'], 'isoformat') else str(cat['created_at'])
+            })
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/categories', methods=['POST'])
+@require_auth
+def create_category():
+    """Create a new category for the current user"""
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        icon = data.get('icon', '📝').strip()
+        color = data.get('color', '#6B7280').strip()
+        user_id = get_current_user_id()
+        
+        if not name:
+            return jsonify({'error': 'Category name is required'}), 400
+        
+        # Check if category name already exists for this user
+        check_sql = 'SELECT id FROM categories WHERE name = %s AND user_id = %s'
+        existing = run_query(check_sql, (name, user_id), fetch_one=True)
+        if existing:
+            return jsonify({'error': 'Category name already exists'}), 409
+        
+        # Insert new category
+        sql = '''
+            INSERT INTO categories (name, icon, color, is_default, daily_budget, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id, name, icon, color, is_default, daily_budget, created_at
+        '''
+        new_category = run_query(sql, (name, icon, color, False, 0.0, user_id), fetch_one=True)
+        
+        result = {
+            'id': new_category['id'],
+            'name': new_category['name'],
+            'icon': new_category['icon'],
+            'color': new_category['color'],
+            'is_default': bool(new_category['is_default']),
+            'daily_budget': float(new_category['daily_budget']),
+            'created_at': new_category['created_at'].isoformat() if hasattr(new_category['created_at'], 'isoformat') else str(new_category['created_at'])
+        }
+        
+        return jsonify(result), 201
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@app.route('/api/categories/<int:category_id>/budget', methods=['PUT', 'POST'])
+@require_auth
+def update_category_budget(category_id):
+    """Update daily budget for a specific category"""
+    try:
+        data = request.get_json()
+        daily_budget = data.get('daily_budget')
+        user_id = get_current_user_id()
+        
+        if daily_budget is None:
+            return jsonify({
+                'error': 'daily_budget is required',
+                'success': False
+            }), 400
+        
+        try:
+            daily_budget = float(daily_budget)
+            if daily_budget < 0:
+                return jsonify({
+                    'error': 'daily_budget must be positive or zero',
+                    'success': False
+                }), 400
+        except (ValueError, TypeError):
+            return jsonify({
+                'error': 'daily_budget must be a valid number',
+                'success': False
+            }), 400
+        
+        # Check if category exists and belongs to the user
+        check_sql = 'SELECT id, name FROM categories WHERE id = %s AND user_id = %s'
+        category = run_query(check_sql, (category_id, user_id), fetch_one=True)
+        if not category:
+            return jsonify({
+                'error': 'Category not found',
+                'success': False
+            }), 404
+        
+        # Update category budget
+        sql = '''
+            UPDATE categories 
+            SET daily_budget = %s 
+            WHERE id = %s
+            RETURNING id, name, daily_budget
+        '''
+        result = run_query(sql, (daily_budget, category_id), fetch_one=True)
+        
+        if result:
+            return jsonify({
+                'category_id': result['id'],
+                'category_name': result['name'],
+                'daily_budget': float(result['daily_budget']),
+                'success': True,
+                'message': f"Budget for {result['name']} updated to ${float(result['daily_budget']):.2f}/day"
+            })
+        else:
+            return jsonify({
+                'error': 'Failed to update category budget',
+                'success': False
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@app.route('/api/categories/budgets', methods=['PUT', 'POST'])
+@require_auth
+def update_multiple_category_budgets():
+    """Update daily budgets for multiple categories at once"""
+    try:
+        data = request.get_json()
+        budgets = data.get('budgets', {})
+        
+        if not budgets or not isinstance(budgets, dict):
+            return jsonify({
+                'error': 'budgets object is required (format: {"category_id": daily_budget})',
+                'success': False
+            }), 400
+        
+        updated_categories = []
+        errors = []
+        
+        for category_id_str, daily_budget in budgets.items():
+            try:
+                category_id = int(category_id_str)
+                daily_budget = float(daily_budget)
+                
+                if daily_budget < 0:
+                    errors.append(f"Category {category_id}: budget must be positive or zero")
+                    continue
+                
+                # Check if category exists and update
+                sql = '''
+                    UPDATE categories 
+                    SET daily_budget = %s 
+                    WHERE id = %s
+                    RETURNING id, name, daily_budget
+                '''
+                result = run_query(sql, (daily_budget, category_id), fetch_one=True)
+                
+                if result:
+                    updated_categories.append({
+                        'category_id': result['id'],
+                        'category_name': result['name'],
+                        'daily_budget': float(result['daily_budget'])
+                    })
+                else:
+                    errors.append(f"Category {category_id}: not found")
+                    
+            except (ValueError, TypeError):
+                errors.append(f"Category {category_id_str}: invalid budget value")
+            except Exception as e:
+                errors.append(f"Category {category_id_str}: {str(e)}")
+        
+        if updated_categories:
+            response = {
+                'updated_categories': updated_categories,
+                'success': True,
+                'message': f"Updated budgets for {len(updated_categories)} categories"
+            }
+            if errors:
+                response['warnings'] = errors
+            return jsonify(response)
+        else:
+            return jsonify({
+                'error': 'No categories were updated',
+                'errors': errors,
+                'success': False
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@app.route('/api/categories/budget-tracking', methods=['GET'])
+@require_auth
+def get_category_budget_tracking():
+    """Get category budget tracking for today - spending vs. budget for each category"""
+    try:
+        day_offset = int(request.args.get('dayOffset', 0))
+        today_start, today_end = get_day_bounds(day_offset)
+        user_id = get_current_user_id()
+        
+        # Get all categories with their budgets for the current user
+        categories_sql = '''
+            SELECT id, name, icon, color, daily_budget
+            FROM categories 
+            WHERE user_id = %s
+            ORDER BY is_default DESC, name ASC
+        '''
+        categories = run_query(categories_sql, (user_id,), fetch_all=True)
+        
+        # Get today's spending by category
+        spending_sql = '''
+            SELECT e.category_id, SUM(e.amount) as total_spent
+            FROM expenses e
+            WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
+            GROUP BY e.category_id
+        '''
+        spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()))
+        
+        # Create spending lookup
+        spending_by_category = {row['category_id']: float(row['total_spent']) for row in spending_data}
+        
+        # Separate budgeted and unbedgeted categories
+        budgeted_categories = []
+        unbedgeted_categories = []
+        total_budget = 0
+        total_spent_budgeted = 0
+        total_spent_unbedgeted = 0
+        
+        for cat in categories:
+            budget = float(cat['daily_budget']) if cat['daily_budget'] else 0.0
+            spent = spending_by_category.get(cat['id'], 0.0)
+            
+            category_data = {
+                'category_id': cat['id'],
+                'category_name': cat['name'],
+                'category_icon': cat['icon'],
+                'category_color': cat['color'],
+                'spent_today': spent
+            }
+            
+            if budget > 0:
+                # This category has a budget
+                remaining = budget - spent
+                total_budget += budget
+                total_spent_budgeted += spent
+                
+                category_data.update({
+                    'daily_budget': budget,
+                    'remaining_today': remaining,
+                    'percentage_used': (spent / budget * 100),
+                    'is_over_budget': spent > budget
+                })
+                budgeted_categories.append(category_data)
+            else:
+                # This category has no budget
+                total_spent_unbedgeted += spent
+                unbedgeted_categories.append(category_data)
+        
+        return jsonify({
+            'budgeted_categories': budgeted_categories,
+            'unbedgeted_categories': unbedgeted_categories,
+            'summary': {
+                'total_budget': total_budget,
+                'total_spent_budgeted': total_spent_budgeted,
+                'total_spent_unbedgeted': total_spent_unbedgeted,
+                'total_spent_all': total_spent_budgeted + total_spent_unbedgeted,
+                'total_remaining': total_budget - total_spent_budgeted,
+                'overall_percentage_used': (total_spent_budgeted / total_budget * 100) if total_budget > 0 else 0,
+                'budgeted_categories_count': len(budgeted_categories),
+                'unbedgeted_categories_count': len(unbedgeted_categories)
+            },
+            'success': True
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
 @app.route('/api/expenses', methods=['POST'])
+@require_auth
 def add_expense():
     data = request.get_json()
     amount = data.get('amount')
     description = data.get('description', '')
+    category_id = data.get('category_id')  # New: category selection
+    
     if amount is None:
         return jsonify({'error': 'Amount is required'}), 400
-    timestamp = datetime.now().isoformat()
+    
+    # Validate category_id is required
+    if not category_id:
+        return jsonify({'error': 'Category is required'}), 400
+    
+    user_id = get_current_user_id()
+    
+    try:
+        category_id = int(category_id)
+        # Check if category exists and belongs to the user
+        check_sql = 'SELECT id FROM categories WHERE id = %s AND user_id = %s'
+        category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+        if not category_exists:
+            return jsonify({'error': 'Invalid category'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid category ID'}), 400
+    
+    # Use local timezone-aware timestamp to ensure consistent date handling
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     sql = '''
-        INSERT INTO expenses (user_id, amount, description, timestamp) 
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
+        VALUES (%s, %s, %s, %s, %s)
     '''
-    run_query(sql, (0, amount, description, timestamp), fetch_all=False)
+    run_query(sql, (user_id, amount, description, category_id, timestamp), fetch_all=False)
     return jsonify({'success': True}), 201
 
 @app.route('/api/summary', methods=['GET'])
+@require_auth
 def get_summary():
     day_offset = int(request.args.get('dayOffset', 0))
     today_start, today_end = get_day_bounds(day_offset)
+    
+    user_id = get_current_user_id()
     
     # Calculate daily surplus for the last 7 days
     deltas = []
     for i in range(7):
         offset = day_offset - i
         day_start, day_end = get_day_bounds(offset)
-        expenses = get_expenses_between(day_start, day_end)
+        expenses = get_expenses_between(day_start, day_end, user_id)
         total_spent = sum(e['amount'] for e in expenses)
-        daily_surplus = BUDGET - total_spent
+        daily_surplus = get_user_daily_limit(user_id) - total_spent # Use user's daily limit
         deltas.append(daily_surplus)
     
     # Today's balance and averages
@@ -185,19 +762,33 @@ def get_summary():
     avg_daily_surplus = sum(deltas) / 7  # Always divide by 7 days
     projection_30 = avg_daily_surplus * 30  # 30-day projection based on average daily surplus
     
-    # Plant state logic based on average daily surplus
-    if avg_daily_surplus >= 2:
+    # Plant state logic - prioritize today's spending over 7-day average
+    print(f"DEBUG: today_balance={today_balance}, avg_daily_surplus={avg_daily_surplus}")
+    
+    if today_balance < 0:
+        # Today's spending exceeded the daily limit
+        if today_balance >= -5:
+            plant = 'wilting'
+            plant_emoji = '🥀'
+            print(f"DEBUG: Plant set to wilting (today_balance={today_balance})")
+        else:
+            plant = 'dead'
+            plant_emoji = '☠️'
+            print(f"DEBUG: Plant set to dead (today_balance={today_balance})")
+    elif today_balance >= 10 and avg_daily_surplus >= 2:
         plant = 'thriving'
         plant_emoji = '🌳'
-    elif avg_daily_surplus >= -2:
+        print(f"DEBUG: Plant set to thriving")
+    elif today_balance >= 0 and avg_daily_surplus >= -2:
         plant = 'healthy'
         plant_emoji = '🌱'
-    elif avg_daily_surplus >= -5:
-        plant = 'wilting'
-        plant_emoji = '🥀'
+        print(f"DEBUG: Plant set to healthy")
     else:
-        plant = 'dead'
-        plant_emoji = '☠️'
+        plant = 'struggling'
+        plant_emoji = '🌿'
+        print(f"DEBUG: Plant set to struggling")
+    
+    print(f"DEBUG: Final plant state={plant}, emoji={plant_emoji}")
     
     return jsonify({
         'balance': round(today_balance, 2),
@@ -208,29 +799,391 @@ def get_summary():
     })
 
 @app.route('/api/history', methods=['GET'])
+@require_auth
 def get_history():
     # Get all expenses from the last 7 days (including today)
     day_offset = int(request.args.get('dayOffset', 0))
-    start_7days, _ = get_day_bounds(day_offset - 6)
-    _, end_today = get_day_bounds(day_offset)
-    expenses = get_expenses_between(start_7days, end_today)
+    period = int(request.args.get('period', 7))  # Default to 7 days
+    category_id = request.args.get('category_id')  # Optional category filter
+    
+    user_id = get_current_user_id()
+    start_date, _ = get_day_bounds(day_offset - (period - 1))
+    _, end_date = get_day_bounds(day_offset)
+    expenses = get_expenses_between(start_date, end_date, user_id, category_id)
     # Group by date (YYYY-MM-DD)
     grouped = {}
     for e in expenses:
         date = e['timestamp'][:10]  # 'YYYY-MM-DD' (timestamp is already a string from helper)
         if date not in grouped:
             grouped[date] = []
-        grouped[date].append({
+        expense_data = {
             'amount': e['amount'],  # Already converted to float in helper
             'description': e['description'],
             'timestamp': e['timestamp']  # Already converted to string in helper
-        })
+        }
+        
+        # Add category information if present
+        if e.get('category'):
+            expense_data['category'] = e['category']
+        else:
+            expense_data['category'] = None
+            
+        grouped[date].append(expense_data)
     # Sort by date descending
     grouped_sorted = [
         {'date': date, 'expenses': grouped[date]}
         for date in sorted(grouped.keys(), reverse=True)
     ]
     return jsonify(grouped_sorted)
+
+# Helper function to get user's daily spending limit
+def get_user_daily_limit(user_id=0):
+    """Get the user's daily spending limit from preferences"""
+    try:
+        sql = 'SELECT daily_spending_limit FROM user_preferences WHERE user_id = %s'
+        result = run_query(sql, (user_id,), fetch_one=True)
+        if result:
+            return float(result['daily_spending_limit'])
+        else:
+            # If no preference found, create default and return it
+            sql = '''
+                INSERT INTO user_preferences (user_id, daily_spending_limit)
+                VALUES (%s, %s)
+                RETURNING daily_spending_limit
+            '''
+            result = run_query(sql, (user_id, 30.0), fetch_one=True)
+            return float(result['daily_spending_limit']) if result else 30.0
+    except Exception as e:
+        print(f"Error getting user daily limit: {e}")
+        return 30.0  # Fallback to default
+
+@app.route('/api/preferences/daily-limit', methods=['GET'])
+@require_auth
+def get_daily_limit():
+    """Get the user's current daily spending limit"""
+    try:
+        user_id = get_current_user_id()
+        daily_limit = get_user_daily_limit(user_id)
+        return jsonify({
+            'daily_limit': daily_limit,
+            'success': True
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@app.route('/api/preferences/daily-limit', methods=['POST', 'PUT'])
+@require_auth
+def set_daily_limit():
+    """Set the user's daily spending limit"""
+    try:
+        data = request.get_json()
+        daily_limit = data.get('daily_limit')
+        
+        if daily_limit is None:
+            return jsonify({
+                'error': 'daily_limit is required',
+                'success': False
+            }), 400
+        
+        try:
+            daily_limit = float(daily_limit)
+            if daily_limit < 0:
+                return jsonify({
+                    'error': 'daily_limit must be positive',
+                    'success': False
+                }), 400
+        except (ValueError, TypeError):
+            return jsonify({
+                'error': 'daily_limit must be a valid number',
+                'success': False
+            }), 400
+        
+        user_id = get_current_user_id()
+        
+        # Update or insert user preference
+        sql = '''
+            INSERT INTO user_preferences (user_id, daily_spending_limit, updated_at)
+            VALUES (%s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) DO UPDATE SET
+                daily_spending_limit = EXCLUDED.daily_spending_limit,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING daily_spending_limit
+        '''
+        result = run_query(sql, (user_id, daily_limit), fetch_one=True)
+        
+        if result:
+            return jsonify({
+                'daily_limit': float(result['daily_spending_limit']),
+                'success': True,
+                'message': 'Daily spending limit updated successfully'
+            })
+        else:
+            return jsonify({
+                'error': 'Failed to update daily spending limit',
+                'success': False
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+# Authentication Routes
+@app.route('/api/auth/signup', methods=['POST'])
+def signup():
+    """User registration with email requirement"""
+    try:
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+        
+        # Validation
+        if not username or not email or not password:
+            return jsonify({'error': 'Username, email, and password are required'}), 400
+        
+        if len(username) < 3:
+            return jsonify({'error': 'Username must be at least 3 characters'}), 400
+        
+        if len(password) < 6:
+            return jsonify({'error': 'Password must be at least 6 characters'}), 400
+        
+        if not validate_email(email):
+            return jsonify({'error': 'Please enter a valid email address'}), 400
+        
+        # Check if username already exists
+        existing_user = run_query(
+            'SELECT id FROM users WHERE username = %s',
+            (username,),
+            fetch_one=True
+        )
+        if existing_user:
+            return jsonify({'error': 'Username already exists'}), 409
+        
+        # Check if email already exists
+        existing_email = run_query(
+            'SELECT id FROM users WHERE email = %s',
+            (email,),
+            fetch_one=True
+        )
+        if existing_email:
+            return jsonify({'error': 'An account with this email already exists'}), 409
+        
+        # Hash password and create user
+        password_hash = hash_password(password)
+        sql = '''
+            INSERT INTO users (username, email, password_hash)
+            VALUES (%s, %s, %s)
+            RETURNING id, username, email
+        '''
+        result = run_query(sql, (username, email, password_hash), fetch_one=True)
+        
+        if result:
+            user_id = result['id']
+            
+            # Create default categories and preferences for new user
+            try:
+                create_default_categories(user_id)
+            except Exception as cat_error:
+                # If categories creation fails, delete the user to maintain consistency
+                print(f"Failed to create default categories for user {user_id}: {cat_error}")
+                delete_sql = 'DELETE FROM users WHERE id = %s'
+                run_query(delete_sql, (user_id,), fetch_all=False)
+                raise cat_error
+            
+            return jsonify({
+                'message': 'Account created successfully! You can now log in.',
+                'user': {
+                    'id': result['id'],
+                    'username': result['username'],
+                    'email': result['email']
+                }
+            }), 201
+        else:
+            return jsonify({'error': 'Failed to create account'}), 500
+            
+    except Exception as e:
+        print(f"Signup error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """User login with username/email and password"""
+    try:
+        data = request.get_json()
+        username_or_email = data.get('username', '').strip()
+        password = data.get('password', '')
+        
+        if not username_or_email or not password:
+            return jsonify({'error': 'Username/email and password are required'}), 400
+        
+        # Check if input is email or username
+        if validate_email(username_or_email):
+            # Login with email
+            sql = 'SELECT id, username, email, password_hash FROM users WHERE email = %s'
+        else:
+            # Login with username
+            sql = 'SELECT id, username, email, password_hash FROM users WHERE username = %s'
+        
+        user = run_query(sql, (username_or_email,), fetch_one=True)
+        
+        if not user or not verify_password(password, user['password_hash']):
+            return jsonify({'error': 'Invalid credentials'}), 401
+        
+        # Set session
+        session['user_id'] = user['id']
+        session['username'] = user['username']
+        
+        return jsonify({
+            'message': 'Login successful',
+            'user': {
+                'id': user['id'],
+                'username': user['username'],
+                'email': user['email']
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Login error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+@require_auth
+def logout():
+    """User logout"""
+    session.clear()
+    return jsonify({'message': 'Logged out successfully'}), 200
+
+@app.route('/api/auth/me', methods=['GET'])
+@require_auth
+def get_current_user():
+    """Get current user information"""
+    try:
+        sql = 'SELECT id, username, email, created_at FROM users WHERE id = %s'
+        user = run_query(sql, (session['user_id'],), fetch_one=True)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({
+            'user': {
+                'id': user['id'],
+                'username': user['username'],
+                'email': user['email'],
+                'created_at': user['created_at'].isoformat() if user['created_at'] else None
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Get current user error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/auth/forgot-password', methods=['POST'])
+def forgot_password():
+    """Initiate password reset process"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        
+        if not email:
+            return jsonify({'error': 'Email address is required'}), 400
+        
+        if not validate_email(email):
+            return jsonify({'error': 'Please enter a valid email address'}), 400
+        
+        # Check if user exists
+        user = run_query(
+            'SELECT id, username, email FROM users WHERE email = %s',
+            (email,),
+            fetch_one=True
+        )
+        
+        # Always return success message for security (don't reveal if email exists)
+        if user:
+            # Generate reset token
+            reset_token = generate_reset_token()
+            expires_at = datetime.now() + timedelta(hours=1)  # Token expires in 1 hour
+            
+            # Store token in database
+            sql = '''
+                INSERT INTO password_reset_tokens (user_id, token, expires_at)
+                VALUES (%s, %s, %s)
+            '''
+            run_query(sql, (user['id'], reset_token, expires_at), fetch_all=False)
+            
+            # Send email
+            if send_password_reset_email(user['email'], user['username'], reset_token):
+                print(f"Password reset initiated for user {user['id']} ({user['email']})")
+            else:
+                print(f"Failed to send password reset email to {user['email']}")
+        
+        # Always return the same message for security
+        return jsonify({
+            'message': 'If an account with that email exists, we\'ve sent password reset instructions.'
+        }), 200
+        
+    except Exception as e:
+        print(f"Forgot password error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+def reset_password():
+    """Reset password using token"""
+    try:
+        data = request.get_json()
+        token = data.get('token', '').strip()
+        new_password = data.get('password', '')
+        
+        if not token or not new_password:
+            return jsonify({'error': 'Token and new password are required'}), 400
+        
+        if len(new_password) < 6:
+            return jsonify({'error': 'Password must be at least 6 characters'}), 400
+        
+        # Find valid token
+        sql = '''
+            SELECT prt.user_id, prt.id as token_id, u.username, u.email
+            FROM password_reset_tokens prt
+            JOIN users u ON prt.user_id = u.id
+            WHERE prt.token = %s 
+            AND prt.expires_at > NOW() 
+            AND prt.used = FALSE
+        '''
+        token_data = run_query(sql, (token,), fetch_one=True)
+        
+        if not token_data:
+            return jsonify({'error': 'Invalid or expired reset token'}), 400
+        
+        # Hash new password
+        password_hash = hash_password(new_password)
+        
+        # Update user password
+        run_query(
+            'UPDATE users SET password_hash = %s WHERE id = %s',
+            (password_hash, token_data['user_id']),
+            fetch_all=False
+        )
+        
+        # Mark token as used
+        run_query(
+            'UPDATE password_reset_tokens SET used = TRUE WHERE id = %s',
+            (token_data['token_id'],),
+            fetch_all=False
+        )
+        
+        print(f"Password reset completed for user {token_data['user_id']} ({token_data['email']})")
+        
+        return jsonify({'message': 'Password reset successful! You can now log in with your new password.'}), 200
+        
+    except Exception as e:
+        print(f"Reset password error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 # Get the frontend directory path relative to this file
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend')
@@ -239,9 +1192,21 @@ FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'fronten
 def serve_index():
     return send_from_directory(FRONTEND_DIR, 'index.html')
 
+@app.route('/auth.html')
+def serve_auth():
+    return send_from_directory(FRONTEND_DIR, 'auth.html')
+
+@app.route('/reset-password.html')
+def serve_reset_password():
+    return send_from_directory(FRONTEND_DIR, 'reset-password.html')
+
 @app.route('/history.html')
 def serve_history():
     return send_from_directory(FRONTEND_DIR, 'history.html')
+
+@app.route('/settings.html')
+def serve_settings():
+    return send_from_directory(FRONTEND_DIR, 'settings.html')
 
 @app.route('/<path:filename>')
 def serve_static(filename):

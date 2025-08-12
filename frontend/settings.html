@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Sprout Budget</title>
+    <link rel="stylesheet" href="style.css?v=optional_budgets_v1">
+    <link rel="icon" href="logo.svg" type="image/svg+xml">
+</head>
+<body>
+    <div class="settings-container">
+        <header class="settings-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <a href="/" class="back-button">
+                        <span class="back-icon">←</span>
+                        Back to Home
+                    </a>
+                </div>
+                <h1>Settings</h1>
+                <div class="header-right"></div>
+            </div>
+        </header>
+
+        <main class="settings-main">
+            <div class="settings-section">
+                <h2>Daily Spending Limit</h2>
+                <p class="section-description">
+                    Set your daily spending limit to help track your budget and see how much you have left to spend each day.
+                </p>
+                
+                <div class="limit-form">
+                    <div class="current-limit-display">
+                        <div class="current-limit-label">Current Daily Limit</div>
+                        <div class="current-limit-value" id="current-limit-display">$30.00</div>
+                    </div>
+                    
+                    <form id="daily-limit-form" class="daily-limit-form">
+                        <div class="form-group">
+                            <label for="daily-limit-input" class="form-label">New Daily Limit</label>
+                            <div class="input-wrapper">
+                                <span class="currency-symbol">$</span>
+                                <input 
+                                    type="number" 
+                                    id="daily-limit-input" 
+                                    name="daily_limit"
+                                    step="0.01" 
+                                    min="0" 
+                                    placeholder="30.00"
+                                    class="daily-limit-input"
+                                    required
+                                >
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="save-button">
+                                Save Changes
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="cancel-button">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div id="status-message" class="status-message"></div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h2>Category Budgets</h2>
+                <p class="section-description">
+                    Choose which categories you want to budget for. Toggle the switch to enable/disable budgets for specific categories like food, transportation, etc.
+                </p>
+                
+                <div class="category-budgets-container" id="category-budgets-container">
+                    <div class="loading-message">Loading categories...</div>
+                </div>
+                
+                <div class="category-budget-actions">
+                    <button type="button" class="btn btn-primary" id="save-all-budgets-button" disabled>
+                        Save All Changes
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="reset-budgets-button">
+                        Reset to Defaults
+                    </button>
+                </div>
+                
+                <div id="category-status-message" class="status-message"></div>
+            </div>
+
+            <div class="settings-section">
+                <h2>About Your Budget</h2>
+                <div class="info-cards">
+                    <div class="info-card">
+                        <div class="info-icon">🌱</div>
+                        <div class="info-content">
+                            <div class="info-title">Plant Growth</div>
+                            <div class="info-text">Your plant grows healthier when you stay within your daily budget!</div>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-icon">📊</div>
+                        <div class="info-content">
+                            <div class="info-title">Smart Tracking</div>
+                            <div class="info-text">We calculate your 7-day average and 30-day projections based on your daily limit.</div>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-icon">🎯</div>
+                        <div class="info-content">
+                            <div class="info-title">Flexible Goals</div>
+                            <div class="info-text">Change your daily limit anytime to match your budget needs.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="settings.js?v=optional_budgets_v1"></script>
+</body>
+</html> 

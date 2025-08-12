@@ -33,21 +33,126 @@ A minimalist personal budget tracker designed to help you stay financially aware
 - **Nginx** - Production web server
 - **Render** - Cloud deployment platform
 
-## Docker Quickstart
+## Prerequisites
 
-### Production Build & Run
+- **Docker** (for production builds)
+- **Python 3.x** (for development)
+- **Node.js** and **npm** (for frontend development server)
 
-Build and run the production version using Docker:
+## Initial Setup
+
+### 1. Clone the Repository
 
 ```bash
-# Clone the repository
 git clone https://github.com/yourusername/sprout-budget-tracker.git
 cd sprout-budget-tracker
+```
 
-# Build the Docker image (creates production container with Nginx + Flask)
+### 2. Development Setup
+
+#### Backend Setup
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+#### Frontend Setup
+```bash
+npm install -g live-server
+```
+
+### 3. Environment Variables (Optional)
+
+The application works with default values, but you can customize behavior with environment variables.
+
+#### For Development (Local)
+
+Create a `.env` file in the `backend/` directory to customize settings:
+
+```bash
+cd backend
+cat > .env << EOF
+DAILY_BUDGET=25.0
+PORT=5001
+FLASK_ENV=development
+FLASK_DEBUG=true
+DATABASE_URL=postgresql://localhost/sprout_budget
+EOF
+```
+
+**Available Development Variables:**
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `DAILY_BUDGET` | Daily budget amount | `30.0` | No |
+| `PORT` | Flask server port | `5001` | No |
+| `FLASK_ENV` | Flask environment | `development` | No |
+| `FLASK_DEBUG` | Enable debug mode | `true` | No |
+| `DATABASE_URL` | Database connection | Uses SQLite by default | No |
+
+> **Note:** If no `.env` file exists, the app uses sensible defaults and SQLite for the database.
+
+#### For Production (Render Platform)
+
+Set these in your Render service's Environment Variables section:
+
+**Required Production Variables:**
+| Variable | Description | Example | Required |
+|----------|-------------|---------|----------|
+| `DATABASE_URL` | PostgreSQL connection | `postgresql://user:pass@host:5432/db` | ✅ Yes |
+| `FLASK_ENV` | Flask environment | `production` | ✅ Yes |
+| `DAILY_BUDGET` | Daily budget amount | `30.0` | No |
+| `PORT` | External port | `10000` | No (Render sets this) |
+
+**How to set in Render:**
+1. Go to your Render service dashboard
+2. Click "Environment" tab
+3. Add the variables above
+4. Deploy your service
+
+## How to Build
+
+### Development Build
+
+No build step required for development. The application runs directly from source files.
+
+### Production Build
+
+Build the Docker image for production deployment:
+
+```bash
 docker build -t sprout-budget-tracker .
+```
 
-# Run the production container
+This creates a production container with Nginx + Flask using Gunicorn WSGI server.
+
+## How to Run
+
+### Development Mode (Recommended for Local Development)
+
+#### Quick Start
+```bash
+./start.sh
+```
+
+**🌐 Access your app at: http://localhost:8080**
+
+#### Manual Start
+```bash
+# Terminal 1: Start backend
+cd backend
+source venv/bin/activate
+python app.py  # Starts on http://localhost:5001
+
+# Terminal 2: Start frontend  
+cd frontend
+live-server --port=8080  # Starts on http://localhost:8080
+```
+
+### Production Mode (Docker)
+
+```bash
 docker run -p 10000:10000 \
   -e FLASK_ENV=production \
   -e DAILY_BUDGET=30.0 \
@@ -55,41 +160,6 @@ docker run -p 10000:10000 \
 ```
 
 **🌐 Access your app at: http://localhost:10000**
-
-### How It Works
-- **Port 10000** (External): Nginx serves frontend files and handles incoming requests
-- **Port 5000** (Internal): Flask backend API running with Gunicorn WSGI server
-- **Request Flow**: Browser → Nginx (10000) → Flask API (5000) → PostgreSQL
-
-> **Note:** This Docker setup mirrors the exact production environment used on Render.
-
-## Want to Deploy Online?
-
-**Ready to deploy to production?** This app is designed for **Render** deployment using Docker containers.
-
-👉 **See [DEPLOYMENT.md](DEPLOYMENT.md) for complete step-by-step instructions including:**
-- Local Docker testing
-- Render account setup
-- PostgreSQL database creation
-- Environment variable configuration
-- Health monitoring and troubleshooting
-
-## Local Development Setup
-
-### Quick Start (Recommended)
-
-For development with auto-reload and debugging:
-
-```bash
-# Clone and navigate to project
-git clone https://github.com/yourusername/sprout-budget-tracker.git
-cd sprout-budget-tracker
-
-# Start development servers (uses ./start.sh)
-./start.sh
-```
-
-**🌐 Access your app at: http://localhost:8080**
 
 ### Development vs Production
 
@@ -102,25 +172,81 @@ cd sprout-budget-tracker
 | **Auto-reload** | ✅ Yes (both frontend/backend) | ❌ No (production stability) |
 | **Debug Mode** | ✅ Yes (detailed errors) | ❌ No (security) |
 
-### Manual Development Setup
+## How to Test
 
-If you prefer not to use `./start.sh`:
+### Test Development Environment
 
-#### Backend Setup
+#### 1. Start the Development Servers
 ```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python app.py  # Starts on http://localhost:5001
+./start.sh
 ```
 
-#### Frontend Setup
+#### 2. Test Backend API
 ```bash
-npm install -g live-server
-cd frontend
-live-server --port=8080  # Starts on http://localhost:8080
+curl http://localhost:5001/health
 ```
+Expected response:
+```json
+{"status":"ok"}
+```
+
+#### 3. Test Frontend
+Open your browser to: http://localhost:8080
+
+#### 4. Test API Endpoints
+```bash
+# Get current budget status
+curl http://localhost:5001/api/budget
+
+# Add an expense
+curl -X POST http://localhost:5001/api/expenses \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 15.50, "description": "Lunch"}'
+
+# Get expense history
+curl http://localhost:5001/api/expenses/history
+```
+
+### Test Production Environment
+
+#### 1. Build and Run Production Container
+```bash
+docker build -t sprout-test .
+docker run -d -p 10000:10000 -e FLASK_ENV=production --name sprout-container sprout-test
+```
+
+#### 2. Test Production Health
+```bash
+curl http://localhost:10000/health
+```
+Expected response:
+```json
+{"status":"ok"}
+```
+
+#### 3. Test Frontend
+Open your browser to: http://localhost:10000
+
+#### 4. Test Production API
+```bash
+# Test budget endpoint through Nginx
+curl http://localhost:10000/api/budget
+
+# Test adding expenses
+curl -X POST http://localhost:10000/api/expenses \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 25.00, "description": "Dinner"}'
+```
+
+#### 5. Cleanup Test Container
+```bash
+docker stop sprout-container && docker rm sprout-container
+```
+
+### How It Works (Architecture)
+- **Port 10000** (External): Nginx serves frontend files and handles incoming requests
+- **Port 5000** (Internal): Flask backend API running with Gunicorn WSGI server
+- **Request Flow**: Browser → Nginx (10000) → Flask API (5000) → PostgreSQL
 
 ## Project Structure
 
@@ -150,56 +276,6 @@ Sprout/
 └── README.md                  # This file
 ```
 
-## Environment Variables
-
-### Development (Local)
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `DAILY_BUDGET` | Daily budget amount | `30.0` | No |
-| `PORT` | Flask server port | `5001` | No |
-| `FLASK_ENV` | Flask environment | `development` | No |
-| `FLASK_DEBUG` | Enable debug mode | `true` | No |
-
-### Production (Render)
-| Variable | Description | Example | Required |
-|----------|-------------|---------|----------|
-| `DATABASE_URL` | PostgreSQL connection | `postgresql://user:pass@host:5432/db` | ✅ Yes |
-| `FLASK_ENV` | Flask environment | `production` | ✅ Yes |
-| `DAILY_BUDGET` | Daily budget amount | `30.0` | No |
-| `PORT` | External port | `10000` | No (Render sets this) |
-
-## Testing Your Setup
-
-### Test Development Environment
-```bash
-# Start development servers
-./start.sh
-
-# Test backend API (in a new terminal)
-curl http://localhost:5001/health
-# Expected: {"status":"ok"}
-
-# Open frontend
-open http://localhost:8080
-```
-
-### Test Production Docker Build
-```bash
-# Build and test production container
-docker build -t sprout-test .
-docker run -d -p 10000:10000 -e FLASK_ENV=production --name sprout-container sprout-test
-
-# Test production health
-curl http://localhost:10000/health
-# Expected: {"status":"ok"}
-
-# Test frontend
-open http://localhost:10000
-
-# Cleanup
-docker stop sprout-container && docker rm sprout-container
-```
-
 ## Usage
 
 1. **Set Your Budget**: Enter your daily spending limit at the top of the page
@@ -213,6 +289,17 @@ docker stop sprout-container && docker rm sprout-container
 - **Auto-reload**: Both frontend and backend restart on file changes
 - **Debug Mode**: Detailed error messages and stack traces
 - **Local Database**: SQLite file for easy development testing
+
+## Deployment
+
+**Want to Deploy Online?** This app is designed for **Render** deployment using Docker containers.
+
+👉 **See [DEPLOYMENT.md](DEPLOYMENT.md) for complete step-by-step instructions including:**
+- Local Docker testing
+- Render account setup
+- PostgreSQL database creation
+- Environment variable configuration
+- Health monitoring and troubleshooting
 
 ## About This Project
 
