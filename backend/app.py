@@ -1,9 +1,12 @@
 from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
+from flask_mail import Mail, Message
 import psycopg2
 import psycopg2.extras
 import os
 import bcrypt
+import secrets
+import re
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from functools import wraps
@@ -14,6 +17,17 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 CORS(app, supports_credentials=True)
+
+# Email configuration
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
+app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL', 'False').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
+
+mail = Mail(app)
 
 # Custom exception for database connection errors
 class DatabaseConnectionError(Exception):
@@ -92,6 +106,50 @@ def hash_password(password):
 def verify_password(password, hashed):
     """Verify a password against its hash"""
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def validate_email(email):
+    """Validate email format using regex"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def generate_reset_token():
+    """Generate a secure random token for password reset"""
+    return secrets.token_urlsafe(32)
+
+def send_password_reset_email(user_email, username, reset_token):
+    """Send password reset email to user"""
+    try:
+        # Create the reset URL (adjust domain for production)
+        reset_url = f"http://localhost:5001/reset-password.html?token={reset_token}"
+        
+        # Create email message
+        msg = Message(
+            subject="Sprout Budget Tracker - Password Reset",
+            recipients=[user_email],
+            body=f"""Hello {username},
+
+You requested a password reset for your Sprout Budget Tracker account.
+
+Click the link below to reset your password:
+{reset_url}
+
+This link will expire in 1 hour for security reasons.
+
+If you didn't request this password reset, please ignore this email.
+
+Best regards,
+The Sprout Team
+
+--
+This is an automated message. Please do not reply to this email."""
+        )
+        
+        mail.send(msg)
+        print(f"Password reset email sent to {user_email}")
+        return True
+    except Exception as e:
+        print(f"Failed to send password reset email: {e}")
+        return False
 
 def require_auth(f):
     """Decorator to require authentication for protected routes"""
@@ -802,14 +860,16 @@ def set_daily_limit():
 # Authentication Routes
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
-    """User registration"""
+    """User registration with email requirement"""
     try:
         data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
         
-        if not username or not password:
-            return jsonify({'error': 'Username and password are required'}), 400
+        # Validation
+        if not username or not email or not password:
+            return jsonify({'error': 'Username, email, and password are required'}), 400
         
         if len(username) < 3:
             return jsonify({'error': 'Username must be at least 3 characters'}), 400
@@ -817,20 +877,35 @@ def signup():
         if len(password) < 6:
             return jsonify({'error': 'Password must be at least 6 characters'}), 400
         
-        # Check if user already exists
-        sql = 'SELECT id FROM users WHERE username = %s'
-        existing_user = run_query(sql, (username,), fetch_one=True)
+        if not validate_email(email):
+            return jsonify({'error': 'Please enter a valid email address'}), 400
+        
+        # Check if username already exists
+        existing_user = run_query(
+            'SELECT id FROM users WHERE username = %s',
+            (username,),
+            fetch_one=True
+        )
         if existing_user:
             return jsonify({'error': 'Username already exists'}), 409
+        
+        # Check if email already exists
+        existing_email = run_query(
+            'SELECT id FROM users WHERE email = %s',
+            (email,),
+            fetch_one=True
+        )
+        if existing_email:
+            return jsonify({'error': 'An account with this email already exists'}), 409
         
         # Hash password and create user
         password_hash = hash_password(password)
         sql = '''
-            INSERT INTO users (username, password_hash)
-            VALUES (%s, %s)
-            RETURNING id
+            INSERT INTO users (username, email, password_hash)
+            VALUES (%s, %s, %s)
+            RETURNING id, username, email
         '''
-        result = run_query(sql, (username, password_hash), fetch_one=True)
+        result = run_query(sql, (username, email, password_hash), fetch_one=True)
         
         if result:
             user_id = result['id']
@@ -846,8 +921,12 @@ def signup():
                 raise cat_error
             
             return jsonify({
-                'message': 'Account created successfully',
-                'user_id': user_id
+                'message': 'Account created successfully! You can now log in.',
+                'user': {
+                    'id': result['id'],
+                    'username': result['username'],
+                    'email': result['email']
+                }
             }), 201
         else:
             return jsonify({'error': 'Failed to create account'}), 500
@@ -860,24 +939,27 @@ def signup():
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """User login"""
+    """User login with username/email and password"""
     try:
         data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
+        username_or_email = data.get('username', '').strip()
+        password = data.get('password', '')
         
-        if not username or not password:
-            return jsonify({'error': 'Username and password are required'}), 400
+        if not username_or_email or not password:
+            return jsonify({'error': 'Username/email and password are required'}), 400
         
-        # Get user by username
-        sql = 'SELECT id, username, password_hash FROM users WHERE username = %s'
-        user = run_query(sql, (username,), fetch_one=True)
+        # Check if input is email or username
+        if validate_email(username_or_email):
+            # Login with email
+            sql = 'SELECT id, username, email, password_hash FROM users WHERE email = %s'
+        else:
+            # Login with username
+            sql = 'SELECT id, username, email, password_hash FROM users WHERE username = %s'
         
-        if not user:
-            return jsonify({'error': 'Invalid username or password'}), 401
+        user = run_query(sql, (username_or_email,), fetch_one=True)
         
-        if not verify_password(password, user['password_hash']):
-            return jsonify({'error': 'Invalid username or password'}), 401
+        if not user or not verify_password(password, user['password_hash']):
+            return jsonify({'error': 'Invalid credentials'}), 401
         
         # Set session
         session['user_id'] = user['id']
@@ -887,7 +969,8 @@ def login():
             'message': 'Login successful',
             'user': {
                 'id': user['id'],
-                'username': user['username']
+                'username': user['username'],
+                'email': user['email']
             }
         }), 200
         
@@ -907,7 +990,7 @@ def logout():
 def get_current_user():
     """Get current user information"""
     try:
-        sql = 'SELECT id, username, created_at FROM users WHERE id = %s'
+        sql = 'SELECT id, username, email, created_at FROM users WHERE id = %s'
         user = run_query(sql, (session['user_id'],), fetch_one=True)
         
         if not user:
@@ -917,12 +1000,114 @@ def get_current_user():
             'user': {
                 'id': user['id'],
                 'username': user['username'],
+                'email': user['email'],
                 'created_at': user['created_at'].isoformat() if user['created_at'] else None
             }
         }), 200
         
     except Exception as e:
         print(f"Get current user error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/auth/forgot-password', methods=['POST'])
+def forgot_password():
+    """Initiate password reset process"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        
+        if not email:
+            return jsonify({'error': 'Email address is required'}), 400
+        
+        if not validate_email(email):
+            return jsonify({'error': 'Please enter a valid email address'}), 400
+        
+        # Check if user exists
+        user = run_query(
+            'SELECT id, username, email FROM users WHERE email = %s',
+            (email,),
+            fetch_one=True
+        )
+        
+        # Always return success message for security (don't reveal if email exists)
+        if user:
+            # Generate reset token
+            reset_token = generate_reset_token()
+            expires_at = datetime.now() + timedelta(hours=1)  # Token expires in 1 hour
+            
+            # Store token in database
+            sql = '''
+                INSERT INTO password_reset_tokens (user_id, token, expires_at)
+                VALUES (%s, %s, %s)
+            '''
+            run_query(sql, (user['id'], reset_token, expires_at), fetch_all=False)
+            
+            # Send email
+            if send_password_reset_email(user['email'], user['username'], reset_token):
+                print(f"Password reset initiated for user {user['id']} ({user['email']})")
+            else:
+                print(f"Failed to send password reset email to {user['email']}")
+        
+        # Always return the same message for security
+        return jsonify({
+            'message': 'If an account with that email exists, we\'ve sent password reset instructions.'
+        }), 200
+        
+    except Exception as e:
+        print(f"Forgot password error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+def reset_password():
+    """Reset password using token"""
+    try:
+        data = request.get_json()
+        token = data.get('token', '').strip()
+        new_password = data.get('password', '')
+        
+        if not token or not new_password:
+            return jsonify({'error': 'Token and new password are required'}), 400
+        
+        if len(new_password) < 6:
+            return jsonify({'error': 'Password must be at least 6 characters'}), 400
+        
+        # Find valid token
+        sql = '''
+            SELECT prt.user_id, prt.id as token_id, u.username, u.email
+            FROM password_reset_tokens prt
+            JOIN users u ON prt.user_id = u.id
+            WHERE prt.token = %s 
+            AND prt.expires_at > NOW() 
+            AND prt.used = FALSE
+        '''
+        token_data = run_query(sql, (token,), fetch_one=True)
+        
+        if not token_data:
+            return jsonify({'error': 'Invalid or expired reset token'}), 400
+        
+        # Hash new password
+        password_hash = hash_password(new_password)
+        
+        # Update user password
+        run_query(
+            'UPDATE users SET password_hash = %s WHERE id = %s',
+            (password_hash, token_data['user_id']),
+            fetch_all=False
+        )
+        
+        # Mark token as used
+        run_query(
+            'UPDATE password_reset_tokens SET used = TRUE WHERE id = %s',
+            (token_data['token_id'],),
+            fetch_all=False
+        )
+        
+        print(f"Password reset completed for user {token_data['user_id']} ({token_data['email']})")
+        
+        return jsonify({'message': 'Password reset successful! You can now log in with your new password.'}), 200
+        
+    except Exception as e:
+        print(f"Reset password error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 # Get the frontend directory path relative to this file
@@ -935,6 +1120,10 @@ def serve_index():
 @app.route('/auth.html')
 def serve_auth():
     return send_from_directory(FRONTEND_DIR, 'auth.html')
+
+@app.route('/reset-password.html')
+def serve_reset_password():
+    return send_from_directory(FRONTEND_DIR, 'reset-password.html')
 
 @app.route('/history.html')
 def serve_history():

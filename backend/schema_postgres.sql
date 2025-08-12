@@ -1,12 +1,28 @@
 -- PostgreSQL schema for Sprout Budget Tracker
 
--- Users table for multi-user support
+-- Users table for multi-user support with email and password reset
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username VARCHAR(50) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Password reset tokens table
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  token VARCHAR(255) UNIQUE NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  used BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Create index for faster token lookups
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires ON password_reset_tokens(expires_at);
 
 -- Categories table for expense categorization (removed UNIQUE constraint on name)
 CREATE TABLE IF NOT EXISTS categories (
@@ -21,9 +37,9 @@ CREATE TABLE IF NOT EXISTS categories (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Insert default user if not exists
-INSERT INTO users (id, username, password_hash) 
-VALUES (0, 'default', 'dummy_hash') 
+-- Insert default user if not exists (updated with email)
+INSERT INTO users (id, username, email, password_hash) 
+VALUES (0, 'default', 'default@example.com', 'dummy_hash') 
 ON CONFLICT (id) DO NOTHING;
 
 -- Insert default categories for user 0
