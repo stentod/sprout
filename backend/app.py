@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
 from flask_mail import Mail, Message
+import sendgrid
+from sendgrid.helpers.mail import Mail as SendGridMail
 import psycopg2
 import psycopg2.extras
 import os
@@ -116,8 +118,77 @@ def generate_reset_token():
     """Generate a secure random token for password reset"""
     return secrets.token_urlsafe(32)
 
-def send_password_reset_email(user_email, username, reset_token):
-    """Send password reset email to user"""
+def send_password_reset_email_sendgrid(user_email, username, reset_token):
+    """Send password reset email using SendGrid (Professional)"""
+    try:
+        # Get SendGrid API key from environment
+        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+        if not sendgrid_api_key:
+            print("SendGrid API key not configured, falling back to Gmail")
+            return send_password_reset_email_gmail(user_email, username, reset_token)
+        
+        # Create the reset URL
+        reset_url = f"http://localhost:5001/reset-password.html?token={reset_token}"
+        
+        # Create SendGrid client
+        sg = sendgrid.SendGridAPIClient(api_key=sendgrid_api_key)
+        
+        # Create HTML email content
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: #4CAF50; color: white; padding: 20px; text-align: center; }}
+                .content {{ padding: 20px; background: #f9f9f9; }}
+                .button {{ background: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; }}
+                .footer {{ color: #666; font-size: 12px; text-align: center; margin-top: 30px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🌱 Sprout Budget Tracker</h1>
+                </div>
+                <div class="content">
+                    <h2>Password Reset Request</h2>
+                    <p>Hello {username},</p>
+                    <p>You requested a password reset for your Sprout Budget Tracker account.</p>
+                    <p><a href="{reset_url}" class="button">Reset Your Password</a></p>
+                    <p><strong>This link will expire in 1 hour</strong> for security reasons.</p>
+                    <p>If you didn't request this password reset, please ignore this email.</p>
+                </div>
+                <div class="footer">
+                    <p>Best regards,<br>The Sprout Team</p>
+                    <p>This is an automated message. Please do not reply to this email.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Create email message
+        message = SendGridMail(
+            from_email=os.environ.get('FROM_EMAIL', 'noreply@sproutbudget.com'),
+            to_emails=user_email,
+            subject="🌱 Reset Your Sprout Budget Password",
+            html_content=html_content
+        )
+        
+        # Send email
+        response = sg.send(message)
+        print(f"✅ SendGrid: Password reset email sent to {user_email}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ SendGrid failed: {e}")
+        print("🔄 Falling back to Gmail...")
+        return send_password_reset_email_gmail(user_email, username, reset_token)
+
+def send_password_reset_email_gmail(user_email, username, reset_token):
+    """Send password reset email using Gmail (Fallback)"""
     try:
         # Create the reset URL (adjust domain for production)
         reset_url = f"http://localhost:5001/reset-password.html?token={reset_token}"
@@ -145,11 +216,15 @@ This is an automated message. Please do not reply to this email."""
         )
         
         mail.send(msg)
-        print(f"Password reset email sent to {user_email}")
+        print(f"📧 Gmail: Password reset email sent to {user_email}")
         return True
     except Exception as e:
-        print(f"Failed to send password reset email: {e}")
+        print(f"❌ Gmail failed: {e}")
         return False
+
+def send_password_reset_email(user_email, username, reset_token):
+    """Send password reset email (tries SendGrid first, falls back to Gmail)"""
+    return send_password_reset_email_sendgrid(user_email, username, reset_token)
 
 def require_auth(f):
     """Decorator to require authentication for protected routes"""
