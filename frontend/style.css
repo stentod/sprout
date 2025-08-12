@@ -1647,6 +1647,46 @@ body {
   color: #4caf50;
 }
 
+.auth-message.info {
+  background: rgba(33, 150, 243, 0.1);
+  border: 1px solid rgba(33, 150, 243, 0.3);
+  color: #2196f3;
+}
+
+.auth-links {
+  margin-top: var(--spacing-md);
+  text-align: center;
+}
+
+.forgot-password-link,
+.back-to-login-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.2s ease;
+}
+
+.forgot-password-link:hover,
+.back-to-login-link:hover {
+  color: var(--color-primary-dark);
+  text-decoration: underline;
+}
+
+.auth-footer {
+  margin-top: var(--spacing-lg);
+  text-align: center;
+}
+
+.auth-footer a {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
 /* Responsive auth styles */
 @media (max-width: 768px) {
   .auth-container {

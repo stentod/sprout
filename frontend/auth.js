@@ -13,24 +13,29 @@ function getApiBaseUrl() {
 
 const API_BASE_URL = getApiBaseUrl();
 
-// Switch between login and signup tabs
+// Switch between login, signup, and forgot password tabs
 function switchTab(tab) {
   const loginForm = document.getElementById('loginForm');
   const signupForm = document.getElementById('signupForm');
+  const forgotForm = document.getElementById('forgotForm');
   const tabs = document.querySelectorAll('.auth-tab');
   
   // Remove active class from all tabs and forms
   tabs.forEach(t => t.classList.remove('active'));
   loginForm.classList.remove('active');
   signupForm.classList.remove('active');
+  forgotForm.classList.remove('active');
   
   // Add active class to selected tab and form
   if (tab === 'login') {
     document.querySelector('[onclick="switchTab(\'login\')"]').classList.add('active');
     loginForm.classList.add('active');
-  } else {
+  } else if (tab === 'signup') {
     document.querySelector('[onclick="switchTab(\'signup\')"]').classList.add('active');
     signupForm.classList.add('active');
+  } else if (tab === 'forgot') {
+    document.querySelector('[onclick="switchTab(\'forgot\')"]').classList.add('active');
+    forgotForm.classList.add('active');
   }
   
   clearMessage();
@@ -46,23 +51,29 @@ function showMessage(message, type = 'error') {
   const messageDiv = document.getElementById('authMessage');
   messageDiv.innerHTML = `<div class="auth-message ${type}">${message}</div>`;
   
-  // Auto-hide success messages after 3 seconds
+  // Auto-hide success messages after 5 seconds
   if (type === 'success') {
     setTimeout(() => {
       messageDiv.innerHTML = '';
-    }, 3000);
+    }, 5000);
   }
+}
+
+// Email validation
+function validateEmail(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
 }
 
 // Handle login form submission
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   
-  const username = document.getElementById('loginUsername').value;
+  const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value;
   
   if (!username || !password) {
-    showMessage('Please enter both username and password');
+    showMessage('Please enter both username/email and password');
     return;
   }
   
@@ -110,17 +121,24 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 document.getElementById('signupForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   
-  const username = document.getElementById('signupUsername').value;
+  const username = document.getElementById('signupUsername').value.trim();
+  const email = document.getElementById('signupEmail').value.trim().toLowerCase();
   const password = document.getElementById('signupPassword').value;
   const confirmPassword = document.getElementById('confirmPassword').value;
   
-  if (!username || !password || !confirmPassword) {
+  // Validation
+  if (!username || !email || !password || !confirmPassword) {
     showMessage('Please fill in all fields');
     return;
   }
   
   if (username.length < 3) {
     showMessage('Username must be at least 3 characters');
+    return;
+  }
+  
+  if (!validateEmail(email)) {
+    showMessage('Please enter a valid email address');
     return;
   }
   
@@ -149,6 +167,7 @@ document.getElementById('signupForm').addEventListener('submit', async function(
       credentials: 'include',
       body: JSON.stringify({
         username: username,
+        email: email,
         password: password
       })
     });
@@ -193,5 +212,73 @@ function checkAuthStatus() {
   }
 }
 
+// Handle forgot password form submission
+document.getElementById('forgotForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
+  
+  if (!email) {
+    showMessage('Please enter your email address');
+    return;
+  }
+  
+  if (!validateEmail(email)) {
+    showMessage('Please enter a valid email address');
+    return;
+  }
+  
+  const submitButton = this.querySelector('button[type="submit"]');
+  const originalText = submitButton.textContent;
+  submitButton.textContent = 'Sending...';
+  submitButton.disabled = true;
+  clearMessage();
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: email
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      showMessage(data.message, 'success');
+      // Clear the form
+      document.getElementById('forgotEmail').value = '';
+      // Switch back to login tab after 3 seconds
+      setTimeout(() => {
+        switchTab('login');
+      }, 3000);
+    } else {
+      showMessage(data.error || 'Failed to send reset email');
+    }
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    showMessage('Network error. Please try again.');
+  } finally {
+    submitButton.textContent = originalText;
+    submitButton.disabled = false;
+  }
+});
+
+// Check for URL parameters (like success messages)
+function checkForMessages() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const message = urlParams.get('message');
+  
+  if (message === 'password-reset-success') {
+    showMessage('Password reset successful! Please log in with your new password.', 'success');
+    // Clean up URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+
 // Check auth status when page loads
+checkForMessages();
 checkAuthStatus();
