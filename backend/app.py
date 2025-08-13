@@ -18,6 +18,12 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
+
+# Enhanced session configuration for production
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Sessions last 7 days
 CORS(app, supports_credentials=True)
 
 # Email configuration
@@ -127,8 +133,9 @@ def send_password_reset_email_sendgrid(user_email, username, reset_token):
             print("SendGrid API key not configured, falling back to Gmail")
             return send_password_reset_email_gmail(user_email, username, reset_token)
         
-        # Create the reset URL
-        reset_url = f"http://localhost:5001/reset-password.html?token={reset_token}"
+        # Create the reset URL (dynamic for production)
+        base_url = os.environ.get('BASE_URL', 'http://localhost:5001')
+        reset_url = f"{base_url}/reset-password.html?token={reset_token}"
         
         # Create SendGrid client
         sg = sendgrid.SendGridAPIClient(api_key=sendgrid_api_key)
@@ -190,8 +197,9 @@ def send_password_reset_email_sendgrid(user_email, username, reset_token):
 def send_password_reset_email_gmail(user_email, username, reset_token):
     """Send password reset email using Gmail (Fallback)"""
     try:
-        # Create the reset URL (adjust domain for production)
-        reset_url = f"http://localhost:5001/reset-password.html?token={reset_token}"
+        # Create the reset URL (dynamic for production)
+        base_url = os.environ.get('BASE_URL', 'http://localhost:5001')
+        reset_url = f"{base_url}/reset-password.html?token={reset_token}"
         
         # Create email message
         msg = Message(
@@ -935,19 +943,27 @@ def set_daily_limit():
 # Authentication Routes
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
-    """User registration with email requirement"""
+    """User registration with email-only authentication"""
     try:
+        # Enhanced request parsing with better error handling
+        if not request.is_json:
+            return jsonify({'error': 'Request must be JSON'}), 400
+            
         data = request.get_json()
-        username = data.get('username', '').strip()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
         
-        # Validation
-        if not username or not email or not password:
-            return jsonify({'error': 'Username, email, and password are required'}), 400
+        print(f"Signup attempt - Email: {email}")
         
-        if len(username) < 3:
-            return jsonify({'error': 'Username must be at least 3 characters'}), 400
+        # Enhanced validation with specific error messages
+        if not email or not password:
+            missing_fields = []
+            if not email: missing_fields.append('email')
+            if not password: missing_fields.append('password')
+            return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
         
         if len(password) < 6:
             return jsonify({'error': 'Password must be at least 6 characters'}), 400
@@ -955,103 +971,143 @@ def signup():
         if not validate_email(email):
             return jsonify({'error': 'Please enter a valid email address'}), 400
         
-        # Check if username already exists
-        existing_user = run_query(
-            'SELECT id FROM users WHERE username = %s',
-            (username,),
-            fetch_one=True
-        )
-        if existing_user:
-            return jsonify({'error': 'Username already exists'}), 409
+        # Check if email already exists with better error handling
+        try:
+            existing_email = run_query(
+                'SELECT id FROM users WHERE email = %s',
+                (email,),
+                fetch_one=True
+            )
+            if existing_email:
+                print(f"Signup failed - Email already exists: {email}")
+                return jsonify({'error': 'An account with this email already exists. Please use a different email or try logging in.'}), 409
+        except Exception as db_error:
+            print(f"Database error checking email: {db_error}")
+            return jsonify({'error': 'Database connection error. Please try again.'}), 503
         
-        # Check if email already exists
-        existing_email = run_query(
-            'SELECT id FROM users WHERE email = %s',
-            (email,),
-            fetch_one=True
-        )
-        if existing_email:
-            return jsonify({'error': 'An account with this email already exists'}), 409
-        
-        # Hash password and create user
-        password_hash = hash_password(password)
-        sql = '''
-            INSERT INTO users (username, email, password_hash)
-            VALUES (%s, %s, %s)
-            RETURNING id, username, email
-        '''
-        result = run_query(sql, (username, email, password_hash), fetch_one=True)
-        
-        if result:
+        # Hash password and create user with enhanced error handling
+        try:
+            password_hash = hash_password(password)
+            sql = '''
+                INSERT INTO users (email, password_hash)
+                VALUES (%s, %s)
+                RETURNING id, email
+            '''
+            result = run_query(sql, (email, password_hash), fetch_one=True)
+            
+            if not result:
+                print(f"Failed to create user account for {email}")
+                return jsonify({'error': 'Failed to create account. Please try again.'}), 500
+                
             user_id = result['id']
+            print(f"User created successfully - ID: {user_id}, Email: {email}")
             
             # Create default categories and preferences for new user
             try:
                 create_default_categories(user_id)
+                print(f"Default categories created for user {user_id}")
             except Exception as cat_error:
                 # If categories creation fails, delete the user to maintain consistency
                 print(f"Failed to create default categories for user {user_id}: {cat_error}")
-                delete_sql = 'DELETE FROM users WHERE id = %s'
-                run_query(delete_sql, (user_id,), fetch_all=False)
-                raise cat_error
+                try:
+                    delete_sql = 'DELETE FROM users WHERE id = %s'
+                    run_query(delete_sql, (user_id,), fetch_all=False)
+                    print(f"Rolled back user creation for {user_id}")
+                except Exception as delete_error:
+                    print(f"Failed to rollback user creation: {delete_error}")
+                return jsonify({'error': 'Failed to set up account. Please try again.'}), 500
             
             return jsonify({
                 'message': 'Account created successfully! You can now log in.',
                 'user': {
                     'id': result['id'],
-                    'username': result['username'],
                     'email': result['email']
                 }
             }), 201
-        else:
-            return jsonify({'error': 'Failed to create account'}), 500
+            
+        except Exception as create_error:
+            print(f"Error creating user account: {create_error}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': 'Failed to create account. Please try again.'}), 500
             
     except Exception as e:
-        print(f"Signup error: {e}")
+        print(f"Unexpected signup error: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({'error': 'An unexpected error occurred. Please try again later.'}), 500
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """User login with username/email and password"""
+    """User login with email and password"""
     try:
+        # Enhanced request parsing with better error handling
+        if not request.is_json:
+            return jsonify({'error': 'Request must be JSON'}), 400
+            
         data = request.get_json()
-        username_or_email = data.get('username', '').strip()
+        if not data:
+            return jsonify({'error': 'No login data provided'}), 400
+            
+        email = data.get('email', '').strip().lower()
         password = data.get('password', '')
         
-        if not username_or_email or not password:
-            return jsonify({'error': 'Username/email and password are required'}), 400
+        print(f"Login attempt for: {email}")
         
-        # Check if input is email or username
-        if validate_email(username_or_email):
-            # Login with email
-            sql = 'SELECT id, username, email, password_hash FROM users WHERE email = %s'
-        else:
-            # Login with username
-            sql = 'SELECT id, username, email, password_hash FROM users WHERE username = %s'
+        if not email or not password:
+            missing_fields = []
+            if not email: missing_fields.append('email')
+            if not password: missing_fields.append('password')
+            return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
         
-        user = run_query(sql, (username_or_email,), fetch_one=True)
+        if not validate_email(email):
+            return jsonify({'error': 'Please enter a valid email address'}), 400
         
-        if not user or not verify_password(password, user['password_hash']):
-            return jsonify({'error': 'Invalid credentials'}), 401
-        
-        # Set session
-        session['user_id'] = user['id']
-        session['username'] = user['username']
-        
-        return jsonify({
-            'message': 'Login successful',
-            'user': {
-                'id': user['id'],
-                'username': user['username'],
-                'email': user['email']
-            }
-        }), 200
+        # Login with email
+        try:
+            sql = 'SELECT id, email, password_hash FROM users WHERE email = %s'
+            print(f"Attempting email login for: {email}")
+            
+            user = run_query(sql, (email,), fetch_one=True)
+            
+            if not user:
+                print(f"No user found for: {email}")
+                return jsonify({'error': 'Invalid email or password'}), 401
+                
+            print(f"User found - ID: {user['id']}, Email: {user['email']}")
+            
+            # Verify password
+            if not verify_password(password, user['password_hash']):
+                print(f"Invalid password for user: {email}")
+                return jsonify({'error': 'Invalid email or password'}), 401
+            
+            # Set session with enhanced session management
+            session.clear()  # Clear any existing session data
+            session['user_id'] = user['id']
+            session['email'] = user['email']
+            session.permanent = True  # Make session permanent
+            
+            print(f"Login successful for user {user['id']} ({user['email']})")
+            
+            return jsonify({
+                'message': 'Login successful',
+                'user': {
+                    'id': user['id'],
+                    'email': user['email']
+                }
+            }), 200
+            
+        except Exception as db_error:
+            print(f"Database error during login: {db_error}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': 'Database connection error. Please try again.'}), 503
         
     except Exception as e:
-        print(f"Login error: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
+        print(f"Unexpected login error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'An unexpected error occurred. Please try again later.'}), 500
 
 @app.route('/api/auth/logout', methods=['POST'])
 @require_auth
@@ -1065,7 +1121,7 @@ def logout():
 def get_current_user():
     """Get current user information"""
     try:
-        sql = 'SELECT id, username, email, created_at FROM users WHERE id = %s'
+        sql = 'SELECT id, email, created_at FROM users WHERE id = %s'
         user = run_query(sql, (session['user_id'],), fetch_one=True)
         
         if not user:
@@ -1074,7 +1130,6 @@ def get_current_user():
         return jsonify({
             'user': {
                 'id': user['id'],
-                'username': user['username'],
                 'email': user['email'],
                 'created_at': user['created_at'].isoformat() if user['created_at'] else None
             }
@@ -1099,7 +1154,7 @@ def forgot_password():
         
         # Check if user exists
         user = run_query(
-            'SELECT id, username, email FROM users WHERE email = %s',
+            'SELECT id, email FROM users WHERE email = %s',
             (email,),
             fetch_one=True
         )
@@ -1117,8 +1172,8 @@ def forgot_password():
             '''
             run_query(sql, (user['id'], reset_token, expires_at), fetch_all=False)
             
-            # Send email
-            if send_password_reset_email(user['email'], user['username'], reset_token):
+            # Send email (use email as display name since no username)
+            if send_password_reset_email(user['email'], user['email'], reset_token):
                 print(f"Password reset initiated for user {user['id']} ({user['email']})")
             else:
                 print(f"Failed to send password reset email to {user['email']}")
@@ -1148,7 +1203,7 @@ def reset_password():
         
         # Find valid token
         sql = '''
-            SELECT prt.user_id, prt.id as token_id, u.username, u.email
+            SELECT prt.user_id, prt.id as token_id, u.email
             FROM password_reset_tokens prt
             JOIN users u ON prt.user_id = u.id
             WHERE prt.token = %s 

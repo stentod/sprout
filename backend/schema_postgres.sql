@@ -1,9 +1,8 @@
--- PostgreSQL schema for Sprout Budget Tracker
+-- PostgreSQL schema for Sprout Budget Tracker (Email-only authentication)
 
--- Users table for multi-user support with email and password reset
+-- Users table for multi-user support with email-only authentication
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
-  username VARCHAR(50) UNIQUE NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -24,7 +23,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires ON password_reset_tokens(expires_at);
 
--- Categories table for expense categorization (removed UNIQUE constraint on name)
+-- Categories table for expense categorization
 CREATE TABLE IF NOT EXISTS categories (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL DEFAULT 0,
@@ -37,9 +36,9 @@ CREATE TABLE IF NOT EXISTS categories (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Insert default user if not exists (updated with email)
-INSERT INTO users (id, username, email, password_hash) 
-VALUES (0, 'default', 'default@example.com', 'dummy_hash') 
+-- Insert default user if not exists (email-only)
+INSERT INTO users (id, email, password_hash) 
+VALUES (0, 'default@example.com', 'dummy_hash') 
 ON CONFLICT (id) DO NOTHING;
 
 -- Insert default categories for user 0
@@ -53,7 +52,7 @@ INSERT INTO categories (name, icon, color, is_default, user_id) VALUES
   ('Other', '📝', '#6B7280', TRUE, 0)
 ON CONFLICT DO NOTHING;
 
--- Expenses table (updated to include category reference and user_id)
+-- Expenses table
 CREATE TABLE IF NOT EXISTS expenses (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL DEFAULT 0,
@@ -77,4 +76,4 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 -- Insert default preference for user 0
 INSERT INTO user_preferences (user_id, daily_spending_limit) 
 VALUES (0, 30.00) 
-ON CONFLICT (user_id) DO NOTHING; 
+ON CONFLICT (user_id) DO NOTHING;
