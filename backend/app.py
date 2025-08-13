@@ -365,6 +365,52 @@ def get_expenses_between(start, end, user_id, category_id=None):
 def health():
     return {'status': 'ok'}
 
+@app.route('/api/test-db')
+def test_database():
+    """Test database schema and connection"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if users table exists and get its schema
+        cursor.execute("""
+            SELECT column_name, data_type, is_nullable 
+            FROM information_schema.columns 
+            WHERE table_name = 'users' 
+            ORDER BY ordinal_position
+        """)
+        
+        columns = cursor.fetchall()
+        column_names = [col[0] for col in columns]
+        
+        # Check if username column exists
+        has_username = 'username' in column_names
+        
+        # Get user count
+        cursor.execute("SELECT COUNT(*) FROM users")
+        user_count = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'status': 'ok',
+            'database': 'connected',
+            'users_table_columns': column_names,
+            'has_username_column': has_username,
+            'user_count': user_count,
+            'needs_migration': has_username,
+            'timestamp': datetime.now().isoformat()
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'database': 'disconnected',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 # Error handlers for database connection issues
 @app.errorhandler(DatabaseConnectionError)
 def handle_database_error(e):
