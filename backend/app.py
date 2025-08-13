@@ -18,6 +18,12 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
+
+# Enhanced session configuration for production
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Sessions last 7 days
 CORS(app, supports_credentials=True)
 
 # Email configuration
@@ -937,14 +943,27 @@ def set_daily_limit():
 def signup():
     """User registration with email requirement"""
     try:
+        # Enhanced request parsing with better error handling
+        if not request.is_json:
+            return jsonify({'error': 'Request must be JSON'}), 400
+            
         data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
         username = data.get('username', '').strip()
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
         
-        # Validation
+        print(f"Signup attempt - Username: {username}, Email: {email}")
+        
+        # Enhanced validation with specific error messages
         if not username or not email or not password:
-            return jsonify({'error': 'Username, email, and password are required'}), 400
+            missing_fields = []
+            if not username: missing_fields.append('username')
+            if not email: missing_fields.append('email')
+            if not password: missing_fields.append('password')
+            return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
         
         if len(username) < 3:
             return jsonify({'error': 'Username must be at least 3 characters'}), 400
@@ -955,45 +974,65 @@ def signup():
         if not validate_email(email):
             return jsonify({'error': 'Please enter a valid email address'}), 400
         
-        # Check if username already exists
-        existing_user = run_query(
-            'SELECT id FROM users WHERE username = %s',
-            (username,),
-            fetch_one=True
-        )
-        if existing_user:
-            return jsonify({'error': 'Username already exists'}), 409
+        # Check if username already exists with better error handling
+        try:
+            existing_user = run_query(
+                'SELECT id FROM users WHERE username = %s',
+                (username,),
+                fetch_one=True
+            )
+            if existing_user:
+                print(f"Signup failed - Username already exists: {username}")
+                return jsonify({'error': 'Username already exists. Please choose a different username.'}), 409
+        except Exception as db_error:
+            print(f"Database error checking username: {db_error}")
+            return jsonify({'error': 'Database connection error. Please try again.'}), 503
         
-        # Check if email already exists
-        existing_email = run_query(
-            'SELECT id FROM users WHERE email = %s',
-            (email,),
-            fetch_one=True
-        )
-        if existing_email:
-            return jsonify({'error': 'An account with this email already exists'}), 409
+        # Check if email already exists with better error handling
+        try:
+            existing_email = run_query(
+                'SELECT id FROM users WHERE email = %s',
+                (email,),
+                fetch_one=True
+            )
+            if existing_email:
+                print(f"Signup failed - Email already exists: {email}")
+                return jsonify({'error': 'An account with this email already exists. Please use a different email or try logging in.'}), 409
+        except Exception as db_error:
+            print(f"Database error checking email: {db_error}")
+            return jsonify({'error': 'Database connection error. Please try again.'}), 503
         
-        # Hash password and create user
-        password_hash = hash_password(password)
-        sql = '''
-            INSERT INTO users (username, email, password_hash)
-            VALUES (%s, %s, %s)
-            RETURNING id, username, email
-        '''
-        result = run_query(sql, (username, email, password_hash), fetch_one=True)
-        
-        if result:
+        # Hash password and create user with enhanced error handling
+        try:
+            password_hash = hash_password(password)
+            sql = '''
+                INSERT INTO users (username, email, password_hash)
+                VALUES (%s, %s, %s)
+                RETURNING id, username, email
+            '''
+            result = run_query(sql, (username, email, password_hash), fetch_one=True)
+            
+            if not result:
+                print(f"Failed to create user account for {email}")
+                return jsonify({'error': 'Failed to create account. Please try again.'}), 500
+                
             user_id = result['id']
+            print(f"User created successfully - ID: {user_id}, Email: {email}")
             
             # Create default categories and preferences for new user
             try:
                 create_default_categories(user_id)
+                print(f"Default categories created for user {user_id}")
             except Exception as cat_error:
                 # If categories creation fails, delete the user to maintain consistency
                 print(f"Failed to create default categories for user {user_id}: {cat_error}")
-                delete_sql = 'DELETE FROM users WHERE id = %s'
-                run_query(delete_sql, (user_id,), fetch_all=False)
-                raise cat_error
+                try:
+                    delete_sql = 'DELETE FROM users WHERE id = %s'
+                    run_query(delete_sql, (user_id,), fetch_all=False)
+                    print(f"Rolled back user creation for {user_id}")
+                except Exception as delete_error:
+                    print(f"Failed to rollback user creation: {delete_error}")
+                return jsonify({'error': 'Failed to set up account. Please try again.'}), 500
             
             return jsonify({
                 'message': 'Account created successfully! You can now log in.',
@@ -1003,55 +1042,95 @@ def signup():
                     'email': result['email']
                 }
             }), 201
-        else:
-            return jsonify({'error': 'Failed to create account'}), 500
+            
+        except Exception as create_error:
+            print(f"Error creating user account: {create_error}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': 'Failed to create account. Please try again.'}), 500
             
     except Exception as e:
-        print(f"Signup error: {e}")
+        print(f"Unexpected signup error: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({'error': 'An unexpected error occurred. Please try again later.'}), 500
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     """User login with username/email and password"""
     try:
+        # Enhanced request parsing with better error handling
+        if not request.is_json:
+            return jsonify({'error': 'Request must be JSON'}), 400
+            
         data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No login data provided'}), 400
+            
         username_or_email = data.get('username', '').strip()
         password = data.get('password', '')
         
+        print(f"Login attempt for: {username_or_email}")
+        
         if not username_or_email or not password:
-            return jsonify({'error': 'Username/email and password are required'}), 400
+            missing_fields = []
+            if not username_or_email: missing_fields.append('username/email')
+            if not password: missing_fields.append('password')
+            return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
         
-        # Check if input is email or username
-        if validate_email(username_or_email):
-            # Login with email
-            sql = 'SELECT id, username, email, password_hash FROM users WHERE email = %s'
-        else:
-            # Login with username
-            sql = 'SELECT id, username, email, password_hash FROM users WHERE username = %s'
-        
-        user = run_query(sql, (username_or_email,), fetch_one=True)
-        
-        if not user or not verify_password(password, user['password_hash']):
-            return jsonify({'error': 'Invalid credentials'}), 401
-        
-        # Set session
-        session['user_id'] = user['id']
-        session['username'] = user['username']
-        
-        return jsonify({
-            'message': 'Login successful',
-            'user': {
-                'id': user['id'],
-                'username': user['username'],
-                'email': user['email']
-            }
-        }), 200
+        # Check if input is email or username with better error handling
+        try:
+            if validate_email(username_or_email):
+                # Login with email
+                sql = 'SELECT id, username, email, password_hash FROM users WHERE email = %s'
+                print(f"Attempting email login for: {username_or_email}")
+            else:
+                # Login with username
+                sql = 'SELECT id, username, email, password_hash FROM users WHERE username = %s'
+                print(f"Attempting username login for: {username_or_email}")
+            
+            user = run_query(sql, (username_or_email,), fetch_one=True)
+            
+            if not user:
+                print(f"No user found for: {username_or_email}")
+                return jsonify({'error': 'Invalid username/email or password'}), 401
+                
+            print(f"User found - ID: {user['id']}, Username: {user['username']}, Email: {user['email']}")
+            
+            # Verify password
+            if not verify_password(password, user['password_hash']):
+                print(f"Invalid password for user: {username_or_email}")
+                return jsonify({'error': 'Invalid username/email or password'}), 401
+            
+            # Set session with enhanced session management
+            session.clear()  # Clear any existing session data
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            session['email'] = user['email']
+            session.permanent = True  # Make session permanent
+            
+            print(f"Login successful for user {user['id']} ({user['email']})")
+            
+            return jsonify({
+                'message': 'Login successful',
+                'user': {
+                    'id': user['id'],
+                    'username': user['username'],
+                    'email': user['email']
+                }
+            }), 200
+            
+        except Exception as db_error:
+            print(f"Database error during login: {db_error}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': 'Database connection error. Please try again.'}), 503
         
     except Exception as e:
-        print(f"Login error: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
+        print(f"Unexpected login error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'An unexpected error occurred. Please try again later.'}), 500
 
 @app.route('/api/auth/logout', methods=['POST'])
 @require_auth
