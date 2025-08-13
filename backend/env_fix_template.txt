@@ -1,0 +1,9 @@
+# Add these lines to your .env file:
+
+# App Configuration
+FLASK_ENV=development
+BASE_URL=http://localhost:5001
+
+# For production, you'll need to set these in Render:
+# FLASK_ENV=production
+# BASE_URL=https://your-app-name.onrender.com
