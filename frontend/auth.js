@@ -69,11 +69,16 @@ function validateEmail(email) {
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   
-  const username = document.getElementById('loginUsername').value.trim();
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
   const password = document.getElementById('loginPassword').value;
   
-  if (!username || !password) {
-    showMessage('Please enter both username/email and password');
+  if (!email || !password) {
+    showMessage('Please enter both email and password');
+    return;
+  }
+  
+  if (!validateEmail(email)) {
+    showMessage('Please enter a valid email address');
     return;
   }
   
@@ -91,7 +96,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
       },
       credentials: 'include', // Include cookies for session
       body: JSON.stringify({
-        username: username,
+        email: email,
         password: password
       })
     });
@@ -121,19 +126,13 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 document.getElementById('signupForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   
-  const username = document.getElementById('signupUsername').value.trim();
   const email = document.getElementById('signupEmail').value.trim().toLowerCase();
   const password = document.getElementById('signupPassword').value;
   const confirmPassword = document.getElementById('confirmPassword').value;
   
   // Validation
-  if (!username || !email || !password || !confirmPassword) {
+  if (!email || !password || !confirmPassword) {
     showMessage('Please fill in all fields');
-    return;
-  }
-  
-  if (username.length < 3) {
-    showMessage('Username must be at least 3 characters');
     return;
   }
   
@@ -166,7 +165,6 @@ document.getElementById('signupForm').addEventListener('submit', async function(
       },
       credentials: 'include',
       body: JSON.stringify({
-        username: username,
         email: email,
         password: password
       })
@@ -178,8 +176,8 @@ document.getElementById('signupForm').addEventListener('submit', async function(
       showMessage('Account created successfully! Please log in.', 'success');
       // Switch to login tab
       switchTab('login');
-      // Pre-fill username in login form
-      document.getElementById('loginUsername').value = username;
+      // Pre-fill email in login form
+      document.getElementById('loginEmail').value = email;
     } else {
       showMessage(data.error || 'Signup failed');
     }
