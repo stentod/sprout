@@ -164,7 +164,7 @@ function renderMainUI(summary) {
         <img src="image.png" alt="Sprout Logo" class="logo">
         ${currentUser ? `
           <div class="user-info">
-            <span class="username">Welcome, ${currentUser.username}!</span>
+            <span class="username">Welcome, ${currentUser.email}!</span>
             <button onclick="logout()" class="btn btn-small">Logout</button>
           </div>
         ` : ''}
