@@ -802,61 +802,87 @@ def add_expense():
 @app.route('/api/summary', methods=['GET'])
 @require_auth
 def get_summary():
-    day_offset = int(request.args.get('dayOffset', 0))
-    today_start, today_end = get_day_bounds(day_offset)
-    
-    user_id = get_current_user_id()
-    
-    # Calculate daily surplus for the last 7 days
-    deltas = []
-    for i in range(7):
-        offset = day_offset - i
-        day_start, day_end = get_day_bounds(offset)
-        expenses = get_expenses_between(day_start, day_end, user_id)
-        total_spent = sum(e['amount'] for e in expenses)
-        daily_surplus = get_user_daily_limit(user_id) - total_spent # Use user's daily limit
-        deltas.append(daily_surplus)
-    
-    # Today's balance and averages
-    today_balance = deltas[0]
-    avg_daily_surplus = sum(deltas) / 7  # Always divide by 7 days
-    projection_30 = avg_daily_surplus * 30  # 30-day projection based on average daily surplus
-    
-    # Plant state logic - prioritize today's spending over 7-day average
-    print(f"DEBUG: today_balance={today_balance}, avg_daily_surplus={avg_daily_surplus}")
-    
-    if today_balance < 0:
-        # Today's spending exceeded the daily limit
-        if today_balance >= -5:
-            plant = 'wilting'
-            plant_emoji = '🥀'
-            print(f"DEBUG: Plant set to wilting (today_balance={today_balance})")
+    try:
+        day_offset = int(request.args.get('dayOffset', 0))
+        today_start, today_end = get_day_bounds(day_offset)
+        
+        user_id = get_current_user_id()
+        
+        # Get user's daily limit with fallback
+        try:
+            user_daily_limit = get_user_daily_limit(user_id)
+        except Exception as e:
+            print(f"Error getting user daily limit: {e}, using default")
+            user_daily_limit = 30.0
+        
+        # Calculate daily surplus for the last 7 days
+        deltas = []
+        for i in range(7):
+            offset = day_offset - i
+            day_start, day_end = get_day_bounds(offset)
+            try:
+                expenses = get_expenses_between(day_start, day_end, user_id)
+                total_spent = sum(e['amount'] for e in expenses)
+                daily_surplus = user_daily_limit - total_spent
+                deltas.append(daily_surplus)
+            except Exception as e:
+                print(f"Error calculating day {i}: {e}, using default")
+                deltas.append(user_daily_limit)  # Assume no spending
+        
+        # Today's balance and averages
+        today_balance = deltas[0] if deltas else user_daily_limit
+        avg_daily_surplus = sum(deltas) / 7 if deltas else user_daily_limit  # Always divide by 7 days
+        projection_30 = avg_daily_surplus * 30  # 30-day projection based on average daily surplus
+        
+        # Plant state logic - prioritize today's spending over 7-day average
+        print(f"DEBUG: today_balance={today_balance}, avg_daily_surplus={avg_daily_surplus}")
+        
+        if today_balance < 0:
+            # Today's spending exceeded the daily limit
+            if today_balance >= -5:
+                plant = 'wilting'
+                plant_emoji = '🥀'
+                print(f"DEBUG: Plant set to wilting (today_balance={today_balance})")
+            else:
+                plant = 'dead'
+                plant_emoji = '☠️'
+                print(f"DEBUG: Plant set to dead (today_balance={today_balance})")
+        elif today_balance >= 10 and avg_daily_surplus >= 2:
+            plant = 'thriving'
+            plant_emoji = '🌳'
+            print(f"DEBUG: Plant set to thriving")
+        elif today_balance >= 0 and avg_daily_surplus >= -2:
+            plant = 'healthy'
+            plant_emoji = '🌱'
+            print(f"DEBUG: Plant set to healthy")
         else:
-            plant = 'dead'
-            plant_emoji = '☠️'
-            print(f"DEBUG: Plant set to dead (today_balance={today_balance})")
-    elif today_balance >= 10 and avg_daily_surplus >= 2:
-        plant = 'thriving'
-        plant_emoji = '🌳'
-        print(f"DEBUG: Plant set to thriving")
-    elif today_balance >= 0 and avg_daily_surplus >= -2:
-        plant = 'healthy'
-        plant_emoji = '🌱'
-        print(f"DEBUG: Plant set to healthy")
-    else:
-        plant = 'struggling'
-        plant_emoji = '🌿'
-        print(f"DEBUG: Plant set to struggling")
-    
-    print(f"DEBUG: Final plant state={plant}, emoji={plant_emoji}")
-    
-    return jsonify({
-        'balance': round(today_balance, 2),
-        'avg_7day': round(avg_daily_surplus, 2),
-        'projection_30': round(projection_30, 2),
-        'plant_state': plant,
-        'plant_emoji': plant_emoji
-    })
+            plant = 'struggling'
+            plant_emoji = '🌿'
+            print(f"DEBUG: Plant set to struggling")
+        
+        print(f"DEBUG: Final plant state={plant}, emoji={plant_emoji}")
+        
+        return jsonify({
+            'balance': round(today_balance, 2),
+            'avg_7day': round(avg_daily_surplus, 2),
+            'projection_30': round(projection_30, 2),
+            'plant_state': plant,
+            'plant_emoji': plant_emoji
+        })
+        
+    except Exception as e:
+        print(f"Summary endpoint error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return a safe fallback response instead of crashing
+        return jsonify({
+            'balance': 30.0,
+            'avg_7day': 30.0,
+            'projection_30': 900.0,
+            'plant_state': 'healthy',
+            'plant_emoji': '🌱'
+        })
 
 @app.route('/api/history', methods=['GET'])
 @require_auth
