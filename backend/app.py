@@ -700,23 +700,46 @@ def get_category_budget_tracking():
         today_start, today_end = get_day_bounds(day_offset)
         user_id = get_current_user_id()
         
-        # Get all categories with their budgets for the current user
-        categories_sql = '''
-            SELECT id, name, icon, color, daily_budget
-            FROM categories 
-            WHERE user_id = %s
-            ORDER BY is_default DESC, name ASC
-        '''
-        categories = run_query(categories_sql, (user_id,), fetch_all=True)
+        try:
+            # Get all categories with their budgets for the current user
+            categories_sql = '''
+                SELECT id, name, icon, color, daily_budget
+                FROM categories 
+                WHERE user_id = %s
+                ORDER BY is_default DESC, name ASC
+            '''
+            categories = run_query(categories_sql, (user_id,), fetch_all=True)
+        except Exception as db_error:
+            print(f"Database error getting categories for budget tracking: {db_error}")
+            # Return empty budget tracking if database fails
+            return jsonify({
+                'budgeted_categories': [],
+                'unbedgeted_categories': [],
+                'summary': {
+                    'total_budget': 0,
+                    'total_spent_budgeted': 0,
+                    'total_spent_unbedgeted': 0,
+                    'total_spent_all': 0,
+                    'total_remaining': 0,
+                    'overall_percentage_used': 0,
+                    'budgeted_categories_count': 0,
+                    'unbedgeted_categories_count': 0
+                },
+                'success': True
+            })
         
-        # Get today's spending by category
-        spending_sql = '''
-            SELECT e.category_id, SUM(e.amount) as total_spent
-            FROM expenses e
-            WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
-            GROUP BY e.category_id
-        '''
-        spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()))
+        try:
+            # Get today's spending by category
+            spending_sql = '''
+                SELECT e.category_id, SUM(e.amount) as total_spent
+                FROM expenses e
+                WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
+                GROUP BY e.category_id
+            '''
+            spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()))
+        except Exception as db_error:
+            print(f"Database error getting spending data: {db_error}")
+            spending_data = []
         
         # Create spending lookup
         spending_by_category = {row['category_id']: float(row['total_spent']) for row in spending_data}
@@ -775,63 +798,93 @@ def get_category_budget_tracking():
         })
         
     except Exception as e:
+        print(f"Category budget tracking endpoint error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
-            'error': str(e),
-            'success': False
-        }), 500
+            'budgeted_categories': [],
+            'unbedgeted_categories': [],
+            'summary': {
+                'total_budget': 0,
+                'total_spent_budgeted': 0,
+                'total_spent_unbedgeted': 0,
+                'total_spent_all': 0,
+                'total_remaining': 0,
+                'overall_percentage_used': 0,
+                'budgeted_categories_count': 0,
+                'unbedgeted_categories_count': 0
+            },
+            'success': True
+        })
 
 @app.route('/api/expenses', methods=['POST'])
 @require_auth
 def add_expense():
     try:
+        print(f"🔍 Add expense request received")
         data = request.get_json()
         if not data:
+            print(f"❌ No data provided in request")
             return jsonify({'error': 'No data provided'}), 400
             
         amount = data.get('amount')
         description = data.get('description', '')
         category_id = data.get('category_id')  # New: category selection
         
+        print(f"📊 Request data: amount={amount}, description='{description}', category_id={category_id}")
+        
         if amount is None:
+            print(f"❌ Amount is missing")
             return jsonify({'error': 'Amount is required'}), 400
         
         # Validate category_id is required
         if not category_id:
+            print(f"❌ Category ID is missing")
             return jsonify({'error': 'Category is required'}), 400
         
         user_id = get_current_user_id()
+        print(f"👤 User ID: {user_id}")
         
         try:
             category_id = int(category_id)
+            print(f"🔍 Checking if category {category_id} exists for user {user_id}")
             # Check if category exists and belongs to the user
             check_sql = 'SELECT id FROM categories WHERE id = %s AND user_id = %s'
             category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
             if not category_exists:
+                print(f"❌ Category {category_id} not found for user {user_id}")
                 return jsonify({'error': 'Invalid category'}), 400
-        except (ValueError, TypeError):
+            print(f"✅ Category {category_id} validated")
+        except (ValueError, TypeError) as e:
+            print(f"❌ Invalid category ID format: {e}")
             return jsonify({'error': 'Invalid category ID'}), 400
         except Exception as db_error:
-            print(f"Database error checking category: {db_error}")
+            print(f"❌ Database error checking category: {db_error}")
+            import traceback
+            traceback.print_exc()
             return jsonify({'error': 'Database connection error. Please try again.'}), 503
         
         # Use local timezone-aware timestamp to ensure consistent date handling
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(f"⏰ Timestamp: {timestamp}")
         
         try:
+            print(f"💾 Inserting expense into database...")
             sql = '''
                 INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
                 VALUES (%s, %s, %s, %s, %s)
             '''
-            run_query(sql, (user_id, amount, description, category_id, timestamp), fetch_all=False)
+            result = run_query(sql, (user_id, amount, description, category_id, timestamp), fetch_all=False)
+            print(f"✅ Expense inserted successfully, result: {result}")
             return jsonify({'success': True}), 201
         except Exception as db_error:
-            print(f"Database error adding expense: {db_error}")
+            print(f"❌ Database error adding expense: {db_error}")
             import traceback
             traceback.print_exc()
             return jsonify({'error': 'Failed to save expense. Please try again.'}), 503
             
     except Exception as e:
-        print(f"Add expense endpoint error: {e}")
+        print(f"❌ Add expense endpoint error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'An unexpected error occurred. Please try again.'}), 500
