@@ -24,6 +24,11 @@ app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Sessions last 7 days
+
+# Set session cookie domain for custom domains
+if os.environ.get('FLASK_ENV') == 'production':
+    # Allow session cookies to work with custom domains
+    app.config['SESSION_COOKIE_DOMAIN'] = None  # Let Flask auto-detect
 CORS(app, supports_credentials=True)
 
 # Email configuration
@@ -1139,6 +1144,29 @@ def get_current_user():
         print(f"Get current user error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/api/auth/debug-session', methods=['GET'])
+def debug_session():
+    """Debug endpoint to check session status"""
+    try:
+        session_data = {
+            'has_session': 'user_id' in session,
+            'user_id': session.get('user_id'),
+            'email': session.get('email'),
+            'session_keys': list(session.keys()),
+            'request_headers': dict(request.headers),
+            'cookies': dict(request.cookies),
+            'flask_env': os.environ.get('FLASK_ENV'),
+            'session_secure': app.config.get('SESSION_COOKIE_SECURE'),
+            'session_httponly': app.config.get('SESSION_COOKIE_HTTPONLY'),
+            'session_samesite': app.config.get('SESSION_COOKIE_SAMESITE'),
+            'session_domain': app.config.get('SESSION_COOKIE_DOMAIN')
+        }
+        
+        return jsonify(session_data), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/auth/forgot-password', methods=['POST'])
 def forgot_password():
     """Initiate password reset process"""
@@ -1254,6 +1282,10 @@ def serve_auth():
 @app.route('/reset-password.html')
 def serve_reset_password():
     return send_from_directory(FRONTEND_DIR, 'reset-password.html')
+
+@app.route('/debug-session.html')
+def serve_debug_session():
+    return send_from_directory(FRONTEND_DIR, 'debug-session.html')
 
 @app.route('/history.html')
 def serve_history():
