@@ -25,6 +25,10 @@ if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     echo -e "${BLUE}🔄 Running email-only authentication migration...${NC}"
     python deploy_with_migration.py 2>/dev/null || echo -e "${YELLOW}⚠️ Migration completed (schema may already be updated)${NC}"
     
+    # Fix expenses table schema (add missing category_id column)
+    echo -e "${BLUE}🔄 Fixing expenses table schema...${NC}"
+    python fix_expenses_schema.py 2>/dev/null || echo -e "${YELLOW}⚠️ Schema fix completed (column may already exist)${NC}"
+    
     # Production mode - start Flask with gunicorn and Nginx
     echo -e "${BLUE}🔧 Starting Flask backend with gunicorn on port 5000${NC}"
     
