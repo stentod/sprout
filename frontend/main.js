@@ -483,6 +483,16 @@ function renderFallbackUI() {
           <button onclick="showDemoMessage()" class="btn btn-primary">Save Expense</button>
         </div>
       </div>
+      
+      <!-- Debug Section -->
+      <div class="form-section" style="margin-top: 20px; border: 2px solid #ff6b6b;">
+        <div class="form-header" style="color: #ff6b6b;">🔧 Debug Tools</div>
+        <div class="form-grid">
+          <button onclick="testSummaryAPI()" class="btn btn-secondary">Test Summary API</button>
+          <button onclick="testAuthAPI()" class="btn btn-secondary">Test Auth API</button>
+          <button onclick="clearConsole()" class="btn btn-secondary">Clear Console</button>
+        </div>
+      </div>
     </div>
   `;
   console.log('✅ Fallback UI rendered');
@@ -504,34 +514,45 @@ function showDemoMessage() {
 // Enhanced load summary with multiple fallbacks
 async function loadSummaryWithFallbacks() {
   console.log('🔄 Starting loadSummaryWithFallbacks...');
+  console.log('📍 API_BASE_URL:', API_BASE_URL);
+  console.log('📍 Current URL:', window.location.href);
   
   // First check authentication
   try {
+    console.log('🔒 Checking authentication...');
     const isAuthenticated = await checkAuthentication();
     if (!isAuthenticated) {
       console.log('🔒 Authentication failed, redirecting...');
       return; // Will redirect to auth page
     }
+    console.log('✅ Authentication successful');
   } catch (error) {
     console.error('🔒 Authentication check failed:', error);
     return;
   }
   
   try {
-    console.log('🌐 Attempting API call...');
-    const resp = await fetch(`${API_BASE_URL}/api/summary?dayOffset=${dayOffset}`, {
+    console.log('🌐 Attempting API call to /api/summary...');
+    const summaryUrl = `${API_BASE_URL}/api/summary?dayOffset=${dayOffset}`;
+    console.log('📍 Summary URL:', summaryUrl);
+    
+    const resp = await fetch(summaryUrl, {
       credentials: 'include'
     });
+    
+    console.log('📡 Summary response status:', resp.status, resp.statusText);
+    
     if (!resp.ok) {
       if (resp.status === 401) {
         console.log('🔒 Session expired, redirecting to login...');
         logout();
         return;
       }
-      throw new Error(`API returned ${resp.status}`);
+      throw new Error(`API returned ${resp.status}: ${resp.statusText}`);
     }
+    
     const summary = await resp.json();
-    console.log('✅ API call successful');
+    console.log('✅ API call successful, summary data:', summary);
     
     // Load category budgets first
     await loadCategoryBudgets();
@@ -541,7 +562,10 @@ async function loadSummaryWithFallbacks() {
     renderAddExpenseForm();
     
   } catch (error) {
-    console.warn('⚠️ API call failed, trying offline UI:', error.message);
+    console.error('❌ API call failed with error:', error.message);
+    console.error('❌ Full error:', error);
+    console.warn('⚠️ Falling back to offline UI...');
+    
     try {
       renderOfflineUI();
       renderAddExpenseForm();
@@ -562,4 +586,55 @@ if (document.readyState === 'loading') {
   loadSummaryWithFallbacks();
 } 
 
-// Force deployment refresh - production fix for blank screen issue 
+// Force deployment refresh - production fix for blank screen issue
+
+// Debug functions
+async function testSummaryAPI() {
+  console.log('🧪 Testing Summary API...');
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/summary`, {
+      credentials: 'include'
+    });
+    console.log('📡 Summary API Response:', response.status, response.statusText);
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Summary API Success:', data);
+      alert('✅ Summary API working! Check console for details.');
+    } else {
+      console.error('❌ Summary API Error:', response.status, response.statusText);
+      alert(`❌ Summary API failed: ${response.status} ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('💥 Summary API Exception:', error);
+    alert(`💥 Summary API Exception: ${error.message}`);
+  }
+}
+
+async function testAuthAPI() {
+  console.log('🧪 Testing Auth API...');
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      credentials: 'include'
+    });
+    console.log('📡 Auth API Response:', response.status, response.statusText);
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Auth API Success:', data);
+      alert('✅ Auth API working! Check console for details.');
+    } else {
+      console.error('❌ Auth API Error:', response.status, response.statusText);
+      alert(`❌ Auth API failed: ${response.status} ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error('💥 Auth API Exception:', error);
+    alert(`💥 Auth API Exception: ${error.message}`);
+  }
+}
+
+function clearConsole() {
+  console.clear();
+  console.log('🧹 Console cleared');
+  alert('Console cleared!');
+} 
