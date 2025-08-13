@@ -24,6 +24,13 @@ function getApiBaseUrl() {
 const dayOffset = getDayOffset();
 const API_BASE_URL = getApiBaseUrl();
 
+// Debug API URL detection
+console.log('🔍 API URL Debug:');
+console.log('  Hostname:', window.location.hostname);
+console.log('  Port:', window.location.port);
+console.log('  API_BASE_URL:', API_BASE_URL);
+console.log('  Full URL:', window.location.href);
+
 // DOM Elements
 const app = document.getElementById('app');
 
