@@ -16,6 +16,7 @@ from functools import wraps
 # Load environment variables (for local development)
 load_dotenv()
 
+# Production fix - ensure proper session handling
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 
