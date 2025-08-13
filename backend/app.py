@@ -466,13 +466,28 @@ def get_categories():
     try:
         user_id = get_current_user_id()
         
-        sql = '''
-            SELECT id, name, icon, color, is_default, daily_budget, created_at
-            FROM categories 
-            WHERE user_id = %s
-            ORDER BY is_default DESC, name ASC
-        '''
-        categories = run_query(sql, (user_id,), fetch_all=True)
+        try:
+            sql = '''
+                SELECT id, name, icon, color, is_default, daily_budget, created_at
+                FROM categories 
+                WHERE user_id = %s
+                ORDER BY is_default DESC, name ASC
+            '''
+            categories = run_query(sql, (user_id,), fetch_all=True)
+        except Exception as db_error:
+            print(f"Database error getting categories: {db_error}")
+            # Return default categories if database fails
+            return jsonify([
+                {
+                    'id': 1,
+                    'name': 'Food & Dining',
+                    'icon': '🍽️',
+                    'color': '#FF6B6B',
+                    'is_default': True,
+                    'daily_budget': 0.0,
+                    'created_at': datetime.now().isoformat()
+                }
+            ])
         
         # Convert data types for consistent API response
         result = []
@@ -489,7 +504,10 @@ def get_categories():
         
         return jsonify(result)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Categories endpoint error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify([]), 500
 
 @app.route('/api/categories', methods=['POST'])
 @require_auth
@@ -765,39 +783,58 @@ def get_category_budget_tracking():
 @app.route('/api/expenses', methods=['POST'])
 @require_auth
 def add_expense():
-    data = request.get_json()
-    amount = data.get('amount')
-    description = data.get('description', '')
-    category_id = data.get('category_id')  # New: category selection
-    
-    if amount is None:
-        return jsonify({'error': 'Amount is required'}), 400
-    
-    # Validate category_id is required
-    if not category_id:
-        return jsonify({'error': 'Category is required'}), 400
-    
-    user_id = get_current_user_id()
-    
     try:
-        category_id = int(category_id)
-        # Check if category exists and belongs to the user
-        check_sql = 'SELECT id FROM categories WHERE id = %s AND user_id = %s'
-        category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
-        if not category_exists:
-            return jsonify({'error': 'Invalid category'}), 400
-    except (ValueError, TypeError):
-        return jsonify({'error': 'Invalid category ID'}), 400
-    
-    # Use local timezone-aware timestamp to ensure consistent date handling
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    sql = '''
-        INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
-        VALUES (%s, %s, %s, %s, %s)
-    '''
-    run_query(sql, (user_id, amount, description, category_id, timestamp), fetch_all=False)
-    return jsonify({'success': True}), 201
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        amount = data.get('amount')
+        description = data.get('description', '')
+        category_id = data.get('category_id')  # New: category selection
+        
+        if amount is None:
+            return jsonify({'error': 'Amount is required'}), 400
+        
+        # Validate category_id is required
+        if not category_id:
+            return jsonify({'error': 'Category is required'}), 400
+        
+        user_id = get_current_user_id()
+        
+        try:
+            category_id = int(category_id)
+            # Check if category exists and belongs to the user
+            check_sql = 'SELECT id FROM categories WHERE id = %s AND user_id = %s'
+            category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+            if not category_exists:
+                return jsonify({'error': 'Invalid category'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid category ID'}), 400
+        except Exception as db_error:
+            print(f"Database error checking category: {db_error}")
+            return jsonify({'error': 'Database connection error. Please try again.'}), 503
+        
+        # Use local timezone-aware timestamp to ensure consistent date handling
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        try:
+            sql = '''
+                INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
+                VALUES (%s, %s, %s, %s, %s)
+            '''
+            run_query(sql, (user_id, amount, description, category_id, timestamp), fetch_all=False)
+            return jsonify({'success': True}), 201
+        except Exception as db_error:
+            print(f"Database error adding expense: {db_error}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': 'Failed to save expense. Please try again.'}), 503
+            
+    except Exception as e:
+        print(f"Add expense endpoint error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'An unexpected error occurred. Please try again.'}), 500
 
 @app.route('/api/summary', methods=['GET'])
 @require_auth
@@ -887,40 +924,55 @@ def get_summary():
 @app.route('/api/history', methods=['GET'])
 @require_auth
 def get_history():
-    # Get all expenses from the last 7 days (including today)
-    day_offset = int(request.args.get('dayOffset', 0))
-    period = int(request.args.get('period', 7))  # Default to 7 days
-    category_id = request.args.get('category_id')  # Optional category filter
-    
-    user_id = get_current_user_id()
-    start_date, _ = get_day_bounds(day_offset - (period - 1))
-    _, end_date = get_day_bounds(day_offset)
-    expenses = get_expenses_between(start_date, end_date, user_id, category_id)
-    # Group by date (YYYY-MM-DD)
-    grouped = {}
-    for e in expenses:
-        date = e['timestamp'][:10]  # 'YYYY-MM-DD' (timestamp is already a string from helper)
-        if date not in grouped:
-            grouped[date] = []
-        expense_data = {
-            'amount': e['amount'],  # Already converted to float in helper
-            'description': e['description'],
-            'timestamp': e['timestamp']  # Already converted to string in helper
-        }
+    try:
+        # Get all expenses from the last 7 days (including today)
+        day_offset = int(request.args.get('dayOffset', 0))
+        period = int(request.args.get('period', 7))  # Default to 7 days
+        category_id = request.args.get('category_id')  # Optional category filter
         
-        # Add category information if present
-        if e.get('category'):
-            expense_data['category'] = e['category']
-        else:
-            expense_data['category'] = None
+        user_id = get_current_user_id()
+        start_date, _ = get_day_bounds(day_offset - (period - 1))
+        _, end_date = get_day_bounds(day_offset)
+        
+        try:
+            expenses = get_expenses_between(start_date, end_date, user_id, category_id)
+        except Exception as e:
+            print(f"Error getting expenses: {e}")
+            # Return empty history instead of crashing
+            return jsonify([])
+        
+        # Group by date (YYYY-MM-DD)
+        grouped = {}
+        for e in expenses:
+            date = e['timestamp'][:10]  # 'YYYY-MM-DD' (timestamp is already a string from helper)
+            if date not in grouped:
+                grouped[date] = []
+            expense_data = {
+                'amount': e['amount'],  # Already converted to float in helper
+                'description': e['description'],
+                'timestamp': e['timestamp']  # Already converted to string in helper
+            }
             
-        grouped[date].append(expense_data)
-    # Sort by date descending
-    grouped_sorted = [
-        {'date': date, 'expenses': grouped[date]}
-        for date in sorted(grouped.keys(), reverse=True)
-    ]
-    return jsonify(grouped_sorted)
+            # Add category information if present
+            if e.get('category'):
+                expense_data['category'] = e['category']
+            else:
+                expense_data['category'] = None
+                
+            grouped[date].append(expense_data)
+        # Sort by date descending
+        grouped_sorted = [
+            {'date': date, 'expenses': grouped[date]}
+            for date in sorted(grouped.keys(), reverse=True)
+        ]
+        return jsonify(grouped_sorted)
+        
+    except Exception as e:
+        print(f"History endpoint error: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return empty history instead of crashing
+        return jsonify([])
 
 # Helper function to get user's daily spending limit
 def get_user_daily_limit(user_id=0):
