@@ -133,8 +133,9 @@ def send_password_reset_email_sendgrid(user_email, username, reset_token):
             print("SendGrid API key not configured, falling back to Gmail")
             return send_password_reset_email_gmail(user_email, username, reset_token)
         
-        # Create the reset URL
-        reset_url = f"http://localhost:5001/reset-password.html?token={reset_token}"
+        # Create the reset URL (dynamic for production)
+        base_url = os.environ.get('BASE_URL', 'http://localhost:5001')
+        reset_url = f"{base_url}/reset-password.html?token={reset_token}"
         
         # Create SendGrid client
         sg = sendgrid.SendGridAPIClient(api_key=sendgrid_api_key)
@@ -196,8 +197,9 @@ def send_password_reset_email_sendgrid(user_email, username, reset_token):
 def send_password_reset_email_gmail(user_email, username, reset_token):
     """Send password reset email using Gmail (Fallback)"""
     try:
-        # Create the reset URL (adjust domain for production)
-        reset_url = f"http://localhost:5001/reset-password.html?token={reset_token}"
+        # Create the reset URL (dynamic for production)
+        base_url = os.environ.get('BASE_URL', 'http://localhost:5001')
+        reset_url = f"{base_url}/reset-password.html?token={reset_token}"
         
         # Create email message
         msg = Message(
@@ -941,7 +943,7 @@ def set_daily_limit():
 # Authentication Routes
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
-    """User registration with email requirement"""
+    """User registration with email-only authentication"""
     try:
         # Enhanced request parsing with better error handling
         if not request.is_json:
@@ -951,42 +953,23 @@ def signup():
         if not data:
             return jsonify({'error': 'No data provided'}), 400
             
-        username = data.get('username', '').strip()
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
         
-        print(f"Signup attempt - Username: {username}, Email: {email}")
+        print(f"Signup attempt - Email: {email}")
         
         # Enhanced validation with specific error messages
-        if not username or not email or not password:
+        if not email or not password:
             missing_fields = []
-            if not username: missing_fields.append('username')
             if not email: missing_fields.append('email')
             if not password: missing_fields.append('password')
             return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
-        
-        if len(username) < 3:
-            return jsonify({'error': 'Username must be at least 3 characters'}), 400
         
         if len(password) < 6:
             return jsonify({'error': 'Password must be at least 6 characters'}), 400
         
         if not validate_email(email):
             return jsonify({'error': 'Please enter a valid email address'}), 400
-        
-        # Check if username already exists with better error handling
-        try:
-            existing_user = run_query(
-                'SELECT id FROM users WHERE username = %s',
-                (username,),
-                fetch_one=True
-            )
-            if existing_user:
-                print(f"Signup failed - Username already exists: {username}")
-                return jsonify({'error': 'Username already exists. Please choose a different username.'}), 409
-        except Exception as db_error:
-            print(f"Database error checking username: {db_error}")
-            return jsonify({'error': 'Database connection error. Please try again.'}), 503
         
         # Check if email already exists with better error handling
         try:
@@ -1006,11 +989,11 @@ def signup():
         try:
             password_hash = hash_password(password)
             sql = '''
-                INSERT INTO users (username, email, password_hash)
-                VALUES (%s, %s, %s)
-                RETURNING id, username, email
+                INSERT INTO users (email, password_hash)
+                VALUES (%s, %s)
+                RETURNING id, email
             '''
-            result = run_query(sql, (username, email, password_hash), fetch_one=True)
+            result = run_query(sql, (email, password_hash), fetch_one=True)
             
             if not result:
                 print(f"Failed to create user account for {email}")
@@ -1038,7 +1021,6 @@ def signup():
                 'message': 'Account created successfully! You can now log in.',
                 'user': {
                     'id': result['id'],
-                    'username': result['username'],
                     'email': result['email']
                 }
             }), 201
@@ -1057,7 +1039,7 @@ def signup():
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """User login with username/email and password"""
+    """User login with email and password"""
     try:
         # Enhanced request parsing with better error handling
         if not request.is_json:
@@ -1067,45 +1049,41 @@ def login():
         if not data:
             return jsonify({'error': 'No login data provided'}), 400
             
-        username_or_email = data.get('username', '').strip()
+        email = data.get('email', '').strip().lower()
         password = data.get('password', '')
         
-        print(f"Login attempt for: {username_or_email}")
+        print(f"Login attempt for: {email}")
         
-        if not username_or_email or not password:
+        if not email or not password:
             missing_fields = []
-            if not username_or_email: missing_fields.append('username/email')
+            if not email: missing_fields.append('email')
             if not password: missing_fields.append('password')
             return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
         
-        # Check if input is email or username with better error handling
+        if not validate_email(email):
+            return jsonify({'error': 'Please enter a valid email address'}), 400
+        
+        # Login with email
         try:
-            if validate_email(username_or_email):
-                # Login with email
-                sql = 'SELECT id, username, email, password_hash FROM users WHERE email = %s'
-                print(f"Attempting email login for: {username_or_email}")
-            else:
-                # Login with username
-                sql = 'SELECT id, username, email, password_hash FROM users WHERE username = %s'
-                print(f"Attempting username login for: {username_or_email}")
+            sql = 'SELECT id, email, password_hash FROM users WHERE email = %s'
+            print(f"Attempting email login for: {email}")
             
-            user = run_query(sql, (username_or_email,), fetch_one=True)
+            user = run_query(sql, (email,), fetch_one=True)
             
             if not user:
-                print(f"No user found for: {username_or_email}")
-                return jsonify({'error': 'Invalid username/email or password'}), 401
+                print(f"No user found for: {email}")
+                return jsonify({'error': 'Invalid email or password'}), 401
                 
-            print(f"User found - ID: {user['id']}, Username: {user['username']}, Email: {user['email']}")
+            print(f"User found - ID: {user['id']}, Email: {user['email']}")
             
             # Verify password
             if not verify_password(password, user['password_hash']):
-                print(f"Invalid password for user: {username_or_email}")
-                return jsonify({'error': 'Invalid username/email or password'}), 401
+                print(f"Invalid password for user: {email}")
+                return jsonify({'error': 'Invalid email or password'}), 401
             
             # Set session with enhanced session management
             session.clear()  # Clear any existing session data
             session['user_id'] = user['id']
-            session['username'] = user['username']
             session['email'] = user['email']
             session.permanent = True  # Make session permanent
             
@@ -1115,7 +1093,6 @@ def login():
                 'message': 'Login successful',
                 'user': {
                     'id': user['id'],
-                    'username': user['username'],
                     'email': user['email']
                 }
             }), 200
@@ -1144,7 +1121,7 @@ def logout():
 def get_current_user():
     """Get current user information"""
     try:
-        sql = 'SELECT id, username, email, created_at FROM users WHERE id = %s'
+        sql = 'SELECT id, email, created_at FROM users WHERE id = %s'
         user = run_query(sql, (session['user_id'],), fetch_one=True)
         
         if not user:
@@ -1153,7 +1130,6 @@ def get_current_user():
         return jsonify({
             'user': {
                 'id': user['id'],
-                'username': user['username'],
                 'email': user['email'],
                 'created_at': user['created_at'].isoformat() if user['created_at'] else None
             }
@@ -1178,7 +1154,7 @@ def forgot_password():
         
         # Check if user exists
         user = run_query(
-            'SELECT id, username, email FROM users WHERE email = %s',
+            'SELECT id, email FROM users WHERE email = %s',
             (email,),
             fetch_one=True
         )
@@ -1196,8 +1172,8 @@ def forgot_password():
             '''
             run_query(sql, (user['id'], reset_token, expires_at), fetch_all=False)
             
-            # Send email
-            if send_password_reset_email(user['email'], user['username'], reset_token):
+            # Send email (use email as display name since no username)
+            if send_password_reset_email(user['email'], user['email'], reset_token):
                 print(f"Password reset initiated for user {user['id']} ({user['email']})")
             else:
                 print(f"Failed to send password reset email to {user['email']}")
@@ -1227,7 +1203,7 @@ def reset_password():
         
         # Find valid token
         sql = '''
-            SELECT prt.user_id, prt.id as token_id, u.username, u.email
+            SELECT prt.user_id, prt.id as token_id, u.email
             FROM password_reset_tokens prt
             JOIN users u ON prt.user_id = u.id
             WHERE prt.token = %s 
