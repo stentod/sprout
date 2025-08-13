@@ -1342,6 +1342,10 @@ def serve_history():
 def serve_settings():
     return send_from_directory(FRONTEND_DIR, 'settings.html')
 
+@app.route('/debug-api.html')
+def serve_debug_api():
+    return send_from_directory(FRONTEND_DIR, 'debug-api.html')
+
 @app.route('/<path:filename>')
 def serve_static(filename):
     return send_from_directory(FRONTEND_DIR, filename)
