@@ -1482,11 +1482,19 @@ FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'fronten
 
 @app.route('/')
 def serve_index():
-    return send_from_directory(FRONTEND_DIR, 'index.html')
+    response = send_from_directory(FRONTEND_DIR, 'index.html')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/auth.html')
 def serve_auth():
-    return send_from_directory(FRONTEND_DIR, 'auth.html')
+    response = send_from_directory(FRONTEND_DIR, 'auth.html')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/reset-password.html')
 def serve_reset_password():
@@ -1559,7 +1567,15 @@ def debug_email_config():
 
 @app.route('/<path:filename>')
 def serve_static(filename):
-    return send_from_directory(FRONTEND_DIR, filename)
+    response = send_from_directory(FRONTEND_DIR, filename)
+    
+    # Add cache control for CSS and JS files
+    if filename.endswith(('.css', '.js')):
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    
+    return response
 
 if __name__ == '__main__':
     # Only run the development server if this file is run directly
