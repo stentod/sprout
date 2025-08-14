@@ -238,6 +238,19 @@ This is an automated message. Please do not reply to this email."""
 
 def send_password_reset_email(user_email, username, reset_token):
     """Send password reset email (tries SendGrid first, falls back to Gmail)"""
+    print(f"📧 Starting email send process for {user_email}")
+    print(f"🔧 Using username: {username}")
+    print(f"🔑 Token: {reset_token[:10]}...")
+    
+    # Check environment variables
+    sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+    mail_username = os.environ.get('MAIL_USERNAME')
+    mail_password = os.environ.get('MAIL_PASSWORD')
+    
+    print(f"🔍 SendGrid API key: {'SET' if sendgrid_api_key else 'NOT SET'}")
+    print(f"🔍 Gmail username: {'SET' if mail_username else 'NOT SET'}")
+    print(f"🔍 Gmail password: {'SET' if mail_password else 'NOT SET'}")
+    
     return send_password_reset_email_sendgrid(user_email, username, reset_token)
 
 def require_auth(f):
@@ -1349,14 +1362,21 @@ def get_current_user():
 def forgot_password():
     """Initiate password reset process"""
     try:
+        print("🔍 Forgot password request received")
         data = request.get_json()
         email = data.get('email', '').strip().lower()
         
+        print(f"📧 Email provided: {email}")
+        
         if not email:
+            print("❌ No email provided")
             return jsonify({'error': 'Email address is required'}), 400
         
         if not validate_email(email):
+            print("❌ Invalid email format")
             return jsonify({'error': 'Please enter a valid email address'}), 400
+        
+        print("✅ Email validation passed")
         
         # Check if user exists
         user = run_query(
@@ -1365,11 +1385,14 @@ def forgot_password():
             fetch_one=True
         )
         
-        # Always return success message for security (don't reveal if email exists)
         if user:
+            print(f"✅ User found: ID {user['id']}, Email {user['email']}")
+            
             # Generate reset token
             reset_token = generate_reset_token()
             expires_at = datetime.now() + timedelta(hours=1)  # Token expires in 1 hour
+            
+            print(f"🔑 Generated reset token: {reset_token[:10]}...")
             
             # Store token in database
             sql = '''
@@ -1377,12 +1400,18 @@ def forgot_password():
                 VALUES (%s, %s, %s)
             '''
             run_query(sql, (user['id'], reset_token, expires_at), fetch_all=False)
+            print("💾 Token stored in database")
             
             # Send email (use email as display name since no username)
-            if send_password_reset_email(user['email'], user['email'], reset_token):
-                print(f"Password reset initiated for user {user['id']} ({user['email']})")
+            print("📧 Attempting to send password reset email...")
+            email_sent = send_password_reset_email(user['email'], user['email'], reset_token)
+            
+            if email_sent:
+                print(f"✅ Password reset email sent successfully to {user['email']}")
             else:
-                print(f"Failed to send password reset email to {user['email']}")
+                print(f"❌ Failed to send password reset email to {user['email']}")
+        else:
+            print(f"⚠️ No user found with email: {email}")
         
         # Always return the same message for security
         return jsonify({
@@ -1390,7 +1419,9 @@ def forgot_password():
         }), 200
         
     except Exception as e:
-        print(f"Forgot password error: {e}")
+        print(f"❌ Forgot password error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/auth/reset-password', methods=['POST'])
@@ -1476,6 +1507,55 @@ def serve_settings():
 @app.route('/debug-api.html')
 def serve_debug_api():
     return send_from_directory(FRONTEND_DIR, 'debug-api.html')
+
+@app.route('/api/debug/email-config')
+def debug_email_config():
+    """Debug endpoint to check email configuration"""
+    try:
+        # Check Gmail configuration
+        mail_server = os.environ.get('MAIL_SERVER')
+        mail_port = os.environ.get('MAIL_PORT')
+        mail_username = os.environ.get('MAIL_USERNAME')
+        mail_password = os.environ.get('MAIL_PASSWORD')
+        mail_default_sender = os.environ.get('MAIL_DEFAULT_SENDER')
+        
+        # Check SendGrid configuration
+        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
+        from_email = os.environ.get('FROM_EMAIL')
+        
+        # Check app configuration
+        base_url = os.environ.get('BASE_URL')
+        flask_env = os.environ.get('FLASK_ENV')
+        
+        config = {
+            'gmail': {
+                'server': mail_server,
+                'port': mail_port,
+                'username': mail_username,
+                'password_set': bool(mail_password),
+                'default_sender': mail_default_sender,
+                'configured': all([mail_server, mail_username, mail_password])
+            },
+            'sendgrid': {
+                'api_key_set': bool(sendgrid_api_key),
+                'from_email': from_email,
+                'configured': bool(sendgrid_api_key)
+            },
+            'app': {
+                'base_url': base_url,
+                'flask_env': flask_env
+            },
+            'summary': {
+                'gmail_configured': all([mail_server, mail_username, mail_password]),
+                'sendgrid_configured': bool(sendgrid_api_key),
+                'email_should_work': all([mail_server, mail_username, mail_password]) or bool(sendgrid_api_key)
+            }
+        }
+        
+        return jsonify(config)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/<path:filename>')
 def serve_static(filename):
