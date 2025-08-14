@@ -1,22 +1,29 @@
 // Settings page JavaScript
-const API_BASE = 'http://localhost:5001/api';
+const API_BASE = window.location.hostname === 'localhost' && window.location.port !== '5001' 
+    ? 'http://localhost:5001/api' 
+    : '/api';
 
 // Authentication Functions
 function checkAuthentication() {
+  console.log('🔒 Making auth request to:', `${API_BASE}/auth/me`);
   return fetch(`${API_BASE}/auth/me`, {
     credentials: 'include'
   }).then(response => {
+    console.log('🔒 Auth response status:', response.status, response.statusText);
     if (response.ok) {
       return response.json().then(data => {
+        console.log('🔒 Auth successful, user data:', data);
         localStorage.setItem('sprout_user', JSON.stringify(data.user));
         return true;
       });
     } else {
+      console.log('🔒 Auth failed with status:', response.status);
       localStorage.removeItem('sprout_user');
       window.location.href = '/auth.html';
       return false;
     }
-  }).catch(() => {
+  }).catch((error) => {
+    console.error('🔒 Auth request failed:', error);
     localStorage.removeItem('sprout_user');
     window.location.href = '/auth.html';
     return false;
@@ -60,14 +67,18 @@ let currentBudgets = {};
 // Initialize the settings page
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('Settings page loaded');
+    console.log('📍 API_BASE:', API_BASE);
+    console.log('📍 Current URL:', window.location.href);
     
     // Check authentication first
     try {
+        console.log('🔒 Checking authentication...');
         const isAuthenticated = await checkAuthentication();
         if (!isAuthenticated) {
             console.log('🔒 Authentication failed, redirecting...');
             return; // Will redirect to auth page
         }
+        console.log('✅ Authentication successful');
     } catch (error) {
         console.error('🔒 Authentication check failed:', error);
         return;
