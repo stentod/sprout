@@ -173,11 +173,23 @@ document.getElementById('signupForm').addEventListener('submit', async function(
     const data = await response.json();
     
     if (response.ok) {
-      showMessage('Account created successfully! Please log in.', 'success');
-      // Switch to login tab
-      switchTab('login');
-      // Pre-fill email in login form
-      document.getElementById('loginEmail').value = email;
+      if (data.auto_login) {
+        // User was automatically logged in
+        showMessage('Account created successfully! You are now logged in.', 'success');
+        // Store user info in localStorage
+        localStorage.setItem('sprout_user', JSON.stringify(data.user));
+        // Redirect to main app after short delay
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
+      } else {
+        // Fallback to old behavior (shouldn't happen with new backend)
+        showMessage('Account created successfully! Please log in.', 'success');
+        // Switch to login tab
+        switchTab('login');
+        // Pre-fill email in login form
+        document.getElementById('loginEmail').value = email;
+      }
     } else {
       showMessage(data.error || 'Signup failed');
     }

@@ -1213,12 +1213,20 @@ def signup():
                     print(f"Failed to rollback user creation: {delete_error}")
                 return jsonify({'error': 'Failed to set up account. Please try again.'}), 500
             
+            # Automatically log the user in after successful signup
+            session.clear()  # Clear any existing session
+            session['user_id'] = user_id
+            session.permanent = True  # Make session persistent
+            
+            print(f"User {user_id} automatically logged in after signup")
+            
             return jsonify({
-                'message': 'Account created successfully! You can now log in.',
+                'message': 'Account created successfully! You are now logged in.',
                 'user': {
                     'id': result['id'],
                     'email': result['email']
-                }
+                },
+                'auto_login': True
             }), 201
             
         except Exception as create_error:
