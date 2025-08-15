@@ -3,13 +3,103 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sprout - History</title>
-  <link rel="stylesheet" href="style.css?v=dark_theme_v2">
+  <title>Expense History - Sprout Budget</title>
+  
+  <!-- Comprehensive Cache Busting -->
+  <script>
+    // Force cache refresh and prevent any caching
+    if (performance.navigation.type === 1) {
+      // Page was refreshed, clear any cached data
+      if (window.caches) {
+        caches.keys().then(function(names) {
+          for (let name of names) caches.delete(name);
+        });
+      }
+    }
+    
+    // Register Service Worker for advanced cache control
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(function(registration) {
+          console.log('Service Worker registered successfully:', registration.scope);
+        })
+        .catch(function(error) {
+          console.log('Service Worker registration failed:', error);
+        });
+    }
+    
+    // Add timestamp to prevent caching
+    document.addEventListener('DOMContentLoaded', function() {
+      const links = document.querySelectorAll('link[rel="stylesheet"]');
+      const scripts = document.querySelectorAll('script[src]');
+      
+      const timestamp = Date.now();
+      
+      links.forEach(link => {
+        if (link.href && !link.href.includes('?v=')) {
+          link.href += (link.href.includes('?') ? '&' : '?') + 't=' + timestamp;
+        }
+      });
+      
+      scripts.forEach(script => {
+        if (script.src && !script.src.includes('?v=')) {
+          script.src += (script.src.includes('?') ? '&' : '?') + 't=' + timestamp;
+        }
+      });
+    });
+  </script>
+  
+  <link rel="stylesheet" href="style.css?v=3.0">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
 </head>
 <body>
-  <main id="history">
-    <!-- History content will go here -->
-  </main>
-      <script type="module" src="history.js?v=2.0"></script>
+  <div class="history-container">
+    <header class="history-header">
+      <h1>Expense History</h1>
+      <nav class="history-nav">
+        <a href="/" class="nav-link">← Back to Dashboard</a>
+        <a href="/settings.html" class="nav-link">Settings</a>
+      </nav>
+    </header>
+
+    <div class="history-controls">
+      <div class="date-navigation">
+        <button id="prevDay" class="date-btn">← Previous</button>
+        <span id="currentDate" class="current-date">Today</span>
+        <button id="nextDay" class="date-btn">Next →</button>
+      </div>
+      <div class="view-controls">
+        <button id="todayBtn" class="view-btn active">Today</button>
+        <button id="weekBtn" class="view-btn">This Week</button>
+        <button id="monthBtn" class="view-btn">This Month</button>
+      </div>
+    </div>
+
+    <div class="history-summary">
+      <div class="summary-card">
+        <h3>Total Spent</h3>
+        <p id="totalSpent" class="summary-amount">$0.00</p>
+      </div>
+      <div class="summary-card">
+        <h3>Daily Budget</h3>
+        <p id="dailyBudget" class="summary-amount">$30.00</p>
+      </div>
+      <div class="summary-card">
+        <h3>Remaining</h3>
+        <p id="remainingBudget" class="summary-amount">$30.00</p>
+      </div>
+    </div>
+
+    <div class="history-content">
+      <div id="loadingMessage" class="loading-message">Loading expenses...</div>
+      <div id="noExpensesMessage" class="no-expenses-message" style="display: none;">
+        <p>No expenses found for this period.</p>
+        <a href="/" class="btn-primary">Add Your First Expense</a>
+      </div>
+      <div id="expensesList" class="expenses-list"></div>
+    </div>
+  </div>
+
+  <script type="module" src="history.js?v=3.0"></script>
 </body>
 </html> 

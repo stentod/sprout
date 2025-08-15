@@ -1,3 +1,39 @@
+// Cache Busting and Version Control
+(function() {
+  'use strict';
+  
+  // Force cache refresh on page load
+  if (performance.navigation.type === 1) {
+    // Page was refreshed, clear any cached data
+    if (window.caches) {
+      caches.keys().then(function(names) {
+        for (let name of names) caches.delete(name);
+      });
+    }
+  }
+  
+  // Add cache-busting headers to all fetch requests
+  const originalFetch = window.fetch;
+  window.fetch = function(url, options = {}) {
+    // Add cache-busting headers to prevent caching
+    options.headers = {
+      ...options.headers,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache'
+    };
+    
+    // Add timestamp to prevent caching for GET requests
+    if (!options.method || options.method === 'GET') {
+      const separator = url.includes('?') ? '&' : '?';
+      url += `${separator}_t=${Date.now()}`;
+    }
+    
+    return originalFetch(url, options);
+  };
+  
+  console.log('🔧 Cache busting enabled');
+})();
+
 // Utility: Get dayOffset from query string
 function getDayOffset() {
   const params = new URLSearchParams(window.location.search);
