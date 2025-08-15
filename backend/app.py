@@ -1488,49 +1488,25 @@ def reset_password():
 # Get the frontend directory path relative to this file
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend')
 
-def get_file_version(filename):
-    """Generate a version number based on file modification time"""
-    try:
-        file_path = os.path.join(FRONTEND_DIR, filename)
-        if os.path.exists(file_path):
-            # Use modification time as version (changes when file is updated)
-            mtime = os.path.getmtime(file_path)
-            return str(int(mtime))
-        return '1'
-    except:
-        return '1'
-
-def add_comprehensive_cache_headers(response, filename=None):
-    """Add comprehensive cache-busting headers to prevent any caching"""
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0, private'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    response.headers['Last-Modified'] = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S GMT')
-    
-    if filename:
-        response.headers['ETag'] = f'W/"v{get_file_version(filename)}"'
-    
-    # Additional headers for maximum cache prevention
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
-    
-    return response
-
 @app.route('/')
 def serve_index():
     response = send_from_directory(FRONTEND_DIR, 'index.html')
-    return add_comprehensive_cache_headers(response, 'index.html')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/auth.html')
 def serve_auth():
     response = send_from_directory(FRONTEND_DIR, 'auth.html')
-    return add_comprehensive_cache_headers(response, 'auth.html')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/reset-password.html')
 def serve_reset_password():
-    response = send_from_directory(FRONTEND_DIR, 'reset-password.html')
-    return add_comprehensive_cache_headers(response, 'reset-password.html')
+    return send_from_directory(FRONTEND_DIR, 'reset-password.html')
 
 # @app.route('/debug-session.html')
 # def serve_debug_session():
@@ -1538,23 +1514,15 @@ def serve_reset_password():
 
 @app.route('/history.html')
 def serve_history():
-    response = send_from_directory(FRONTEND_DIR, 'history.html')
-    return add_comprehensive_cache_headers(response, 'history.html')
+    return send_from_directory(FRONTEND_DIR, 'history.html')
 
 @app.route('/settings.html')
 def serve_settings():
-    response = send_from_directory(FRONTEND_DIR, 'settings.html')
-    return add_comprehensive_cache_headers(response, 'settings.html')
+    return send_from_directory(FRONTEND_DIR, 'settings.html')
 
 @app.route('/debug-api.html')
 def serve_debug_api():
-    response = send_from_directory(FRONTEND_DIR, 'debug-api.html')
-    return add_comprehensive_cache_headers(response, 'debug-api.html')
-
-@app.route('/sw.js')
-def serve_service_worker():
-    response = send_from_directory(FRONTEND_DIR, 'sw.js')
-    return add_comprehensive_cache_headers(response, 'sw.js')
+    return send_from_directory(FRONTEND_DIR, 'debug-api.html')
 
 @app.route('/api/debug/email-config')
 def debug_email_config():
@@ -1609,9 +1577,11 @@ def debug_email_config():
 def serve_static(filename):
     response = send_from_directory(FRONTEND_DIR, filename)
     
-    # Add comprehensive cache control for ALL static files
-    if filename.endswith(('.css', '.js', '.html', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.woff', '.woff2', '.ttf', '.eot')):
-        return add_comprehensive_cache_headers(response, filename)
+    # Add cache control for CSS and JS files
+    if filename.endswith(('.css', '.js')):
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
     
     return response
 
