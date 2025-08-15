@@ -28,29 +28,36 @@
       <section class="settings-section">
         <h2>Daily Budget</h2>
         <p class="section-description">Set your daily spending limit:</p>
-        <div class="limit-form">
-          <div class="current-limit-display">
+        <form id="daily-limit-form" class="limit-form">
+          <div id="current-limit-display" class="current-limit-display">
             <span class="current-limit-value">$30.00</span>
             <p class="info-text">Current daily limit</p>
           </div>
           <div class="form-actions">
             <div class="budget-input-group">
               <span class="currency-symbol">$</span>
-              <input type="number" id="dailyBudget" min="0" step="0.01" placeholder="30.00" class="form-input">
+              <input type="number" id="daily-limit-input" min="0" step="0.01" placeholder="30.00" class="form-input">
             </div>
-            <button id="saveBudget" class="btn btn-primary">Save</button>
+            <button type="submit" id="save-button" class="btn btn-primary">Save</button>
+            <button type="button" id="cancel-button" class="btn btn-secondary">Cancel</button>
           </div>
           <p class="info-text">This is your daily spending target. Try to stay under this amount!</p>
-        </div>
+        </form>
+        <div id="status-message" class="status-message" style="display: none;"></div>
       </section>
 
       <section class="settings-section">
         <h2>Categories</h2>
         <p class="section-description">Manage your expense categories and set individual budgets.</p>
-        <div id="categoriesList" class="category-budgets-container">
+        <div id="category-budgets-container" class="category-budgets-container">
           <!-- Categories will be loaded here -->
         </div>
-        <button id="addCategory" class="btn btn-secondary">+ Add New Category</button>
+        <div class="form-actions">
+          <button id="save-all-budgets-button" class="btn btn-primary" disabled>No Changes</button>
+          <button id="reset-budgets-button" class="btn btn-secondary">Reset</button>
+          <button id="addCategory" class="btn btn-secondary">+ Add New Category</button>
+        </div>
+        <div id="category-status-message" class="status-message" style="display: none;"></div>
       </section>
 
       <section class="settings-section">
