@@ -1064,8 +1064,10 @@ body {
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  display: none;
   text-align: center;
+  margin-top: var(--spacing-sm);
+  opacity: 1;
+  transition: opacity 0.3s ease-in-out;
 }
 
 .status-success {

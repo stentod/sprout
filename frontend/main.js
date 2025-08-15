@@ -284,7 +284,7 @@ async function renderAddExpenseForm() {
               ${categoryOptions}
             </select>
           </div>
-          <button type="submit" class="btn btn-primary">Save Expense</button>
+                      <button type="submit" class="btn btn-primary">Add Expense</button>
         </div>
       </form>
       
@@ -305,19 +305,40 @@ async function renderAddExpenseForm() {
     const categoryId = form.category.value ? parseInt(form.category.value) : null;
     
     if (!amount || amount <= 0) {
-      errorDiv.innerHTML = '<div class="status-message status-error">Enter a valid amount.</div>';
+      errorDiv.innerHTML = `
+        <div class="status-message status-error">
+          <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+            <span style="font-size: 16px;">⚠️</span>
+            <span>Please enter a valid amount greater than $0.</span>
+          </div>
+        </div>
+      `;
       return;
     }
     
     if (!categoryId) {
-      errorDiv.innerHTML = '<div class="status-message status-error">Please select a category for this expense.</div>';
+      errorDiv.innerHTML = `
+        <div class="status-message status-error">
+          <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+            <span style="font-size: 16px;">⚠️</span>
+            <span>Please select a category for this expense.</span>
+          </div>
+        </div>
+      `;
       return;
     }
     
     // Show loading state
-    submitButton.textContent = 'Saving...';
+    submitButton.textContent = 'Adding Expense...';
     submitButton.disabled = true;
-    errorDiv.innerHTML = '';
+    errorDiv.innerHTML = `
+      <div class="status-message status-info">
+        <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+          <span style="font-size: 16px;">⏳</span>
+          <span>Adding your expense...</span>
+        </div>
+      </div>
+    `;
     
     try {
       // Prepare request body
@@ -339,22 +360,69 @@ async function renderAddExpenseForm() {
         // Success - refresh summary and reset form
         await loadSummaryWithFallbacks();
         form.reset();
-        errorDiv.innerHTML = '<div class="status-message status-success">Expense saved successfully!</div>';
-        setTimeout(() => errorDiv.innerHTML = '', 3000);
+        
+        // Enhanced success message with better UX
+        const successMessage = `
+          <div class="status-message status-success">
+            <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+              <span style="font-size: 16px;">✅</span>
+              <span>Expense added successfully! Your budget has been updated.</span>
+            </div>
+          </div>
+        `;
+        errorDiv.innerHTML = successMessage;
+        
+        // Auto-hide after 4 seconds with fade effect
+        setTimeout(() => {
+          const messageElement = errorDiv.querySelector('.status-message');
+          if (messageElement) {
+            messageElement.style.transition = 'opacity 0.5s ease-out';
+            messageElement.style.opacity = '0';
+            setTimeout(() => errorDiv.innerHTML = '', 500);
+          }
+        }, 4000);
+        
+        // Focus back to amount field for quick entry of next expense
+        setTimeout(() => {
+          const amountInput = form.querySelector('input[name="amount"]');
+          if (amountInput) amountInput.focus();
+        }, 100);
+        
       } else {
         try {
           const err = await resp.json();
-          const message = err.demo_mode ? 'Demo mode - expenses not saved to database' : (err.error || 'Error adding expense.');
-          errorDiv.innerHTML = `<div class="status-message status-warning">${message}</div>`;
+          const message = err.demo_mode ? 'Demo mode - expenses not saved to database' : (err.error || 'Unable to add expense. Please try again.');
+          errorDiv.innerHTML = `
+            <div class="status-message status-error">
+              <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+                <span style="font-size: 16px;">❌</span>
+                <span>${message}</span>
+              </div>
+            </div>
+          `;
         } catch (parseError) {
-          errorDiv.innerHTML = '<div class="status-message status-error">Error adding expense.</div>';
+          errorDiv.innerHTML = `
+            <div class="status-message status-error">
+              <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+                <span style="font-size: 16px;">❌</span>
+                <span>Unable to add expense. Please try again.</span>
+              </div>
+            </div>
+          `;
         }
       }
     } catch (networkError) {
-      errorDiv.innerHTML = '<div class="status-message status-error">Network error. Please try again.</div>';
+      errorDiv.innerHTML = `
+        <div class="status-message status-error">
+          <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+            <span style="font-size: 16px;">🌐</span>
+            <span>Network error. Please check your connection and try again.</span>
+          </div>
+        </div>
+      `;
     } finally {
       // Reset button state
-      submitButton.textContent = 'Save Expense';
+      submitButton.textContent = 'Add Expense';
       submitButton.disabled = false;
     }
   };
@@ -480,7 +548,7 @@ function renderFallbackUI() {
           <div class="form-group">
             <input type="text" placeholder="Description (optional)" class="form-input">
           </div>
-          <button onclick="showDemoMessage()" class="btn btn-primary">Save Expense</button>
+                      <button onclick="showDemoMessage()" class="btn btn-primary">Add Expense</button>
         </div>
       </div>
       
