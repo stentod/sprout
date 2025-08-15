@@ -4,56 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - Sprout Budget</title>
-  
-  <!-- Comprehensive Cache Busting -->
-  <script>
-    // Force cache refresh and prevent any caching
-    if (performance.navigation.type === 1) {
-      // Page was refreshed, clear any cached data
-      if (window.caches) {
-        caches.keys().then(function(names) {
-          for (let name of names) caches.delete(name);
-        });
-      }
-    }
-    
-    // Register Service Worker for advanced cache control
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
-        .then(function(registration) {
-          console.log('Service Worker registered successfully:', registration.scope);
-        })
-        .catch(function(error) {
-          console.log('Service Worker registration failed:', error);
-        });
-    }
-    
-    // Add timestamp to prevent caching
-    document.addEventListener('DOMContentLoaded', function() {
-      const links = document.querySelectorAll('link[rel="stylesheet"]');
-      const scripts = document.querySelectorAll('script[src]');
-      
-      const timestamp = Date.now();
-      
-      links.forEach(link => {
-        if (link.href && !link.href.includes('?v=')) {
-          link.href += (link.href.includes('?') ? '&' : '?') + 't=' + timestamp;
-        }
-      });
-      
-      scripts.forEach(script => {
-        if (script.src && !script.src.includes('?v=')) {
-          script.src += (script.src.includes('?') ? '&' : '?') + 't=' + timestamp;
-        }
-      });
-    });
-  </script>
-  
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.0">
+  <link rel="stylesheet" href="style.css?v=3.1">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
 </head>
 <body>
@@ -124,6 +78,6 @@
     </div>
   </div>
 
-  <script src="auth.js?v=3.0"></script>
+  <script src="auth.js?v=3.1"></script>
 </body>
 </html>

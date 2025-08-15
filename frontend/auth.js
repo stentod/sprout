@@ -17,7 +17,7 @@ const API_BASE_URL = getApiBaseUrl();
 function switchTab(tab) {
   const loginForm = document.getElementById('loginForm');
   const signupForm = document.getElementById('signupForm');
-  const forgotForm = document.getElementById('forgotForm');
+  const forgotForm = document.getElementById('forgotPasswordForm');
   const tabs = document.querySelectorAll('.auth-tab');
   
   // Remove active class from all tabs and forms
@@ -28,13 +28,13 @@ function switchTab(tab) {
   
   // Add active class to selected tab and form
   if (tab === 'login') {
-    document.querySelector('[onclick="switchTab(\'login\')"]').classList.add('active');
+    document.querySelector('[data-tab="login"]').classList.add('active');
     loginForm.classList.add('active');
   } else if (tab === 'signup') {
-    document.querySelector('[onclick="switchTab(\'signup\')"]').classList.add('active');
+    document.querySelector('[data-tab="signup"]').classList.add('active');
     signupForm.classList.add('active');
   } else if (tab === 'forgot') {
-    document.querySelector('[onclick="switchTab(\'forgot\')"]').classList.add('active');
+    // Show forgot password form
     forgotForm.classList.add('active');
   }
   
@@ -43,19 +43,22 @@ function switchTab(tab) {
 
 // Clear message
 function clearMessage() {
-  document.getElementById('authMessage').innerHTML = '';
+  const messages = document.querySelectorAll('.auth-message');
+  messages.forEach(msg => msg.innerHTML = '');
 }
 
 // Show message
-function showMessage(message, type = 'error') {
-  const messageDiv = document.getElementById('authMessage');
-  messageDiv.innerHTML = `<div class="auth-message ${type}">${message}</div>`;
-  
-  // Auto-hide success messages after 5 seconds
-  if (type === 'success') {
-    setTimeout(() => {
-      messageDiv.innerHTML = '';
-    }, 5000);
+function showMessage(message, type = 'error', formId = 'loginForm') {
+  const messageDiv = document.getElementById(formId).querySelector('.auth-message');
+  if (messageDiv) {
+    messageDiv.innerHTML = `<div class="auth-message ${type}">${message}</div>`;
+    
+    // Auto-hide success messages after 5 seconds
+    if (type === 'success') {
+      setTimeout(() => {
+        messageDiv.innerHTML = '';
+      }, 5000);
+    }
   }
 }
 
@@ -73,12 +76,12 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
   const password = document.getElementById('loginPassword').value;
   
   if (!email || !password) {
-    showMessage('Please enter both email and password');
+    showMessage('Please enter both email and password', 'error', 'loginForm');
     return;
   }
   
   if (!validateEmail(email)) {
-    showMessage('Please enter a valid email address');
+    showMessage('Please enter a valid email address', 'error', 'loginForm');
     return;
   }
   
@@ -104,18 +107,19 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     const data = await response.json();
     
     if (response.ok) {
-      showMessage('Login successful! Redirecting...', 'success');
-      // Store user info in localStorage for the frontend
-      localStorage.setItem('sprout_user', JSON.stringify(data.user));
-      // Redirect to main app after short delay
+      showMessage('Login successful! Redirecting...', 'success', 'loginForm');
+      // Store user data in localStorage for frontend use
+      localStorage.setItem('user', JSON.stringify(data.user));
+      // Redirect to main dashboard
       setTimeout(() => {
         window.location.href = '/';
       }, 1000);
     } else {
-      showMessage(data.error || 'Login failed');
+      showMessage(data.error || 'Login failed. Please try again.', 'error', 'loginForm');
     }
   } catch (error) {
-    showMessage('Network error. Please try again.');
+    console.error('Login error:', error);
+    showMessage('Network error. Please check your connection and try again.', 'error', 'loginForm');
   } finally {
     submitButton.textContent = originalText;
     submitButton.disabled = false;
@@ -128,26 +132,25 @@ document.getElementById('signupForm').addEventListener('submit', async function(
   
   const email = document.getElementById('signupEmail').value.trim().toLowerCase();
   const password = document.getElementById('signupPassword').value;
-  const confirmPassword = document.getElementById('confirmPassword').value;
+  const confirmPassword = document.getElementById('signupConfirmPassword').value;
   
-  // Validation
   if (!email || !password || !confirmPassword) {
-    showMessage('Please fill in all fields');
+    showMessage('Please fill in all fields', 'error', 'signupForm');
     return;
   }
   
   if (!validateEmail(email)) {
-    showMessage('Please enter a valid email address');
+    showMessage('Please enter a valid email address', 'error', 'signupForm');
     return;
   }
   
   if (password.length < 6) {
-    showMessage('Password must be at least 6 characters');
+    showMessage('Password must be at least 6 characters long', 'error', 'signupForm');
     return;
   }
   
   if (password !== confirmPassword) {
-    showMessage('Passwords do not match');
+    showMessage('Passwords do not match', 'error', 'signupForm');
     return;
   }
   
@@ -175,66 +178,43 @@ document.getElementById('signupForm').addEventListener('submit', async function(
     if (response.ok) {
       if (data.auto_login) {
         // User was automatically logged in
-        showMessage('Account created successfully! You are now logged in.', 'success');
-        // Store user info in localStorage
-        localStorage.setItem('sprout_user', JSON.stringify(data.user));
-        // Redirect to main app after short delay
+        showMessage('Account created successfully! You are now logged in.', 'success', 'signupForm');
+        localStorage.setItem('user', JSON.stringify(data.user));
         setTimeout(() => {
           window.location.href = '/';
-        }, 1500);
+        }, 1000);
       } else {
-        // Fallback to old behavior (shouldn't happen with new backend)
-        showMessage('Account created successfully! Please log in.', 'success');
-        // Switch to login tab
-        switchTab('login');
-        // Pre-fill email in login form
-        document.getElementById('loginEmail').value = email;
+        // User needs to log in manually
+        showMessage('Account created successfully! Please log in.', 'success', 'signupForm');
+        setTimeout(() => {
+          switchTab('login');
+        }, 2000);
       }
     } else {
-      showMessage(data.error || 'Signup failed');
+      showMessage(data.error || 'Signup failed. Please try again.', 'error', 'signupForm');
     }
   } catch (error) {
-    showMessage('Network error. Please try again.');
+    console.error('Signup error:', error);
+    showMessage('Network error. Please check your connection and try again.', 'error', 'signupForm');
   } finally {
     submitButton.textContent = originalText;
     submitButton.disabled = false;
   }
 });
 
-// Check if user is already logged in
-function checkAuthStatus() {
-  // Simple check - if user data exists, redirect to main app
-  const userData = localStorage.getItem('sprout_user');
-  if (userData) {
-    // Verify session is still valid by making a quick API call
-    fetch(`${API_BASE_URL}/api/auth/me`, {
-      credentials: 'include'
-    }).then(response => {
-      if (response.ok) {
-        window.location.href = '/';
-      } else {
-        // Session expired, clear storage
-        localStorage.removeItem('sprout_user');
-      }
-    }).catch(() => {
-      // Network error, stay on auth page
-    });
-  }
-}
-
 // Handle forgot password form submission
-document.getElementById('forgotForm').addEventListener('submit', async function(e) {
+document.getElementById('forgotPasswordForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   
   const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
   
   if (!email) {
-    showMessage('Please enter your email address');
+    showMessage('Please enter your email address', 'error', 'forgotPasswordForm');
     return;
   }
   
   if (!validateEmail(email)) {
-    showMessage('Please enter a valid email address');
+    showMessage('Please enter a valid email address', 'error', 'forgotPasswordForm');
     return;
   }
   
@@ -250,6 +230,7 @@ document.getElementById('forgotForm').addEventListener('submit', async function(
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify({
         email: email
       })
@@ -258,37 +239,69 @@ document.getElementById('forgotForm').addEventListener('submit', async function(
     const data = await response.json();
     
     if (response.ok) {
-      showMessage(data.message, 'success');
+      showMessage(data.message || 'Password reset instructions sent to your email.', 'success', 'forgotPasswordForm');
       // Clear the form
       document.getElementById('forgotEmail').value = '';
-      // Switch back to login tab after 3 seconds
-      setTimeout(() => {
-        switchTab('login');
-      }, 3000);
     } else {
-      showMessage(data.error || 'Failed to send reset email');
+      showMessage(data.error || 'Failed to send reset instructions. Please try again.', 'error', 'forgotPasswordForm');
     }
   } catch (error) {
     console.error('Forgot password error:', error);
-    showMessage('Network error. Please try again.');
+    showMessage('Network error. Please check your connection and try again.', 'error', 'forgotPasswordForm');
   } finally {
     submitButton.textContent = originalText;
     submitButton.disabled = false;
   }
 });
 
-// Check for URL parameters (like success messages)
-function checkForMessages() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const message = urlParams.get('message');
+// Add event listeners for tab switching
+document.addEventListener('DOMContentLoaded', function() {
+  // Tab switching
+  const tabs = document.querySelectorAll('.auth-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', function() {
+      const tabName = this.getAttribute('data-tab');
+      switchTab(tabName);
+    });
+  });
   
-  if (message === 'password-reset-success') {
-    showMessage('Password reset successful! Please log in with your new password.', 'success');
-    // Clean up URL
-    window.history.replaceState({}, document.title, window.location.pathname);
+  // Forgot password link
+  const forgotPasswordLink = document.querySelector('.forgot-password-link');
+  if (forgotPasswordLink) {
+    forgotPasswordLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      switchTab('forgot');
+    });
+  }
+  
+  // Back to login link
+  const backToLoginLink = document.querySelector('.back-to-login-link');
+  if (backToLoginLink) {
+    backToLoginLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      switchTab('login');
+    });
+  }
+  
+  // Check if user is already logged in
+  checkAuthentication();
+});
+
+// Check if user is already authenticated
+async function checkAuthentication() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      credentials: 'include'
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      localStorage.setItem('user', JSON.stringify(data.user));
+      // User is already logged in, redirect to dashboard
+      window.location.href = '/';
+    }
+  } catch (error) {
+    // User is not logged in, stay on auth page
+    console.log('User not authenticated');
   }
 }
-
-// Check auth status when page loads
-checkForMessages();
-checkAuthStatus();
