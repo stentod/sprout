@@ -357,22 +357,40 @@ async function renderAddExpenseForm() {
     });
       
       if (resp.ok) {
-        // Success - refresh summary and reset form
-        await loadSummaryWithFallbacks();
-        form.reset();
+        console.log('✅ Expense added successfully!');
         
         // Enhanced success message with better UX
         const successMessage = `
-          <div class="status-message status-success">
+          <div class="status-message status-success" style="background: rgba(0, 200, 81, 0.15); border: 2px solid rgba(0, 200, 81, 0.4); padding: 12px 16px; font-weight: 600;">
             <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
-              <span style="font-size: 16px;">✅</span>
-              <span>Expense added successfully! Your budget has been updated.</span>
+              <span style="font-size: 18px;">✅</span>
+              <span style="font-size: 14px;">SUCCESS! Expense added successfully! Your budget has been updated.</span>
             </div>
           </div>
         `;
         errorDiv.innerHTML = successMessage;
         
-        // Auto-hide after 4 seconds with fade effect
+        // Add a brief flash effect to make success more noticeable
+        setTimeout(() => {
+          const messageElement = errorDiv.querySelector('.status-message');
+          if (messageElement) {
+            messageElement.style.transform = 'scale(1.02)';
+            messageElement.style.transition = 'transform 0.2s ease-out';
+            setTimeout(() => {
+              messageElement.style.transform = 'scale(1)';
+            }, 200);
+          }
+        }, 100);
+        
+        // Success - refresh summary and reset form
+        try {
+          await loadSummaryWithFallbacks();
+        } catch (summaryError) {
+          console.warn('Summary refresh failed, but expense was added:', summaryError);
+        }
+        form.reset();
+        
+        // Auto-hide after 5 seconds with fade effect (longer to ensure visibility)
         setTimeout(() => {
           const messageElement = errorDiv.querySelector('.status-message');
           if (messageElement) {
@@ -380,7 +398,7 @@ async function renderAddExpenseForm() {
             messageElement.style.opacity = '0';
             setTimeout(() => errorDiv.innerHTML = '', 500);
           }
-        }, 4000);
+        }, 5000);
         
         // Focus back to amount field for quick entry of next expense
         setTimeout(() => {
