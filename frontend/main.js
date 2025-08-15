@@ -85,6 +85,27 @@ function getCurrentUser() {
 let categories = [];
 let isLoadingCategories = false;
 let categoryBudgets = null;
+let userCategoryPreference = true; // Default to requiring categories
+
+// Load user's category preference
+async function loadCategoryPreference() {
+  try {
+    console.log('🔄 Loading category preference...');
+    const response = await fetch(`${API_BASE_URL}/api/preferences/category-requirement`, {
+      credentials: 'include'
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success) {
+        userCategoryPreference = data.require_categories;
+        console.log('✅ Category preference loaded:', userCategoryPreference);
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ Failed to load category preference, using default (required):', error);
+    userCategoryPreference = true; // Default to requiring categories
+  }
+}
 
 // Load categories from API
 async function loadCategories() {
@@ -243,16 +264,22 @@ async function renderAddExpenseForm() {
     return;
   }
   
-  // Load categories first
+  // Load categories and user preferences first
   console.log('📂 Loading categories for form...');
   await loadCategories();
+  await loadCategoryPreference();
   console.log('📂 Categories after loading:', categories.length);
+  console.log('📂 Category preference:', userCategoryPreference);
   
   // Build category options
   const categoryOptions = categories.map(cat => 
     `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`
   ).join('');
   console.log('🔧 Built category options:', categoryOptions);
+  
+  // Determine category field requirements based on user preference
+  const categoryRequired = userCategoryPreference ? 'required' : '';
+  const categoryPlaceholder = userCategoryPreference ? 'Select Category (Required)' : 'Select Category (Optional)';
   
   container.innerHTML = `
     <div class="form-section">
@@ -279,12 +306,12 @@ async function renderAddExpenseForm() {
             >
           </div>
           <div class="form-group category-group">
-            <select name="category" class="form-input category-select" required>
-              <option value="">Select Category (Required)</option>
+            <select name="category" class="form-input category-select" ${categoryRequired}>
+              <option value="">${categoryPlaceholder}</option>
               ${categoryOptions}
             </select>
           </div>
-                      <button type="submit" class="btn btn-primary">Add Expense</button>
+          <button type="submit" class="btn btn-primary">Add Expense</button>
         </div>
       </form>
       
@@ -316,7 +343,7 @@ async function renderAddExpenseForm() {
       return;
     }
     
-    if (!categoryId) {
+    if (userCategoryPreference && !categoryId) {
       errorDiv.innerHTML = `
         <div class="status-message status-error">
           <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">

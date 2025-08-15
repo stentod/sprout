@@ -47,6 +47,27 @@
       </section>
 
       <section class="settings-section">
+        <h2>Expense Preferences</h2>
+        <p class="section-description">Customize how you add expenses:</p>
+        <div class="setting-item">
+          <div class="preference-toggle">
+            <label class="toggle-switch">
+              <input type="checkbox" id="require-categories-toggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+            <div class="preference-info">
+              <span class="preference-label">Require categories for all expenses</span>
+              <p class="preference-description">
+                When enabled, you must select a category for every expense. 
+                When disabled, expenses without categories will be marked as "Uncategorized."
+              </p>
+            </div>
+          </div>
+        </div>
+        <div id="preference-status-message" class="status-message" style="display: none;"></div>
+      </section>
+
+      <section class="settings-section">
         <h2>Categories</h2>
         <p class="section-description">Manage your expense categories and set individual budgets.</p>
         <div id="category-budgets-container" class="category-budgets-container">

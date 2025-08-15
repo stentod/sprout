@@ -850,32 +850,48 @@ def add_expense():
             print(f"❌ Amount is missing")
             return jsonify({'error': 'Amount is required'}), 400
         
-        # Validate category_id is required
-        if not category_id:
-            print(f"❌ Category ID is missing")
+        # Check user's category requirement preference
+        try:
+            sql = 'SELECT require_categories FROM user_preferences WHERE user_id = %s'
+            result = run_query(sql, (user_id,), fetch_one=True)
+            require_categories = result['require_categories'] if result else True  # Default to True
+        except Exception as e:
+            print(f"⚠️ Error checking category preference, defaulting to required: {e}")
+            require_categories = True
+        
+        # Validate category_id based on user preference
+        if require_categories and not category_id:
+            print(f"❌ Category ID is missing and categories are required")
             return jsonify({'error': 'Category is required'}), 400
+        elif not require_categories and not category_id:
+            print(f"ℹ️ Category ID is missing but categories are optional, proceeding without category")
+            category_id = None
         
         user_id = get_current_user_id()
         print(f"👤 User ID: {user_id}")
         
-        try:
-            category_id = int(category_id)
-            print(f"🔍 Checking if category {category_id} exists for user {user_id}")
-            # Check if category exists and belongs to the user
-            check_sql = 'SELECT id FROM categories WHERE id = %s AND user_id = %s'
-            category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
-            if not category_exists:
-                print(f"❌ Category {category_id} not found for user {user_id}")
-                return jsonify({'error': 'Invalid category'}), 400
-            print(f"✅ Category {category_id} validated")
-        except (ValueError, TypeError) as e:
-            print(f"❌ Invalid category ID format: {e}")
-            return jsonify({'error': 'Invalid category ID'}), 400
-        except Exception as db_error:
-            print(f"❌ Database error checking category: {db_error}")
-            import traceback
-            traceback.print_exc()
-            return jsonify({'error': 'Database connection error. Please try again.'}), 503
+        # Validate category_id if provided
+        if category_id:
+            try:
+                category_id = int(category_id)
+                print(f"🔍 Checking if category {category_id} exists for user {user_id}")
+                # Check if category exists and belongs to the user
+                check_sql = 'SELECT id FROM categories WHERE id = %s AND user_id = %s'
+                category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+                if not category_exists:
+                    print(f"❌ Category {category_id} not found for user {user_id}")
+                    return jsonify({'error': 'Invalid category'}), 400
+                print(f"✅ Category {category_id} validated")
+            except (ValueError, TypeError) as e:
+                print(f"❌ Invalid category ID format: {e}")
+                return jsonify({'error': 'Invalid category ID'}), 400
+            except Exception as db_error:
+                print(f"❌ Database error checking category: {db_error}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({'error': 'Database connection error. Please try again.'}), 503
+        else:
+            print(f"ℹ️ No category provided, expense will be saved without category")
         
         # Use UTC timestamp to ensure consistent date handling across timezones
         timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
@@ -1127,6 +1143,89 @@ def set_daily_limit():
         else:
             return jsonify({
                 'error': 'Failed to update daily spending limit',
+                'success': False
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@app.route('/api/preferences/category-requirement', methods=['GET'])
+@require_auth
+def get_category_requirement():
+    """Get the user's preference for requiring categories"""
+    try:
+        user_id = get_current_user_id()
+        
+        sql = 'SELECT require_categories FROM user_preferences WHERE user_id = %s'
+        result = run_query(sql, (user_id,), fetch_one=True)
+        
+        if result:
+            require_categories = result['require_categories']
+        else:
+            # Create default preference if none exists
+            sql = '''
+                INSERT INTO user_preferences (user_id, require_categories)
+                VALUES (%s, TRUE)
+                RETURNING require_categories
+            '''
+            result = run_query(sql, (user_id,), fetch_one=True)
+            require_categories = result['require_categories']
+        
+        return jsonify({
+            'require_categories': require_categories,
+            'success': True
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@app.route('/api/preferences/category-requirement', methods=['POST', 'PUT'])
+@require_auth
+def set_category_requirement():
+    """Set the user's preference for requiring categories"""
+    try:
+        data = request.get_json()
+        require_categories = data.get('require_categories')
+        
+        if require_categories is None:
+            return jsonify({
+                'error': 'require_categories is required',
+                'success': False
+            }), 400
+        
+        if not isinstance(require_categories, bool):
+            return jsonify({
+                'error': 'require_categories must be a boolean',
+                'success': False
+            }), 400
+        
+        user_id = get_current_user_id()
+        
+        # Update or insert user preference
+        sql = '''
+            INSERT INTO user_preferences (user_id, require_categories, updated_at)
+            VALUES (%s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) DO UPDATE SET
+                require_categories = EXCLUDED.require_categories,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING require_categories
+        '''
+        result = run_query(sql, (user_id, require_categories), fetch_one=True)
+        
+        if result:
+            return jsonify({
+                'require_categories': result['require_categories'],
+                'success': True,
+                'message': f"Category requirement {'enabled' if result['require_categories'] else 'disabled'} successfully"
+            })
+        else:
+            return jsonify({
+                'error': 'Failed to update category requirement preference',
                 'success': False
             }), 500
             

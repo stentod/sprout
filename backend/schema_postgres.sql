@@ -63,17 +63,18 @@ CREATE TABLE IF NOT EXISTS expenses (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- User preferences table for daily spending limits
+-- User preferences table for daily spending limits and category requirements
 CREATE TABLE IF NOT EXISTS user_preferences (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL DEFAULT 0 UNIQUE,
   daily_spending_limit DECIMAL(10,2) DEFAULT 30.00,
+  require_categories BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Insert default preference for user 0
-INSERT INTO user_preferences (user_id, daily_spending_limit) 
-VALUES (0, 30.00) 
+INSERT INTO user_preferences (user_id, daily_spending_limit, require_categories) 
+VALUES (0, 30.00, TRUE) 
 ON CONFLICT (user_id) DO NOTHING;

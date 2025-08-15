@@ -57,12 +57,17 @@ let categoryStatusMessage;
 let saveAllBudgetsButton;
 let resetBudgetsButton;
 
+// Category preference elements
+let requireCategoriesToggle;
+let preferenceStatusMessage;
+
 // State
 let originalLimit = 30.00;
 let isLoading = false;
 let categories = [];
 let originalBudgets = {};
 let currentBudgets = {};
+let originalRequireCategories = true;
 
 // Initialize the settings page
 document.addEventListener('DOMContentLoaded', async function() {
@@ -98,9 +103,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     saveAllBudgetsButton = document.getElementById('save-all-budgets-button');
     resetBudgetsButton = document.getElementById('reset-budgets-button');
     
-    // Load current daily limit and categories
+    // Category preference elements
+    requireCategoriesToggle = document.getElementById('require-categories-toggle');
+    preferenceStatusMessage = document.getElementById('preference-status-message');
+    
+    // Load current daily limit, categories, and preferences
     loadCurrentDailyLimit();
     loadCategories();
+    loadCategoryPreference();
     
     // Set up event listeners
     setupEventListeners();
@@ -119,6 +129,9 @@ function setupEventListeners() {
     // Category budget buttons
     saveAllBudgetsButton.addEventListener('click', handleSaveAllBudgets);
     resetBudgetsButton.addEventListener('click', handleResetBudgets);
+    
+    // Category preference toggle
+    requireCategoriesToggle.addEventListener('change', handleCategoryPreferenceChange);
 }
 
 async function loadCurrentDailyLimit() {
@@ -548,4 +561,99 @@ function clearCategoryStatusMessage() {
     categoryStatusMessage.style.display = 'none';
     categoryStatusMessage.textContent = '';
     categoryStatusMessage.className = 'status-message';
+}
+
+// ==========================================
+// CATEGORY PREFERENCE MANAGEMENT
+// ==========================================
+
+async function loadCategoryPreference() {
+    try {
+        console.log('Loading category preference...');
+        
+        const response = await fetch(`${API_BASE}/preferences/category-requirement`, {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Category preference data:', data);
+        
+        if (data.success) {
+            originalRequireCategories = data.require_categories;
+            requireCategoriesToggle.checked = originalRequireCategories;
+        } else {
+            throw new Error(data.error || 'Failed to load category preference');
+        }
+        
+    } catch (error) {
+        console.error('Error loading category preference:', error);
+        // Default to true (categories required) if loading fails
+        originalRequireCategories = true;
+        requireCategoriesToggle.checked = true;
+    }
+}
+
+async function handleCategoryPreferenceChange(event) {
+    const newValue = event.target.checked;
+    
+    try {
+        console.log('Saving category preference:', newValue);
+        
+        const response = await fetch(`${API_BASE}/preferences/category-requirement`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                require_categories: newValue
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Save preference response:', data);
+        
+        if (data.success) {
+            originalRequireCategories = data.require_categories;
+            showPreferenceStatusMessage(
+                data.message || `Category requirement ${newValue ? 'enabled' : 'disabled'} successfully`, 
+                'success'
+            );
+        } else {
+            throw new Error(data.error || 'Failed to update category preference');
+        }
+        
+    } catch (error) {
+        console.error('Error saving category preference:', error);
+        // Revert toggle to original state
+        requireCategoriesToggle.checked = originalRequireCategories;
+        showPreferenceStatusMessage('Failed to update preference. Please try again.', 'error');
+    }
+}
+
+function showPreferenceStatusMessage(message, type = 'info') {
+    preferenceStatusMessage.className = `status-message status-${type}`;
+    preferenceStatusMessage.textContent = message;
+    preferenceStatusMessage.style.display = 'block';
+    
+    console.log(`Preference Status (${type}):`, message);
+    
+    // Auto-hide success messages after 3 seconds
+    if (type === 'success') {
+        setTimeout(clearPreferenceStatusMessage, 3000);
+    }
+}
+
+function clearPreferenceStatusMessage() {
+    preferenceStatusMessage.style.display = 'none';
+    preferenceStatusMessage.textContent = '';
+    preferenceStatusMessage.className = 'status-message';
 } 
