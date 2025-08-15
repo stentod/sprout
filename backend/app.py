@@ -9,7 +9,7 @@ import os
 import bcrypt
 import secrets
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from functools import wraps
 
@@ -317,7 +317,7 @@ def create_default_categories(user_id):
 
 # Helper: Get the start and end of the target day (using dayOffset)
 def get_day_bounds(day_offset=0):
-    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     target_day = today + timedelta(days=day_offset)
     start = target_day
     end = target_day + timedelta(days=1)
@@ -413,7 +413,7 @@ def test_database():
             'has_username_column': has_username,
             'user_count': user_count,
             'needs_migration': has_username,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }), 200
         
     except Exception as e:
@@ -421,7 +421,7 @@ def test_database():
             'status': 'error',
             'database': 'disconnected',
             'error': str(e),
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }), 500
 
 # Error handlers for database connection issues
@@ -498,7 +498,7 @@ def get_categories():
                     'color': '#FF6B6B',
                     'is_default': True,
                     'daily_budget': 0.0,
-                    'created_at': datetime.now().isoformat()
+                    'created_at': datetime.now(timezone.utc).isoformat()
                 }
             ])
         
@@ -877,8 +877,8 @@ def add_expense():
             traceback.print_exc()
             return jsonify({'error': 'Database connection error. Please try again.'}), 503
         
-        # Use local timezone-aware timestamp to ensure consistent date handling
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Use UTC timestamp to ensure consistent date handling across timezones
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         print(f"⏰ Timestamp: {timestamp}")
         
         try:
@@ -1398,7 +1398,7 @@ def forgot_password():
             
             # Generate reset token
             reset_token = generate_reset_token()
-            expires_at = datetime.now() + timedelta(hours=1)  # Token expires in 1 hour
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=1)  # Token expires in 1 hour
             
             print(f"🔑 Generated reset token: {reset_token[:10]}...")
             
