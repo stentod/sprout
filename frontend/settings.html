@@ -10,48 +10,57 @@
 <body>
   <div class="settings-container">
     <header class="settings-header">
-      <h1>Settings</h1>
-      <nav class="settings-nav">
-        <a href="/" class="nav-link">← Back to Dashboard</a>
-        <a href="/history.html" class="nav-link">History</a>
-      </nav>
+      <div class="header-content">
+        <div class="header-left">
+          <a href="/" class="back-button">
+            <span class="back-icon">←</span>
+            Back to Dashboard
+          </a>
+        </div>
+        <h1>Settings</h1>
+        <div class="header-right">
+          <a href="/history.html" class="back-button">History</a>
+        </div>
+      </div>
     </header>
 
-    <div class="settings-content">
+    <main class="settings-main">
       <section class="settings-section">
         <h2>Daily Budget</h2>
-        <div class="setting-item">
-          <label for="dailyBudget">Set your daily spending limit:</label>
-          <div class="input-group">
-            <span class="currency-symbol">$</span>
-            <input type="number" id="dailyBudget" min="0" step="0.01" placeholder="30.00">
-            <button id="saveBudget" class="btn-primary">Save</button>
+        <p class="section-description">Set your daily spending limit:</p>
+        <div class="limit-form">
+          <div class="current-limit-display">
+            <span class="current-limit-value">$30.00</span>
+            <p class="info-text">Current daily limit</p>
           </div>
-          <p class="setting-description">This is your daily spending target. Try to stay under this amount!</p>
+          <div class="form-actions">
+            <div class="budget-input-group">
+              <span class="currency-symbol">$</span>
+              <input type="number" id="dailyBudget" min="0" step="0.01" placeholder="30.00" class="form-input">
+            </div>
+            <button id="saveBudget" class="btn btn-primary">Save</button>
+          </div>
+          <p class="info-text">This is your daily spending target. Try to stay under this amount!</p>
         </div>
       </section>
 
       <section class="settings-section">
         <h2>Categories</h2>
-        <div class="setting-item">
-          <p class="setting-description">Manage your expense categories and set individual budgets.</p>
-          <div id="categoriesList" class="categories-list">
-            <!-- Categories will be loaded here -->
-          </div>
-          <button id="addCategory" class="btn-secondary">+ Add New Category</button>
+        <p class="section-description">Manage your expense categories and set individual budgets.</p>
+        <div id="categoriesList" class="category-budgets-container">
+          <!-- Categories will be loaded here -->
         </div>
+        <button id="addCategory" class="btn btn-secondary">+ Add New Category</button>
       </section>
 
       <section class="settings-section">
         <h2>Account</h2>
-        <div class="setting-item">
-          <p class="setting-description">Manage your account settings and preferences.</p>
-          <div class="account-actions">
-            <button id="logoutBtn" class="btn-danger">Logout</button>
-          </div>
+        <p class="section-description">Manage your account settings and preferences.</p>
+        <div class="form-actions">
+          <button id="logoutBtn" class="btn btn-danger">Logout</button>
         </div>
       </section>
-    </div>
+    </main>
 
     <div id="messageContainer" class="message-container"></div>
   </div>
