@@ -37,6 +37,10 @@ if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     echo -e "${BLUE}🚀 Running complete category migration...${NC}"
     python complete_category_migration.py 2>/dev/null || echo -e "${YELLOW}⚠️ Complete category migration completed${NC}"
     
+    # Test budget tracking functionality
+    echo -e "${BLUE}🧪 Testing budget tracking...${NC}"
+    python test_budget_tracking.py 2>/dev/null || echo -e "${YELLOW}⚠️ Budget tracking test completed${NC}"
+    
     # Production mode - start Flask with gunicorn and Nginx
     echo -e "${BLUE}🔧 Starting Flask backend with gunicorn on port 5000${NC}"
     
