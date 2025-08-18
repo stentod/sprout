@@ -832,14 +832,36 @@ def get_category_budget_tracking():
         user_id = get_current_user_id()
         
         try:
-            # Get all categories with their budgets for the current user
+            # Get all categories with their budgets for the current user (new normalized structure)
             categories_sql = '''
-                SELECT id, name, icon, color, daily_budget
-                FROM categories 
-                WHERE user_id = %s
-                ORDER BY is_default DESC, name ASC
+                SELECT 
+                    'default_' || dc.id as id,
+                    dc.name,
+                    dc.icon,
+                    dc.color,
+                    COALESCE(ucb.daily_budget, 0.0) as daily_budget
+                FROM default_categories dc
+                LEFT JOIN user_category_budgets ucb ON ucb.category_id = dc.id 
+                    AND ucb.category_type = 'default' 
+                    AND ucb.user_id = %s
+                
+                UNION ALL
+                
+                SELECT 
+                    'custom_' || cc.id as id,
+                    cc.name,
+                    cc.icon,
+                    cc.color,
+                    COALESCE(ucb.daily_budget, cc.daily_budget, 0.0) as daily_budget
+                FROM custom_categories cc
+                LEFT JOIN user_category_budgets ucb ON ucb.category_id = cc.id 
+                    AND ucb.category_type = 'custom' 
+                    AND ucb.user_id = %s
+                WHERE cc.user_id = %s
+                
+                ORDER BY name ASC
             '''
-            categories = run_query(categories_sql, (user_id,), fetch_all=True)
+            categories = run_query(categories_sql, (user_id, user_id, user_id), fetch_all=True)
         except Exception as db_error:
             print(f"Database error getting categories for budget tracking: {db_error}")
             # Return empty budget tracking if database fails
@@ -860,12 +882,23 @@ def get_category_budget_tracking():
             })
         
         try:
-            # Get today's spending by category
+            # Get today's spending by category (handle new category ID format)
             spending_sql = '''
-                SELECT e.category_id, SUM(e.amount) as total_spent
+                SELECT 
+                    CASE 
+                        WHEN e.category_id LIKE 'default_%%' THEN e.category_id
+                        WHEN e.category_id LIKE 'custom_%%' THEN e.category_id
+                        ELSE CONCAT('default_', e.category_id) -- Legacy format
+                    END as category_id,
+                    SUM(e.amount) as total_spent
                 FROM expenses e
                 WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
-                GROUP BY e.category_id
+                GROUP BY 
+                    CASE 
+                        WHEN e.category_id LIKE 'default_%%' THEN e.category_id
+                        WHEN e.category_id LIKE 'custom_%%' THEN e.category_id
+                        ELSE CONCAT('default_', e.category_id)
+                    END
             '''
             spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()))
         except Exception as db_error:
