@@ -685,21 +685,6 @@ function showAddCategoryModal() {
                     <input type="text" id="category-name" name="name" class="form-input" required maxlength="100" placeholder="e.g., Coffee, Gym, etc.">
                 </div>
                 <div class="form-group">
-                    <label for="category-icon">Icon</label>
-                    <select id="category-icon" name="icon" class="form-input">
-                        <option value="📦">📦 Other</option>
-                        <option value="☕">☕ Coffee</option>
-                        <option value="🏋️">🏋️ Gym</option>
-                        <option value="🎮">🎮 Gaming</option>
-                        <option value="📱">📱 Tech</option>
-                        <option value="🎨">🎨 Art</option>
-                        <option value="📚">📚 Books</option>
-                        <option value="🎵">🎵 Music</option>
-                        <option value="🍕">🍕 Pizza</option>
-                        <option value="🚴">🚴 Cycling</option>
-                    </select>
-                </div>
-                <div class="form-group">
                     <label for="category-color">Color</label>
                     <input type="color" id="category-color" name="color" class="form-input" value="#A9A9A9">
                 </div>
@@ -723,7 +708,7 @@ function showAddCategoryModal() {
         const formData = new FormData(e.target);
         const categoryData = {
             name: formData.get('name'),
-            icon: formData.get('icon'),
+            icon: '📝', // Default icon for custom categories
             color: formData.get('color'),
             daily_budget: parseFloat(formData.get('daily_budget')) || 0
         };
