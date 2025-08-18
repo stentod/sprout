@@ -868,6 +868,7 @@ def get_category_budget_tracking():
         user_id = get_current_user_id()
         
         try:
+            print(f"🔍 Budget tracking for user_id: {user_id}")
             # Get all categories with their budgets for the current user (new normalized structure)
             categories_sql = '''
                 SELECT 
@@ -898,6 +899,9 @@ def get_category_budget_tracking():
                 ORDER BY name ASC
             '''
             categories = run_query(categories_sql, (user_id, user_id, user_id), fetch_all=True)
+            print(f"📊 Found {len(categories)} categories for user {user_id}")
+            budgeted_count = sum(1 for cat in categories if cat['daily_budget'] > 0)
+            print(f"💰 {budgeted_count} categories have budgets")
         except Exception as db_error:
             print(f"Database error getting categories for budget tracking: {db_error}")
             # Return empty budget tracking if database fails
@@ -968,6 +972,7 @@ def get_category_budget_tracking():
                 remaining = budget - spent
                 total_budget += budget
                 total_spent_budgeted += spent
+                print(f"   💰 {cat['name']} ({cat['id']}): ${budget} budget, ${spent} spent, ${remaining} remaining")
                 
                 category_data.update({
                     'daily_budget': budget,
