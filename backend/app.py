@@ -1098,12 +1098,22 @@ def add_expense():
         
         try:
             print(f"💾 Inserting expense into database...")
+            
+            # Convert category_id back to the full string format for storage
+            if category_id:
+                if category_type == 'default':
+                    storage_category_id = f"default_{category_id}"
+                else:
+                    storage_category_id = f"custom_{category_id}"
+            else:
+                storage_category_id = None
+            
             sql = '''
                 INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
                 VALUES (%s, %s, %s, %s, %s)
             '''
-            result = run_query(sql, (user_id, amount, description, category_id, timestamp), fetch_all=False)
-            print(f"✅ Expense inserted successfully, result: {result}")
+            result = run_query(sql, (user_id, amount, description, storage_category_id, timestamp), fetch_all=False)
+            print(f"✅ Expense inserted successfully with category_id: {storage_category_id}, result: {result}")
             return jsonify({'success': True}), 201
         except Exception as db_error:
             print(f"❌ Database error adding expense: {db_error}")
