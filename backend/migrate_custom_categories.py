@@ -75,19 +75,16 @@ def run_migration():
             )
         """)
         
-        # Insert default categories
+        # Insert default categories (original 7 categories only)
         print("📝 Inserting default categories...")
         default_categories = [
             ('Food & Dining', '🍽️', '#FF6B6B'),
             ('Transportation', '🚗', '#4ECDC4'),
-            ('Entertainment', '🎬', '#45B7D1'),
-            ('Shopping', '🛍️', '#96CEB4'),
-            ('Bills & Utilities', '💡', '#FFEAA7'),
-            ('Healthcare', '🏥', '#DDA0DD'),
-            ('Education', '📚', '#98D8C8'),
-            ('Travel', '✈️', '#F7DC6F'),
-            ('Gifts', '🎁', '#BB8FCE'),
-            ('Other', '📦', '#A9A9A9')
+            ('Shopping', '🛒', '#45B7D1'),
+            ('Health & Fitness', '💪', '#96CEB4'),
+            ('Entertainment', '🎬', '#FECA57'),
+            ('Bills & Utilities', '⚡', '#FF9FF3'),
+            ('Other', '📝', '#6B7280')
         ]
         
         for name, icon, color in default_categories:

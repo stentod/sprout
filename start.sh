@@ -37,6 +37,10 @@ if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     echo -e "${BLUE}🔄 Restructuring categories for custom categories...${NC}"
     python migrate_custom_categories.py 2>/dev/null || echo -e "${YELLOW}⚠️ Custom categories migration completed (tables may already exist)${NC}"
     
+    # Clean up any extra default categories that were incorrectly added
+    echo -e "${BLUE}🧹 Cleaning up extra default categories...${NC}"
+    python cleanup_extra_categories.py 2>/dev/null || echo -e "${YELLOW}⚠️ Category cleanup completed (no extra categories to remove)${NC}"
+    
     # Production mode - start Flask with gunicorn and Nginx
     echo -e "${BLUE}🔧 Starting Flask backend with gunicorn on port 5000${NC}"
     

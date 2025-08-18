@@ -565,6 +565,51 @@ def get_categories():
                     'daily_budget': 0.0,
                     'is_default': True,
                     'is_custom': False
+                },
+                {
+                    'id': 'default_3',
+                    'name': 'Shopping',
+                    'icon': '🛒',
+                    'color': '#45B7D1',
+                    'daily_budget': 0.0,
+                    'is_default': True,
+                    'is_custom': False
+                },
+                {
+                    'id': 'default_4',
+                    'name': 'Health & Fitness',
+                    'icon': '💪',
+                    'color': '#96CEB4',
+                    'daily_budget': 0.0,
+                    'is_default': True,
+                    'is_custom': False
+                },
+                {
+                    'id': 'default_5',
+                    'name': 'Entertainment',
+                    'icon': '🎬',
+                    'color': '#FECA57',
+                    'daily_budget': 0.0,
+                    'is_default': True,
+                    'is_custom': False
+                },
+                {
+                    'id': 'default_6',
+                    'name': 'Bills & Utilities',
+                    'icon': '⚡',
+                    'color': '#FF9FF3',
+                    'daily_budget': 0.0,
+                    'is_default': True,
+                    'is_custom': False
+                },
+                {
+                    'id': 'default_7',
+                    'name': 'Other',
+                    'icon': '📝',
+                    'color': '#6B7280',
+                    'daily_budget': 0.0,
+                    'is_default': True,
+                    'is_custom': False
                 }
             ])
             
