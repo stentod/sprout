@@ -869,6 +869,18 @@ def get_category_budget_tracking():
         
         try:
             print(f"🔍 Budget tracking for user_id: {user_id}")
+            
+            # Debug: Check what's in user_category_budgets table
+            debug_sql = '''
+                SELECT user_id, category_id, category_type, daily_budget 
+                FROM user_category_budgets 
+                WHERE user_id = %s
+            '''
+            debug_budgets = run_query(debug_sql, (user_id,), fetch_all=True)
+            print(f"🔍 User category budgets in database: {len(debug_budgets)} entries")
+            for budget in debug_budgets:
+                print(f"   💰 User {budget['user_id']}, Category {budget['category_type']}_{budget['category_id']}: ${budget['daily_budget']}")
+            
             # Get all categories with their budgets for the current user (new normalized structure)
             categories_sql = '''
                 SELECT 
@@ -900,6 +912,11 @@ def get_category_budget_tracking():
             '''
             categories = run_query(categories_sql, (user_id, user_id, user_id), fetch_all=True)
             print(f"📊 Found {len(categories)} categories for user {user_id}")
+            
+            # Debug: Show all categories and their budget values
+            for cat in categories:
+                print(f"   📋 {cat['name']} ({cat['id']}): budget=${cat['daily_budget']}")
+            
             budgeted_count = sum(1 for cat in categories if cat['daily_budget'] > 0)
             print(f"💰 {budgeted_count} categories have budgets")
         except Exception as db_error:
