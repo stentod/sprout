@@ -850,11 +850,15 @@ def add_expense():
             print(f"❌ Amount is missing")
             return jsonify({'error': 'Amount is required'}), 400
         
+        user_id = get_current_user_id()
+        print(f"👤 User ID: {user_id}")
+        
         # Check user's category requirement preference
         try:
             sql = 'SELECT require_categories FROM user_preferences WHERE user_id = %s'
             result = run_query(sql, (user_id,), fetch_one=True)
             require_categories = result['require_categories'] if result else True  # Default to True
+            print(f"🔍 User category preference: require_categories={require_categories}")
         except Exception as e:
             print(f"⚠️ Error checking category preference, defaulting to required: {e}")
             require_categories = True
@@ -866,8 +870,6 @@ def add_expense():
         elif not require_categories and not category_id:
             print(f"ℹ️ Category ID is missing but categories are optional, proceeding without category")
             category_id = None
-        
-        user_id = get_current_user_id()
         print(f"👤 User ID: {user_id}")
         
         # Validate category_id if provided

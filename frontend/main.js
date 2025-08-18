@@ -343,12 +343,18 @@ async function renderAddExpenseForm() {
       return;
     }
     
+    // Debug: Log the current preference state
+    console.log('🔍 Form submission debug:');
+    console.log('  userCategoryPreference:', userCategoryPreference);
+    console.log('  categoryId:', categoryId);
+    console.log('  should require category:', userCategoryPreference && !categoryId);
+    
     if (userCategoryPreference && !categoryId) {
       errorDiv.innerHTML = `
         <div class="status-message status-error">
           <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
             <span style="font-size: 16px;">⚠️</span>
-            <span>Please select a category for this expense.</span>
+            <span>Category is required</span>
           </div>
         </div>
       `;
