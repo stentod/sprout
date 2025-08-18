@@ -1890,6 +1890,113 @@ def debug_email_config():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/debug/budget-tracking')
+@require_auth
+def debug_budget_tracking():
+    """Debug endpoint to show budget tracking data in a readable format"""
+    try:
+        user_id = get_current_user_id()
+        day_offset = int(request.args.get('dayOffset', 0))
+        today_start, today_end = get_day_bounds(day_offset)
+        
+        # Get categories with budgets
+        categories_sql = '''
+            SELECT 
+                'default_' || dc.id as id,
+                dc.name,
+                dc.icon,
+                dc.color,
+                COALESCE(ucb.daily_budget, 0.0) as daily_budget
+            FROM default_categories dc
+            LEFT JOIN user_category_budgets ucb ON ucb.category_id = dc.id 
+                AND ucb.category_type = 'default' 
+                AND ucb.user_id = %s
+            
+            UNION ALL
+            
+            SELECT 
+                'custom_' || cc.id as id,
+                cc.name,
+                cc.icon,
+                cc.color,
+                COALESCE(ucb.daily_budget, cc.daily_budget, 0.0) as daily_budget
+            FROM custom_categories cc
+            LEFT JOIN user_category_budgets ucb ON ucb.category_id = cc.id 
+                AND ucb.category_type = 'custom' 
+                AND ucb.user_id = %s
+            WHERE cc.user_id = %s
+            
+            ORDER BY name ASC
+        '''
+        categories = run_query(categories_sql, (user_id, user_id, user_id), fetch_all=True)
+        
+        # Get spending data
+        spending_sql = '''
+            SELECT 
+                CASE 
+                    WHEN e.category_id LIKE 'default_%%' THEN e.category_id
+                    WHEN e.category_id LIKE 'custom_%%' THEN e.category_id
+                    ELSE CONCAT('default_', e.category_id)
+                END as category_id,
+                SUM(e.amount) as total_spent
+            FROM expenses e
+            WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
+            GROUP BY 
+                CASE 
+                    WHEN e.category_id LIKE 'default_%%' THEN e.category_id
+                    WHEN e.category_id LIKE 'custom_%%' THEN e.category_id
+                    ELSE CONCAT('default_', e.category_id)
+                END
+        '''
+        spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()), fetch_all=True)
+        
+        spending_by_category = {row['category_id']: float(row['total_spent']) for row in spending_data}
+        
+        # Build debug response
+        debug_data = {
+            'user_id': user_id,
+            'date_range': {
+                'start': today_start.isoformat(),
+                'end': today_end.isoformat()
+            },
+            'categories': [],
+            'spending_by_category': spending_by_category,
+            'summary': {
+                'total_categories': len(categories),
+                'categories_with_budgets': 0,
+                'total_budget': 0,
+                'total_spent': sum(spending_by_category.values())
+            }
+        }
+        
+        for cat in categories:
+            budget = float(cat['daily_budget']) if cat['daily_budget'] else 0.0
+            spent = spending_by_category.get(cat['id'], 0.0)
+            remaining = budget - spent if budget > 0 else 0
+            
+            category_debug = {
+                'id': cat['id'],
+                'name': cat['name'],
+                'budget': budget,
+                'spent': spent,
+                'remaining': remaining,
+                'has_budget': budget > 0
+            }
+            
+            debug_data['categories'].append(category_debug)
+            
+            if budget > 0:
+                debug_data['summary']['categories_with_budgets'] += 1
+                debug_data['summary']['total_budget'] += budget
+        
+        return jsonify(debug_data)
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
 @app.route('/<path:filename>')
 def serve_static(filename):
     response = send_from_directory(FRONTEND_DIR, filename)
