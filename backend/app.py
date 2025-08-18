@@ -475,97 +475,170 @@ def get_expenses():
 @app.route('/api/categories', methods=['GET'])
 @require_auth
 def get_categories():
-    """Get all categories for the current user"""
+    """Get all categories for the current user (default + custom)"""
     try:
         user_id = get_current_user_id()
         
         try:
-            sql = '''
-                SELECT id, name, icon, color, is_default, daily_budget, created_at
-                FROM categories 
-                WHERE user_id = %s
-                ORDER BY is_default DESC, name ASC
+            # Get default categories (shared by all users)
+            default_sql = '''
+                SELECT id, name, icon, color, created_at
+                FROM default_categories 
+                ORDER BY name ASC
             '''
-            categories = run_query(sql, (user_id,), fetch_all=True)
+            default_categories = run_query(default_sql, fetch_all=True)
+            
+            # Get custom categories for this user
+            custom_sql = '''
+                SELECT id, name, icon, color, daily_budget, created_at
+                FROM custom_categories 
+                WHERE user_id = %s
+                ORDER BY name ASC
+            '''
+            custom_categories = run_query(custom_sql, (user_id,), fetch_all=True)
+            
+            # Get user's budget settings for all categories
+            budget_sql = '''
+                SELECT category_id, category_type, daily_budget
+                FROM user_category_budgets 
+                WHERE user_id = %s
+            '''
+            user_budgets = run_query(budget_sql, (user_id,), fetch_all=True)
+            
+            # Create a lookup for user budgets
+            budget_lookup = {}
+            for budget in user_budgets:
+                key = f"{budget['category_type']}_{budget['category_id']}"
+                budget_lookup[key] = float(budget['daily_budget'])
+            
+            # Combine and format categories
+            categories = []
+            
+            # Add default categories
+            for cat in default_categories:
+                budget_key = f"default_{cat['id']}"
+                categories.append({
+                    'id': f"default_{cat['id']}",  # Prefix to distinguish from custom
+                    'name': cat['name'],
+                    'icon': cat['icon'],
+                    'color': cat['color'],
+                    'daily_budget': budget_lookup.get(budget_key, 0.0),
+                    'is_default': True,
+                    'is_custom': False,
+                    'created_at': cat['created_at'].isoformat() if hasattr(cat['created_at'], 'isoformat') else str(cat['created_at'])
+                })
+            
+            # Add custom categories
+            for cat in custom_categories:
+                budget_key = f"custom_{cat['id']}"
+                categories.append({
+                    'id': f"custom_{cat['id']}",  # Prefix to distinguish from default
+                    'name': cat['name'],
+                    'icon': cat['icon'],
+                    'color': cat['color'],
+                    'daily_budget': budget_lookup.get(budget_key, float(cat['daily_budget'])),
+                    'is_default': False,
+                    'is_custom': True,
+                    'created_at': cat['created_at'].isoformat() if hasattr(cat['created_at'], 'isoformat') else str(cat['created_at'])
+                })
+            
+            return jsonify(categories)
+            
         except Exception as db_error:
             print(f"Database error getting categories: {db_error}")
-            # Return default categories if database fails
+            # Return basic default categories if database fails
             return jsonify([
                 {
-                    'id': 1,
+                    'id': 'default_1',
                     'name': 'Food & Dining',
                     'icon': '🍽️',
                     'color': '#FF6B6B',
-                    'is_default': True,
                     'daily_budget': 0.0,
-                    'created_at': datetime.now(timezone.utc).isoformat()
+                    'is_default': True,
+                    'is_custom': False
+                },
+                {
+                    'id': 'default_2', 
+                    'name': 'Transportation',
+                    'icon': '🚗',
+                    'color': '#4ECDC4',
+                    'daily_budget': 0.0,
+                    'is_default': True,
+                    'is_custom': False
                 }
             ])
-        
-        # Convert data types for consistent API response
-        result = []
-        for cat in categories:
-            result.append({
-                'id': cat['id'],
-                'name': cat['name'],
-                'icon': cat['icon'],
-                'color': cat['color'],
-                'is_default': bool(cat['is_default']),
-                'daily_budget': float(cat['daily_budget']) if cat['daily_budget'] else 0.0,
-                'created_at': cat['created_at'].isoformat() if hasattr(cat['created_at'], 'isoformat') else str(cat['created_at'])
-            })
-        
-        return jsonify(result)
+            
     except Exception as e:
-        print(f"Categories endpoint error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify([]), 500
+        print(f"Error in get_categories: {e}")
+        return jsonify({'error': 'Failed to load categories'}), 500
 
 @app.route('/api/categories', methods=['POST'])
 @require_auth
 def create_category():
-    """Create a new category for the current user"""
+    """Create a new custom category for the current user"""
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
         name = data.get('name', '').strip()
-        icon = data.get('icon', '📝').strip()
-        color = data.get('color', '#6B7280').strip()
-        user_id = get_current_user_id()
+        icon = data.get('icon', '📦')
+        color = data.get('color', '#A9A9A9')
+        daily_budget = data.get('daily_budget', 0.0)
         
         if not name:
             return jsonify({'error': 'Category name is required'}), 400
         
+        if len(name) > 100:
+            return jsonify({'error': 'Category name must be 100 characters or less'}), 400
+        
+        user_id = get_current_user_id()
+        
         # Check if category name already exists for this user
-        check_sql = 'SELECT id FROM categories WHERE name = %s AND user_id = %s'
-        existing = run_query(check_sql, (name, user_id), fetch_one=True)
+        check_sql = 'SELECT id FROM custom_categories WHERE user_id = %s AND name = %s'
+        existing = run_query(check_sql, (user_id, name), fetch_one=True)
         if existing:
-            return jsonify({'error': 'Category name already exists'}), 409
+            return jsonify({'error': 'A category with this name already exists'}), 400
         
-        # Insert new category
-        sql = '''
-            INSERT INTO categories (name, icon, color, is_default, daily_budget, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING id, name, icon, color, is_default, daily_budget, created_at
+        # Create the custom category
+        insert_sql = '''
+            INSERT INTO custom_categories (user_id, name, icon, color, daily_budget)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
         '''
-        new_category = run_query(sql, (name, icon, color, False, 0.0, user_id), fetch_one=True)
+        result = run_query(insert_sql, (user_id, name, icon, color, daily_budget), fetch_one=True)
         
-        result = {
-            'id': new_category['id'],
-            'name': new_category['name'],
-            'icon': new_category['icon'],
-            'color': new_category['color'],
-            'is_default': bool(new_category['is_default']),
-            'daily_budget': float(new_category['daily_budget']),
-            'created_at': new_category['created_at'].isoformat() if hasattr(new_category['created_at'], 'isoformat') else str(new_category['created_at'])
-        }
-        
-        return jsonify(result), 201
+        if result:
+            category_id = result['id']
+            
+            # If daily_budget is set, also create a budget entry
+            if daily_budget > 0:
+                budget_sql = '''
+                    INSERT INTO user_category_budgets (user_id, category_id, category_type, daily_budget)
+                    VALUES (%s, %s, 'custom', %s)
+                    ON CONFLICT (user_id, category_id, category_type) 
+                    DO UPDATE SET daily_budget = EXCLUDED.daily_budget, updated_at = CURRENT_TIMESTAMP
+                '''
+                run_query(budget_sql, (user_id, category_id, daily_budget))
+            
+            return jsonify({
+                'success': True,
+                'category': {
+                    'id': f'custom_{category_id}',
+                    'name': name,
+                    'icon': icon,
+                    'color': color,
+                    'daily_budget': float(daily_budget),
+                    'is_default': False,
+                    'is_custom': True
+                }
+            }), 201
+        else:
+            return jsonify({'error': 'Failed to create category'}), 500
+            
     except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'success': False
-        }), 500
+        print(f"Error creating category: {e}")
+        return jsonify({'error': 'Failed to create category'}), 500
 
 @app.route('/api/categories/<int:category_id>/budget', methods=['PUT', 'POST'])
 @require_auth
@@ -875,15 +948,31 @@ def add_expense():
         # Validate category_id if provided
         if category_id:
             try:
-                category_id = int(category_id)
-                print(f"🔍 Checking if category {category_id} exists for user {user_id}")
-                # Check if category exists and belongs to the user
-                check_sql = 'SELECT id FROM categories WHERE id = %s AND user_id = %s'
-                category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+                # Parse category ID (format: "default_123" or "custom_456")
+                if isinstance(category_id, str) and '_' in category_id:
+                    category_type, cat_id = category_id.split('_', 1)
+                    category_id = int(cat_id)
+                else:
+                    # Legacy format - assume it's a custom category
+                    category_id = int(category_id)
+                    category_type = 'custom'
+                
+                print(f"🔍 Checking if {category_type} category {category_id} exists for user {user_id}")
+                
+                if category_type == 'default':
+                    # Check if default category exists
+                    check_sql = 'SELECT id FROM default_categories WHERE id = %s'
+                    category_exists = run_query(check_sql, (category_id,), fetch_one=True)
+                else:
+                    # Check if custom category exists and belongs to the user
+                    check_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
+                    category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+                
                 if not category_exists:
-                    print(f"❌ Category {category_id} not found for user {user_id}")
+                    print(f"❌ {category_type} category {category_id} not found for user {user_id}")
                     return jsonify({'error': 'Invalid category'}), 400
-                print(f"✅ Category {category_id} validated")
+                print(f"✅ {category_type} category {category_id} validated")
+                
             except (ValueError, TypeError) as e:
                 print(f"❌ Invalid category ID format: {e}")
                 return jsonify({'error': 'Invalid category ID'}), 400

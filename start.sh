@@ -33,6 +33,10 @@ if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     echo -e "${BLUE}🔄 Adding category preference column...${NC}"
     python migrate_category_preference.py 2>/dev/null || echo -e "${YELLOW}⚠️ Category preference migration completed (column may already exist)${NC}"
     
+    # Restructure categories for custom categories support
+    echo -e "${BLUE}🔄 Restructuring categories for custom categories...${NC}"
+    python migrate_custom_categories.py 2>/dev/null || echo -e "${YELLOW}⚠️ Custom categories migration completed (tables may already exist)${NC}"
+    
     # Production mode - start Flask with gunicorn and Nginx
     echo -e "${BLUE}🔧 Starting Flask backend with gunicorn on port 5000${NC}"
     

@@ -662,4 +662,114 @@ function clearPreferenceStatusMessage() {
     preferenceStatusMessage.style.display = 'none';
     preferenceStatusMessage.textContent = '';
     preferenceStatusMessage.className = 'status-message';
+}
+
+// ==========================================
+// CUSTOM CATEGORY MANAGEMENT
+// ==========================================
+
+// Add category button event listener
+document.getElementById('addCategory').addEventListener('click', function() {
+    showAddCategoryModal();
+});
+
+function showAddCategoryModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h2>Add Custom Category</h2>
+            <form id="add-category-form">
+                <div class="form-group">
+                    <label for="category-name">Category Name</label>
+                    <input type="text" id="category-name" name="name" class="form-input" required maxlength="100" placeholder="e.g., Coffee, Gym, etc.">
+                </div>
+                <div class="form-group">
+                    <label for="category-icon">Icon</label>
+                    <select id="category-icon" name="icon" class="form-input">
+                        <option value="📦">📦 Other</option>
+                        <option value="☕">☕ Coffee</option>
+                        <option value="🏋️">🏋️ Gym</option>
+                        <option value="🎮">🎮 Gaming</option>
+                        <option value="📱">📱 Tech</option>
+                        <option value="🎨">🎨 Art</option>
+                        <option value="📚">📚 Books</option>
+                        <option value="🎵">🎵 Music</option>
+                        <option value="🍕">🍕 Pizza</option>
+                        <option value="🚴">🚴 Cycling</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="category-color">Color</label>
+                    <input type="color" id="category-color" name="color" class="form-input" value="#A9A9A9">
+                </div>
+                <div class="form-group">
+                    <label for="category-budget">Daily Budget (Optional)</label>
+                    <input type="number" id="category-budget" name="daily_budget" class="form-input" min="0" step="0.01" placeholder="0.00">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Create Category</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Handle form submission
+    document.getElementById('add-category-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const categoryData = {
+            name: formData.get('name'),
+            icon: formData.get('icon'),
+            color: formData.get('color'),
+            daily_budget: parseFloat(formData.get('daily_budget')) || 0
+        };
+        createCategory(categoryData);
+    });
+}
+
+function closeModal() {
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+async function createCategory(categoryData) {
+    try {
+        console.log('Creating custom category:', categoryData);
+        
+        const response = await fetch(`${API_BASE}/categories`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify(categoryData)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Create category response:', data);
+        
+        if (data.success) {
+            showCategoryStatusMessage('Custom category created successfully!', 'success');
+            closeModal();
+            // Reload categories to show the new one
+            await loadCategories();
+            renderCategoryBudgets();
+        } else {
+            throw new Error(data.error || 'Failed to create category');
+        }
+        
+    } catch (error) {
+        console.error('Error creating category:', error);
+        showCategoryStatusMessage(`Failed to create category: ${error.message}`, 'error');
+    }
 } 
