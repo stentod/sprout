@@ -41,6 +41,10 @@ if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     echo -e "${BLUE}🧹 Cleaning up extra default categories...${NC}"
     python cleanup_extra_categories.py 2>/dev/null || echo -e "${YELLOW}⚠️ Category cleanup completed (no extra categories to remove)${NC}"
     
+    # Force cleanup to ensure exactly 7 default categories (no duplicates)
+    echo -e "${BLUE}🧹 Force cleanup to ensure exactly 7 default categories...${NC}"
+    python force_cleanup_categories.py 2>/dev/null || echo -e "${YELLOW}⚠️ Force cleanup completed${NC}"
+    
     # Production mode - start Flask with gunicorn and Nginx
     echo -e "${BLUE}🔧 Starting Flask backend with gunicorn on port 5000${NC}"
     
