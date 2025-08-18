@@ -142,6 +142,12 @@ async function loadCategoryBudgets() {
     if (response.ok) {
       categoryBudgets = await response.json();
       console.log('✅ Category budgets loaded:', categoryBudgets);
+      console.log('📊 Budgeted categories count:', categoryBudgets?.budgeted_categories?.length || 0);
+      if (categoryBudgets?.budgeted_categories) {
+        categoryBudgets.budgeted_categories.forEach(cat => {
+          console.log(`   ${cat.category_name}: $${cat.daily_budget} budget, $${cat.spent_today} spent, $${cat.remaining_today} remaining`);
+        });
+      }
     } else {
       console.error('❌ Category budgets API failed:', response.status);
       categoryBudgets = null;
@@ -154,7 +160,11 @@ async function loadCategoryBudgets() {
 
 // Render compact category budget indicators for hero section
 function renderCompactCategoryBudgets() {
+  console.log('🔍 renderCompactCategoryBudgets called');
+  console.log('📊 categoryBudgets:', categoryBudgets);
+  
   if (!categoryBudgets || !categoryBudgets.budgeted_categories || categoryBudgets.budgeted_categories.length === 0) {
+    console.log('❌ No budgeted categories to show');
     return ''; // No budgeted categories to show
   }
 
