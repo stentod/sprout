@@ -397,7 +397,7 @@ function renderCategoryBudgets() {
 }
 
 function handleCategoryBudgetChange(event) {
-    const categoryId = parseInt(event.target.dataset.categoryId);
+    const categoryId = event.target.dataset.categoryId; // Keep as string
     const newValue = parseFloat(event.target.value) || 0;
     
     currentBudgets[categoryId] = newValue;
@@ -414,7 +414,7 @@ function handleCategoryBudgetChange(event) {
 }
 
 function handleBudgetToggle(event) {
-    const categoryId = parseInt(event.target.dataset.categoryId);
+    const categoryId = event.target.dataset.categoryId; // Keep as string
     const isEnabled = event.target.checked;
     const budgetItem = event.target.closest('.category-budget-item');
     const budgetInput = budgetItem.querySelector('.category-budget-input');
