@@ -201,6 +201,7 @@ function renderCompactCategoryBudgets() {
 // Render main UI
 function renderMainUI(summary) {
   const compactBudgetsHtml = renderCompactCategoryBudgets();
+  console.log('🎨 compactBudgetsHtml:', compactBudgetsHtml);
   const currentUser = getCurrentUser();
   
   app.innerHTML = `
@@ -224,7 +225,7 @@ function renderMainUI(summary) {
             <div class="balance-display">💵 $${summary.balance.toFixed(2)}</div>
             <div class="balance-subtitle">Left Today</div>
             
-            ${compactBudgetsHtml ? `<div class="balance-breakdown">${compactBudgetsHtml}</div>` : ''}
+            ${compactBudgetsHtml ? `<div class="balance-breakdown">${compactBudgetsHtml}</div>` : '<div class="balance-breakdown" style="display:none;">No budget breakdown</div>'}
             
             <div class="plant-status">
               <div class="plant-emoji" title="${summary.plant_state}">${summary.plant_emoji}</div>
