@@ -1053,6 +1053,9 @@ def add_expense():
             category_id = None
         print(f"👤 User ID: {user_id}")
         
+        # Initialize category_type
+        category_type = None
+        
         # Validate category_id if provided
         if category_id:
             try:
