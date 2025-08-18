@@ -140,13 +140,21 @@ async function loadCategoryBudgets() {
       credentials: 'include'
     });
     if (response.ok) {
-      categoryBudgets = await response.json();
-      console.log('✅ Category budgets loaded:', categoryBudgets);
-      console.log('📊 Budgeted categories count:', categoryBudgets?.budgeted_categories?.length || 0);
-      if (categoryBudgets?.budgeted_categories) {
-        categoryBudgets.budgeted_categories.forEach(cat => {
-          console.log(`   ${cat.category_name}: $${cat.daily_budget} budget, $${cat.spent_today} spent, $${cat.remaining_today} remaining`);
-        });
+      const responseText = await response.text();
+      console.log('📡 Raw API response:', responseText);
+      
+      try {
+        categoryBudgets = JSON.parse(responseText);
+        console.log('✅ Category budgets loaded:', categoryBudgets);
+        console.log('📊 Budgeted categories count:', categoryBudgets?.budgeted_categories?.length || 0);
+        if (categoryBudgets?.budgeted_categories) {
+          categoryBudgets.budgeted_categories.forEach(cat => {
+            console.log(`   ${cat.category_name}: $${cat.daily_budget} budget, $${cat.spent_today} spent, $${cat.remaining_today} remaining`);
+          });
+        }
+      } catch (parseError) {
+        console.error('❌ Failed to parse JSON response:', parseError);
+        categoryBudgets = null;
       }
     } else {
       console.error('❌ Category budgets API failed:', response.status);
