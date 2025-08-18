@@ -329,7 +329,7 @@ async function renderAddExpenseForm() {
     
     const amount = parseFloat(form.amount.value);
     const description = form.description.value;
-    const categoryId = form.category.value ? parseInt(form.category.value) : null;
+    const categoryId = form.category.value || null; // Keep as string, don't parse to int
     
     if (!amount || amount <= 0) {
       errorDiv.innerHTML = `
