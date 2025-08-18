@@ -29,6 +29,10 @@ if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     echo -e "${BLUE}🔄 Fixing expenses table schema...${NC}"
     python fix_expenses_schema.py 2>/dev/null || echo -e "${YELLOW}⚠️ Schema fix completed (column may already exist)${NC}"
     
+    # Add category preference column to user_preferences table
+    echo -e "${BLUE}🔄 Adding category preference column...${NC}"
+    python migrate_category_preference.py 2>/dev/null || echo -e "${YELLOW}⚠️ Category preference migration completed (column may already exist)${NC}"
+    
     # Production mode - start Flask with gunicorn and Nginx
     echo -e "${BLUE}🔧 Starting Flask backend with gunicorn on port 5000${NC}"
     

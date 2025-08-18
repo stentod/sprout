@@ -635,7 +635,13 @@ async function handleCategoryPreferenceChange(event) {
         console.error('Error saving category preference:', error);
         // Revert toggle to original state
         requireCategoriesToggle.checked = originalRequireCategories;
-        showPreferenceStatusMessage('Failed to update preference. Please try again.', 'error');
+        
+        // Show more detailed error message for debugging
+        let errorMessage = 'Failed to update preference. Please try again.';
+        if (error.message) {
+            errorMessage += ` (${error.message})`;
+        }
+        showPreferenceStatusMessage(errorMessage, 'error');
     }
 }
 
