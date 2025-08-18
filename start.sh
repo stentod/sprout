@@ -41,6 +41,10 @@ if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     echo -e "${BLUE}🧪 Testing budget tracking...${NC}"
     python test_budget_tracking.py 2>/dev/null || echo -e "${YELLOW}⚠️ Budget tracking test completed${NC}"
     
+    # Test exact API response
+    echo -e "${BLUE}🔍 Testing API response...${NC}"
+    python test_api_response.py 2>/dev/null || echo -e "${YELLOW}⚠️ API response test completed${NC}"
+    
     # Production mode - start Flask with gunicorn and Nginx
     echo -e "${BLUE}🔧 Starting Flask backend with gunicorn on port 5000${NC}"
     
