@@ -329,9 +329,12 @@ def get_expenses_between(start, end, user_id, category_id=None):
         # Filter by specific category
         sql = '''
             SELECT e.amount, e.description, e.timestamp, e.category_id,
-                   c.name as category_name, c.icon as category_icon, c.color as category_color
+                   COALESCE(dc.name, cc.name) as category_name,
+                   COALESCE(dc.icon, cc.icon) as category_icon,
+                   COALESCE(dc.color, cc.color) as category_color
             FROM expenses e
-            LEFT JOIN categories c ON e.category_id = c.id
+            LEFT JOIN default_categories dc ON e.category_id = CONCAT('default_', dc.id::text)
+            LEFT JOIN custom_categories cc ON e.category_id = CONCAT('custom_', cc.id::text) AND cc.user_id = e.user_id
             WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s AND e.category_id = %s
             ORDER BY e.timestamp DESC
         '''
@@ -340,9 +343,12 @@ def get_expenses_between(start, end, user_id, category_id=None):
         # Get all expenses with category information
         sql = '''
             SELECT e.amount, e.description, e.timestamp, e.category_id,
-                   c.name as category_name, c.icon as category_icon, c.color as category_color
+                   COALESCE(dc.name, cc.name) as category_name,
+                   COALESCE(dc.icon, cc.icon) as category_icon,
+                   COALESCE(dc.color, cc.color) as category_color
             FROM expenses e
-            LEFT JOIN categories c ON e.category_id = c.id
+            LEFT JOIN default_categories dc ON e.category_id = CONCAT('default_', dc.id::text)
+            LEFT JOIN custom_categories cc ON e.category_id = CONCAT('custom_', cc.id::text) AND cc.user_id = e.user_id
             WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
             ORDER BY e.timestamp DESC
         '''
@@ -360,7 +366,7 @@ def get_expenses_between(start, end, user_id, category_id=None):
         }
         
         # Add category information if present
-        if e['category_id']:
+        if e['category_id'] and e['category_name']:
             expense_data['category'] = {
                 'id': e['category_id'],
                 'name': e['category_name'],
