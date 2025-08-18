@@ -201,7 +201,6 @@ function renderCompactCategoryBudgets() {
 // Render main UI
 function renderMainUI(summary) {
   const compactBudgetsHtml = renderCompactCategoryBudgets();
-  console.log('🎨 compactBudgetsHtml:', compactBudgetsHtml);
   const currentUser = getCurrentUser();
   
   app.innerHTML = `
@@ -225,7 +224,7 @@ function renderMainUI(summary) {
             <div class="balance-display">💵 $${summary.balance.toFixed(2)}</div>
             <div class="balance-subtitle">Left Today</div>
             
-            ${compactBudgetsHtml ? `<div class="balance-breakdown">${compactBudgetsHtml}</div>` : '<div class="balance-breakdown" style="display:none;">No budget breakdown</div>'}
+            ${compactBudgetsHtml ? `<div class="balance-breakdown">${compactBudgetsHtml}</div>` : ''}
             
             <div class="plant-status">
               <div class="plant-emoji" title="${summary.plant_state}">${summary.plant_emoji}</div>
@@ -245,12 +244,12 @@ function renderMainUI(summary) {
           <div class="sidebar-nav">
             <a href="history.html${window.location.search}" class="btn btn-secondary btn-full">📊 View History</a>
             <a href="settings.html" class="btn btn-secondary btn-full">⚙️ Settings</a>
-          </div>
-        </div>
-      </div>
+    </div>
+    </div>
+    </div>
 
       <!-- Add Expense Form -->
-      <div id="add-expense-container"></div>
+    <div id="add-expense-container"></div>
     </div>
   `;
 }
@@ -332,7 +331,7 @@ async function renderAddExpenseForm() {
           </div>
           <button type="submit" class="btn btn-primary">Add Expense</button>
         </div>
-      </form>
+    </form>
       
       <div id="add-expense-error"></div>
     </div>
@@ -400,7 +399,7 @@ async function renderAddExpenseForm() {
         category_id: categoryId
       };
       
-          // POST to API
+    // POST to API
       const resp = await fetch(`${API_BASE_URL}/api/expenses`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -408,7 +407,7 @@ async function renderAddExpenseForm() {
         body: JSON.stringify(requestBody)
     });
       
-      if (resp.ok) {
+    if (resp.ok) {
         console.log('✅ Expense added successfully!');
         
         // Enhanced success message with better UX
@@ -440,7 +439,7 @@ async function renderAddExpenseForm() {
         } catch (summaryError) {
           console.warn('Summary refresh failed, but expense was added:', summaryError);
         }
-        form.reset();
+      form.reset();
         
         // Auto-hide after 5 seconds with fade effect (longer to ensure visibility)
         setTimeout(() => {
@@ -458,9 +457,9 @@ async function renderAddExpenseForm() {
           if (amountInput) amountInput.focus();
         }, 100);
         
-      } else {
+    } else {
         try {
-          const err = await resp.json();
+      const err = await resp.json();
           const message = err.demo_mode ? 'Demo mode - expenses not saved to database' : (err.error || 'Unable to add expense. Please try again.');
           errorDiv.innerHTML = `
             <div class="status-message status-error">
@@ -689,15 +688,15 @@ async function loadSummaryWithFallbacks() {
       throw new Error(`API returned ${resp.status}: ${resp.statusText}`);
     }
     
-    const summary = await resp.json();
+  const summary = await resp.json();
     console.log('✅ API call successful, summary data:', summary);
     
     // Load category budgets first
     await loadCategoryBudgets();
     
     // Now render the main UI with budget data
-    renderMainUI(summary);
-    renderAddExpenseForm();
+  renderMainUI(summary);
+  renderAddExpenseForm();
     
   } catch (error) {
     console.error('❌ API call failed with error:', error.message);

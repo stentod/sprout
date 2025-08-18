@@ -821,6 +821,7 @@ def update_multiple_category_budgets():
                     RETURNING daily_budget
                 '''
                 result = run_query(budget_sql, (user_id, category_id, category_type, daily_budget), fetch_one=True)
+                print(f"💰 Budget updated: {category_type}_{category_id} = ${daily_budget} for user {user_id}")
                 
                 if result:
                     updated_categories.append({
@@ -881,13 +882,15 @@ def get_category_budget_tracking():
             for budget in debug_budgets:
                 print(f"   💰 User {budget['user_id']}, Category {budget['category_type']}_{budget['category_id']}: ${budget['daily_budget']}")
             
-            # Get all categories with their budgets for the current user (new normalized structure)
+            # Get all categories with their budgets for the current user (bulletproof version)
             categories_sql = '''
                 SELECT 
-                    'default_' || dc.id as id,
+                    'default_' || dc.id::text as id,
                     dc.name,
                     dc.icon,
                     dc.color,
+                    'default' as category_type,
+                    dc.id as raw_id,
                     COALESCE(ucb.daily_budget, 0.0) as daily_budget
                 FROM default_categories dc
                 LEFT JOIN user_category_budgets ucb ON ucb.category_id = dc.id 
@@ -897,10 +900,12 @@ def get_category_budget_tracking():
                 UNION ALL
                 
                 SELECT 
-                    'custom_' || cc.id as id,
+                    'custom_' || cc.id::text as id,
                     cc.name,
                     cc.icon,
                     cc.color,
+                    'custom' as category_type,
+                    cc.id as raw_id,
                     COALESCE(ucb.daily_budget, cc.daily_budget, 0.0) as daily_budget
                 FROM custom_categories cc
                 LEFT JOIN user_category_budgets ucb ON ucb.category_id = cc.id 
@@ -939,22 +944,25 @@ def get_category_budget_tracking():
             })
         
         try:
-            # Get today's spending by category (handle new category ID format)
+            # Get today's spending by category (bulletproof version)
             spending_sql = '''
                 SELECT 
                     CASE 
-                        WHEN e.category_id LIKE 'default_%%' THEN e.category_id
-                        WHEN e.category_id LIKE 'custom_%%' THEN e.category_id
-                        ELSE CONCAT('default_', e.category_id) -- Legacy format
+                        WHEN e.category_id LIKE 'default_%' THEN e.category_id
+                        WHEN e.category_id LIKE 'custom_%' THEN e.category_id
+                        WHEN e.category_id IS NOT NULL AND e.category_id ~ '^[0-9]+$' THEN CONCAT('default_', e.category_id)
+                        ELSE e.category_id
                     END as category_id,
-                    SUM(e.amount) as total_spent
+                    SUM(e.amount) as total_spent,
+                    COUNT(*) as expense_count
                 FROM expenses e
-                WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
+                WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s AND e.category_id IS NOT NULL
                 GROUP BY 
                     CASE 
-                        WHEN e.category_id LIKE 'default_%%' THEN e.category_id
-                        WHEN e.category_id LIKE 'custom_%%' THEN e.category_id
-                        ELSE CONCAT('default_', e.category_id)
+                        WHEN e.category_id LIKE 'default_%' THEN e.category_id
+                        WHEN e.category_id LIKE 'custom_%' THEN e.category_id
+                        WHEN e.category_id IS NOT NULL AND e.category_id ~ '^[0-9]+$' THEN CONCAT('default_', e.category_id)
+                        ELSE e.category_id
                     END
             '''
             spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()))
@@ -962,8 +970,14 @@ def get_category_budget_tracking():
             print(f"Database error getting spending data: {db_error}")
             spending_data = []
         
-        # Create spending lookup
-        spending_by_category = {row['category_id']: float(row['total_spent']) for row in spending_data}
+        # Create spending lookup with debugging
+        spending_by_category = {}
+        print(f"💸 Found {len(spending_data)} spending records")
+        for row in spending_data:
+            category_id = row['category_id']
+            spent = float(row['total_spent'])
+            spending_by_category[category_id] = spent
+            print(f"   💸 Spending: {category_id} = ${spent} ({row['expense_count']} expenses)")
         
         # Separate budgeted and unbedgeted categories
         budgeted_categories = []
@@ -1002,6 +1016,11 @@ def get_category_budget_tracking():
                 # This category has no budget
                 total_spent_unbedgeted += spent
                 unbedgeted_categories.append(category_data)
+        
+        # Debug: Log the final response
+        print(f"🎯 Final response - Budgeted categories: {len(budgeted_categories)}")
+        for cat in budgeted_categories:
+            print(f"   🎯 Returning: {cat['category_name']} - ${cat['daily_budget']} budget, ${cat['spent_today']} spent, ${cat['remaining_today']} remaining")
         
         return jsonify({
             'budgeted_categories': budgeted_categories,

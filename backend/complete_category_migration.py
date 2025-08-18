@@ -150,10 +150,18 @@ def complete_migration():
                         print(f"   ✅ Updated {cursor.rowcount} expenses for {old_cat['name']} -> {new_category_id}")
         
         # Step 5: Clear custom categories and budgets to start fresh
-        print("\n📋 Step 5: Clear custom categories and budgets...")
-        cursor.execute("DELETE FROM custom_categories")
-        cursor.execute("DELETE FROM user_category_budgets")
-        print("   ✅ Cleared custom categories and budgets")
+        print("\n📋 Step 5: Preserve existing custom categories...")
+        cursor.execute("SELECT COUNT(*) FROM custom_categories")
+        custom_count = cursor.fetchone()[0]
+        
+        if custom_count == 0:
+            print("   ✅ Fresh migration - no custom categories to preserve")
+        else:
+            print(f"   ⚠️  Found {custom_count} existing custom categories - preserving them")
+        
+        # Only clear user budgets for default categories to prevent duplicates
+        cursor.execute("DELETE FROM user_category_budgets WHERE category_type = 'default'")
+        print("   ✅ Preserved custom categories, cleared only default category budgets")
         
         conn.commit()
         print("\n🎉 Complete migration successful!")
