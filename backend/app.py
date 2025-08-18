@@ -756,6 +756,7 @@ def update_category_budget(category_id):
 def update_multiple_category_budgets():
     """Update daily budgets for multiple categories at once"""
     try:
+        user_id = get_current_user_id()
         data = request.get_json()
         budgets = data.get('budgets', {})
         
@@ -770,30 +771,59 @@ def update_multiple_category_budgets():
         
         for category_id_str, daily_budget in budgets.items():
             try:
-                category_id = int(category_id_str)
                 daily_budget = float(daily_budget)
                 
                 if daily_budget < 0:
-                    errors.append(f"Category {category_id}: budget must be positive or zero")
+                    errors.append(f"Category {category_id_str}: budget must be positive or zero")
                     continue
                 
-                # Check if category exists and update
-                sql = '''
-                    UPDATE categories 
-                    SET daily_budget = %s 
-                    WHERE id = %s
-                    RETURNING id, name, daily_budget
+                # Parse category ID (format: "default_123" or "custom_456")
+                if category_id_str.startswith('default_'):
+                    category_type = 'default'
+                    category_id = int(category_id_str.replace('default_', ''))
+                    
+                    # Check if default category exists
+                    check_sql = 'SELECT id, name FROM default_categories WHERE id = %s'
+                    category_exists = run_query(check_sql, (category_id,), fetch_one=True)
+                    
+                elif category_id_str.startswith('custom_'):
+                    category_type = 'custom'
+                    category_id = int(category_id_str.replace('custom_', ''))
+                    
+                    # Check if custom category exists and belongs to user
+                    check_sql = 'SELECT id, name FROM custom_categories WHERE id = %s AND user_id = %s'
+                    category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+                    
+                else:
+                    # Legacy format - assume it's a default category
+                    category_type = 'default'
+                    category_id = int(category_id_str)
+                    
+                    check_sql = 'SELECT id, name FROM default_categories WHERE id = %s'
+                    category_exists = run_query(check_sql, (category_id,), fetch_one=True)
+                
+                if not category_exists:
+                    errors.append(f"Category {category_id_str}: not found")
+                    continue
+                
+                # Update or insert budget in user_category_budgets table
+                budget_sql = '''
+                    INSERT INTO user_category_budgets (user_id, category_id, category_type, daily_budget)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (user_id, category_id, category_type) 
+                    DO UPDATE SET daily_budget = EXCLUDED.daily_budget, updated_at = CURRENT_TIMESTAMP
+                    RETURNING daily_budget
                 '''
-                result = run_query(sql, (daily_budget, category_id), fetch_one=True)
+                result = run_query(budget_sql, (user_id, category_id, category_type, daily_budget), fetch_one=True)
                 
                 if result:
                     updated_categories.append({
-                        'category_id': result['id'],
-                        'category_name': result['name'],
+                        'category_id': category_id_str,
+                        'category_name': category_exists['name'],
                         'daily_budget': float(result['daily_budget'])
                     })
                 else:
-                    errors.append(f"Category {category_id}: not found")
+                    errors.append(f"Category {category_id_str}: failed to update budget")
                     
             except (ValueError, TypeError):
                 errors.append(f"Category {category_id_str}: invalid budget value")
