@@ -90,7 +90,7 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
                     else:
                         return cur.fetchone()
                 else:
-                    return cur.rowcount
+                return cur.rowcount
             elif fetch_one:
                 result = cur.fetchone()
                 return dict(result) if result else None
