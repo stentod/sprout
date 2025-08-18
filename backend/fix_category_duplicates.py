@@ -90,43 +90,18 @@ def fix_category_duplicates():
             new_id = cursor.fetchone()['id']
             print(f"   ✅ {new_id}: {icon} {name}")
         
-        # Step 4: Migrate any custom categories from old table
-        print("\n🔄 Step 4: Migrating custom categories from old table...")
-        cursor.execute("""
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_name = 'categories'
-        """)
+        # Step 4: Clear ALL custom categories to prevent duplicates
+        print("\n🗑️ Step 4: Clearing all custom categories to prevent duplicates...")
+        cursor.execute("DELETE FROM custom_categories")
+        print(f"   Deleted {cursor.rowcount} existing custom categories")
         
-        if cursor.fetchone():
-            # Check for custom categories in old table
-            cursor.execute("""
-                SELECT id, user_id, name, icon, color, daily_budget, created_at
-                FROM categories 
-                WHERE user_id IS NOT NULL AND user_id != 0 AND is_default = FALSE
-            """)
-            
-            old_custom_categories = cursor.fetchall()
-            migrated_count = 0
-            
-            for cat in old_custom_categories:
-                try:
-                    cursor.execute("""
-                        INSERT INTO custom_categories (user_id, name, icon, color, daily_budget, created_at)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (user_id, name) DO NOTHING
-                    """, (cat['user_id'], cat['name'], cat['icon'], cat['color'], cat['daily_budget'], cat['created_at']))
-                    
-                    if cursor.rowcount > 0:
-                        migrated_count += 1
-                        
-                except Exception as e:
-                    print(f"   ⚠️ Could not migrate category '{cat['name']}': {e}")
-            
-            print(f"   Migrated {migrated_count} custom categories")
+        # Step 5: Clear user_category_budgets to start fresh
+        print("\n🗑️ Step 5: Clearing user category budgets...")
+        cursor.execute("DELETE FROM user_category_budgets")
+        print(f"   Deleted {cursor.rowcount} existing budget entries")
         
-        # Step 5: Verify the result
-        print("\n✅ Step 5: Verifying results...")
+        # Step 6: Verify the result
+        print("\n✅ Step 6: Verifying results...")
         cursor.execute("SELECT id, name, icon FROM default_categories ORDER BY name")
         final_categories = cursor.fetchall()
         
