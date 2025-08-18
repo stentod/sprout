@@ -90,7 +90,7 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
                     else:
                         return cur.fetchone()
                 else:
-                    return cur.rowcount
+                return cur.rowcount
             elif fetch_one:
                 result = cur.fetchone()
                 return dict(result) if result else None
@@ -327,7 +327,7 @@ def get_day_bounds(day_offset=0):
 def get_expenses_between(start, end, user_id, category_id=None):
     if category_id:
         # Filter by specific category
-        sql = '''
+    sql = '''
             SELECT e.amount, e.description, e.timestamp, e.category_id,
                    COALESCE(dc.name, cc.name) as category_name,
                    COALESCE(dc.icon, cc.icon) as category_icon,
@@ -965,7 +965,7 @@ def get_category_budget_tracking():
                         ELSE e.category_id
                     END
             '''
-            spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()))
+            spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()), fetch_all=True)
         except Exception as db_error:
             print(f"Database error getting spending data: {db_error}")
             spending_data = []
@@ -1063,20 +1063,20 @@ def get_category_budget_tracking():
 def add_expense():
     try:
         print(f"🔍 Add expense request received")
-        data = request.get_json()
+    data = request.get_json()
         if not data:
             print(f"❌ No data provided in request")
             return jsonify({'error': 'No data provided'}), 400
             
-        amount = data.get('amount')
-        description = data.get('description', '')
+    amount = data.get('amount')
+    description = data.get('description', '')
         category_id = data.get('category_id')  # New: category selection
         
         print(f"📊 Request data: amount={amount}, description='{description}', category_id={category_id}")
         
-        if amount is None:
+    if amount is None:
             print(f"❌ Amount is missing")
-            return jsonify({'error': 'Amount is required'}), 400
+        return jsonify({'error': 'Amount is required'}), 400
         
         user_id = get_current_user_id()
         print(f"👤 User ID: {user_id}")
@@ -1157,14 +1157,14 @@ def add_expense():
                     storage_category_id = f"custom_{category_id}"
             else:
                 storage_category_id = None
-            
-            sql = '''
+    
+    sql = '''
                 INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
                 VALUES (%s, %s, %s, %s, %s)
-            '''
+    '''
             result = run_query(sql, (user_id, amount, description, storage_category_id, timestamp), fetch_all=False)
             print(f"✅ Expense inserted successfully with category_id: {storage_category_id}, result: {result}")
-            return jsonify({'success': True}), 201
+    return jsonify({'success': True}), 201
         except Exception as db_error:
             print(f"❌ Database error adding expense: {db_error}")
             import traceback
@@ -1181,9 +1181,9 @@ def add_expense():
 @require_auth
 def get_summary():
     try:
-        day_offset = int(request.args.get('dayOffset', 0))
-        today_start, today_end = get_day_bounds(day_offset)
-        
+    day_offset = int(request.args.get('dayOffset', 0))
+    today_start, today_end = get_day_bounds(day_offset)
+    
         user_id = get_current_user_id()
         
         # Get user's daily limit with fallback
@@ -1193,37 +1193,37 @@ def get_summary():
             print(f"Error getting user daily limit: {e}, using default")
             user_daily_limit = 30.0
         
-        # Calculate daily surplus for the last 7 days
-        deltas = []
-        for i in range(7):
-            offset = day_offset - i
-            day_start, day_end = get_day_bounds(offset)
+    # Calculate daily surplus for the last 7 days
+    deltas = []
+    for i in range(7):
+        offset = day_offset - i
+        day_start, day_end = get_day_bounds(offset)
             try:
                 expenses = get_expenses_between(day_start, day_end, user_id)
-                total_spent = sum(e['amount'] for e in expenses)
+        total_spent = sum(e['amount'] for e in expenses)
                 daily_surplus = user_daily_limit - total_spent
-                deltas.append(daily_surplus)
+        deltas.append(daily_surplus)
             except Exception as e:
                 print(f"Error calculating day {i}: {e}, using default")
                 deltas.append(user_daily_limit)  # Assume no spending
-        
-        # Today's balance and averages
+    
+    # Today's balance and averages
         today_balance = deltas[0] if deltas else user_daily_limit
         avg_daily_surplus = sum(deltas) / 7 if deltas else user_daily_limit  # Always divide by 7 days
-        projection_30 = avg_daily_surplus * 30  # 30-day projection based on average daily surplus
-        
+    projection_30 = avg_daily_surplus * 30  # 30-day projection based on average daily surplus
+    
         # Plant state logic - prioritize today's spending over 7-day average
         print(f"DEBUG: today_balance={today_balance}, avg_daily_surplus={avg_daily_surplus}")
         
         if today_balance < 0:
             # Today's spending exceeded the daily limit
             if today_balance >= -5:
-                plant = 'wilting'
-                plant_emoji = '🥀'
+        plant = 'wilting'
+        plant_emoji = '🥀'
                 print(f"DEBUG: Plant set to wilting (today_balance={today_balance})")
-            else:
-                plant = 'dead'
-                plant_emoji = '☠️'
+    else:
+        plant = 'dead'
+        plant_emoji = '☠️'
                 print(f"DEBUG: Plant set to dead (today_balance={today_balance})")
         elif today_balance >= 10 and avg_daily_surplus >= 2:
             plant = 'thriving'
@@ -1239,14 +1239,14 @@ def get_summary():
             print(f"DEBUG: Plant set to struggling")
         
         print(f"DEBUG: Final plant state={plant}, emoji={plant_emoji}")
-        
-        return jsonify({
-            'balance': round(today_balance, 2),
-            'avg_7day': round(avg_daily_surplus, 2),
-            'projection_30': round(projection_30, 2),
-            'plant_state': plant,
-            'plant_emoji': plant_emoji
-        })
+    
+    return jsonify({
+        'balance': round(today_balance, 2),
+        'avg_7day': round(avg_daily_surplus, 2),
+        'projection_30': round(projection_30, 2),
+        'plant_state': plant,
+        'plant_emoji': plant_emoji
+    })
         
     except Exception as e:
         print(f"Summary endpoint error: {e}")
@@ -1266,8 +1266,8 @@ def get_summary():
 @require_auth
 def get_history():
     try:
-        # Get all expenses from the last 7 days (including today)
-        day_offset = int(request.args.get('dayOffset', 0))
+    # Get all expenses from the last 7 days (including today)
+    day_offset = int(request.args.get('dayOffset', 0))
         period = int(request.args.get('period', 7))  # Default to 7 days
         category_id = request.args.get('category_id')  # Optional category filter
         
@@ -1282,16 +1282,16 @@ def get_history():
             # Return empty history instead of crashing
             return jsonify([])
         
-        # Group by date (YYYY-MM-DD)
-        grouped = {}
-        for e in expenses:
-            date = e['timestamp'][:10]  # 'YYYY-MM-DD' (timestamp is already a string from helper)
-            if date not in grouped:
-                grouped[date] = []
+    # Group by date (YYYY-MM-DD)
+    grouped = {}
+    for e in expenses:
+        date = e['timestamp'][:10]  # 'YYYY-MM-DD' (timestamp is already a string from helper)
+        if date not in grouped:
+            grouped[date] = []
             expense_data = {
-                'amount': e['amount'],  # Already converted to float in helper
-                'description': e['description'],
-                'timestamp': e['timestamp']  # Already converted to string in helper
+            'amount': e['amount'],  # Already converted to float in helper
+            'description': e['description'],
+            'timestamp': e['timestamp']  # Already converted to string in helper
             }
             
             # Add category information if present
@@ -1301,12 +1301,12 @@ def get_history():
                 expense_data['category'] = None
                 
             grouped[date].append(expense_data)
-        # Sort by date descending
-        grouped_sorted = [
-            {'date': date, 'expenses': grouped[date]}
-            for date in sorted(grouped.keys(), reverse=True)
-        ]
-        return jsonify(grouped_sorted)
+    # Sort by date descending
+    grouped_sorted = [
+        {'date': date, 'expenses': grouped[date]}
+        for date in sorted(grouped.keys(), reverse=True)
+    ]
+    return jsonify(grouped_sorted)
         
     except Exception as e:
         print(f"History endpoint error: {e}")
