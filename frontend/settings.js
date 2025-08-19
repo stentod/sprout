@@ -757,4 +757,154 @@ async function createCategory(categoryData) {
         console.error('Error creating category:', error);
         showCategoryStatusMessage(`Failed to create category: ${error.message}`, 'error');
     }
-} 
+}
+
+// ==========================================
+// CUSTOM CATEGORY DELETION
+// ==========================================
+
+// Load and display custom categories for deletion
+async function loadCustomCategoriesForDeletion() {
+    try {
+        console.log('Loading custom categories for deletion...');
+        
+        const response = await fetch(`${API_BASE}/categories`, {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Categories response:', data);
+        
+        // Filter to only show custom categories
+        const customCategories = data.filter(cat => cat.id.toString().startsWith('custom_'));
+        
+        renderCustomCategoriesList(customCategories);
+        
+    } catch (error) {
+        console.error('Error loading custom categories:', error);
+        showDeleteCategoryStatusMessage(`Failed to load custom categories: ${error.message}`, 'error');
+    }
+}
+
+function renderCustomCategoriesList(customCategories) {
+    const container = document.getElementById('custom-categories-list');
+    
+    if (!customCategories || customCategories.length === 0) {
+        container.innerHTML = `
+            <div class="no-custom-categories">
+                <p>You haven't created any custom categories yet.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const categoriesHtml = customCategories.map(cat => {
+        const categoryId = cat.id.toString().replace('custom_', '');
+        return `
+            <div class="custom-category-item">
+                <div class="custom-category-info">
+                    <span class="custom-category-icon">${cat.icon}</span>
+                    <span class="custom-category-name">${cat.name}</span>
+                    <div class="custom-category-color" style="background-color: ${cat.color}"></div>
+                </div>
+                <button class="delete-category-btn" onclick="deleteCustomCategory('${categoryId}', '${cat.name}')">
+                    Delete
+                </button>
+            </div>
+        `;
+    }).join('');
+    
+    container.innerHTML = categoriesHtml;
+}
+
+async function deleteCustomCategory(categoryId, categoryName) {
+    // Show confirmation modal
+    showDeleteConfirmation(categoryId, categoryName);
+}
+
+function showDeleteConfirmation(categoryId, categoryName) {
+    const modal = document.createElement('div');
+    modal.className = 'confirmation-modal';
+    modal.innerHTML = `
+        <div class="confirmation-content">
+            <h3 class="confirmation-title">Delete Custom Category</h3>
+            <p class="confirmation-message">
+                Are you sure you want to delete the custom category "${categoryName}"?
+                <br><br>
+                <strong>Warning:</strong> This action cannot be undone. Any expenses associated with this category will become uncategorized.
+            </p>
+            <div class="confirmation-actions">
+                <button class="confirmation-btn cancel" onclick="closeConfirmationModal()">Cancel</button>
+                <button class="confirmation-btn confirm" onclick="confirmDeleteCategory('${categoryId}', '${categoryName}')">Yes, Delete</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+function closeConfirmationModal() {
+    const modal = document.querySelector('.confirmation-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+async function confirmDeleteCategory(categoryId, categoryName) {
+    try {
+        console.log('Deleting custom category:', categoryId, categoryName);
+        
+        const response = await fetch(`${API_BASE}/categories/${categoryId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Delete category response:', data);
+        
+        if (data.success) {
+            closeConfirmationModal();
+            showDeleteCategoryStatusMessage('Custom category deleted successfully!', 'success');
+            
+            // Reload the custom categories list
+            await loadCustomCategoriesForDeletion();
+            
+            // Also reload the main categories for budget management
+            await loadCategories();
+            renderCategoryBudgets();
+        } else {
+            throw new Error(data.error || 'Failed to delete category');
+        }
+        
+    } catch (error) {
+        console.error('Error deleting category:', error);
+        closeConfirmationModal();
+        showDeleteCategoryStatusMessage(`Failed to delete category: ${error.message}`, 'error');
+    }
+}
+
+function showDeleteCategoryStatusMessage(message, type) {
+    const statusElement = document.getElementById('delete-category-status-message');
+    statusElement.textContent = message;
+    statusElement.className = `status-message ${type}`;
+    statusElement.style.display = 'block';
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        statusElement.style.display = 'none';
+    }, 5000);
+}
+
+// Initialize custom category deletion on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Add this to the existing DOMContentLoaded event
+    loadCustomCategoriesForDeletion();
+}); 

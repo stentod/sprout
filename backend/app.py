@@ -2009,6 +2009,78 @@ def debug_budget_tracking():
             'traceback': traceback.format_exc()
         }), 500
 
+@app.route('/api/categories/<int:category_id>', methods=['DELETE'])
+@require_auth
+def delete_custom_category(category_id):
+    """Delete a custom category for the current user"""
+    try:
+        user_id = get_current_user_id()
+        
+        # Check if category exists and belongs to user
+        check_sql = '''
+            SELECT id, name, user_id 
+            FROM custom_categories 
+            WHERE id = %s AND user_id = %s
+        '''
+        category = run_query(check_sql, (category_id, user_id), fetch_one=True)
+        
+        if not category:
+            return jsonify({
+                'error': 'Custom category not found or you do not have permission to delete it',
+                'success': False
+            }), 404
+        
+        # Check if category has any expenses
+        expenses_sql = '''
+            SELECT COUNT(*) as expense_count 
+            FROM expenses 
+            WHERE user_id = %s AND category_id = %s
+        '''
+        expenses_result = run_query(expenses_sql, (user_id, f'custom_{category_id}'), fetch_one=True)
+        expense_count = expenses_result['expense_count'] if expenses_result else 0
+        
+        # Update expenses to remove category association (set to NULL)
+        if expense_count > 0:
+            update_expenses_sql = '''
+                UPDATE expenses 
+                SET category_id = NULL 
+                WHERE user_id = %s AND category_id = %s
+            '''
+            run_query(update_expenses_sql, (user_id, f'custom_{category_id}'))
+        
+        # Delete category budgets
+        delete_budgets_sql = '''
+            DELETE FROM user_category_budgets 
+            WHERE user_id = %s AND category_id = %s AND category_type = 'custom'
+        '''
+        run_query(delete_budgets_sql, (user_id, category_id))
+        
+        # Delete the custom category
+        delete_category_sql = '''
+            DELETE FROM custom_categories 
+            WHERE id = %s AND user_id = %s
+        '''
+        result = run_query(delete_category_sql, (category_id, user_id), fetch_all=False)
+        
+        if result:
+            return jsonify({
+                'success': True,
+                'message': f'Custom category "{category["name"]}" deleted successfully',
+                'expenses_updated': expense_count
+            })
+        else:
+            return jsonify({
+                'error': 'Failed to delete custom category',
+                'success': False
+            }), 500
+            
+    except Exception as e:
+        print(f"Error deleting custom category: {e}")
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
 @app.route('/<path:filename>')
 def serve_static(filename):
     response = send_from_directory(FRONTEND_DIR, filename)
