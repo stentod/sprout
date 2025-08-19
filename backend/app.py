@@ -945,8 +945,14 @@ def get_category_budget_tracking():
             print(f"Database error getting spending data: {db_error}")
             spending_data = []
         
-        # Create spending lookup
-        spending_by_category = {row['category_id']: float(row['total_spent']) for row in spending_data}
+        # Create spending lookup with debugging
+        spending_by_category = {}
+        print(f"💸 Found {len(spending_data)} spending records")
+        for row in spending_data:
+            category_id = row['category_id']
+            spent = float(row['total_spent'])
+            spending_by_category[category_id] = spent
+            print(f"   💸 Spending: {category_id} = ${spent}")
         
         # Separate budgeted and unbedgeted categories
         budgeted_categories = []
@@ -973,6 +979,7 @@ def get_category_budget_tracking():
                 total_budget += budget
                 total_spent_budgeted += spent
                 print(f"   💰 {cat['name']} ({cat['id']}): ${budget} budget, ${spent} spent, ${remaining} remaining")
+                print(f"      🔍 Debug: budget={budget} (type: {type(budget)}), spent={spent} (type: {type(spent)}), remaining={remaining}")
                 
                 category_data.update({
                     'daily_budget': budget,
