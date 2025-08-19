@@ -65,8 +65,10 @@ if __name__ == "__main__":
     print("🌱 Sprout Budget Tracker - Deployment Migration")
     print("=" * 50)
     
-    if run_deployment_migration():
+    success = run_deployment_migration()
+    if success:
         print("🎉 Deployment migration successful!")
+        exit(0)
     else:
         print("❌ Deployment migration failed!")
         exit(1)

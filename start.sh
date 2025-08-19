@@ -23,7 +23,7 @@ if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     
     # Run email-only authentication migration
     echo -e "${BLUE}🔄 Running email-only authentication migration...${NC}"
-    python deploy_with_migration.py 2>/dev/null || echo -e "${YELLOW}⚠️ Migration completed (schema may already be updated)${NC}"
+    python deploy_with_migration.py || echo -e "${YELLOW}⚠️ Migration completed (schema may already be updated)${NC}"
     
     # Fix expenses table schema (add missing category_id column)
     echo -e "${BLUE}🔄 Fixing expenses table schema...${NC}"
