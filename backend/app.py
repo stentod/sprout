@@ -940,7 +940,7 @@ def get_category_budget_tracking():
                         ELSE CONCAT('default_', e.category_id)
                     END
             '''
-            spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()))
+            spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()), fetch_all=True)
         except Exception as db_error:
             print(f"Database error getting spending data: {db_error}")
             spending_data = []
