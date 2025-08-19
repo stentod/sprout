@@ -179,12 +179,15 @@ function renderCompactCategoryBudgets() {
   const budgetedCategories = categoryBudgets.budgeted_categories;
   const categoryItems = budgetedCategories.map(cat => {
     const isOverBudget = cat.is_over_budget;
+    const displayAmount = Math.abs(cat.remaining_today).toFixed(2);
+    
+    console.log(`🎨 Rendering budget for ${cat.category_name}: remaining_today=${cat.remaining_today}, displayAmount=${displayAmount}`);
     
     return `
       <div class="compact-budget-item ${isOverBudget ? 'over-budget' : ''}">
         <span class="compact-icon">${cat.category_icon}</span>
         <span class="compact-name">${cat.category_name}</span>
-        <span class="compact-amount ${isOverBudget ? 'negative' : ''}">${isOverBudget ? '-' : ''}$${Math.abs(cat.remaining_today).toFixed(2)}</span>
+        <span class="compact-amount ${isOverBudget ? 'negative' : ''}">${isOverBudget ? '-' : ''}$${displayAmount}</span>
       </div>
     `;
   }).join('');
