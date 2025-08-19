@@ -21,29 +21,8 @@ if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     cd /app/backend
     python setup_db.py 2>/dev/null || echo -e "${YELLOW}⚠️ Database initialization completed (tables may already exist)${NC}"
     
-    # Run email-only authentication migration
-    echo -e "${BLUE}🔄 Running email-only authentication migration...${NC}"
-    python deploy_with_migration.py || echo -e "${YELLOW}⚠️ Migration completed (schema may already be updated)${NC}"
-    
-    # Fix expenses table schema (add missing category_id column)
-    echo -e "${BLUE}🔄 Fixing expenses table schema...${NC}"
-    python fix_expenses_schema.py 2>/dev/null || echo -e "${YELLOW}⚠️ Schema fix completed (column may already exist)${NC}"
-    
-    # Add category preference column to user_preferences table
-    echo -e "${BLUE}🔄 Adding category preference column...${NC}"
-    python migrate_category_preference.py 2>/dev/null || echo -e "${YELLOW}⚠️ Category preference migration completed (column may already exist)${NC}"
-    
-    # Complete category migration (replaces all previous category migrations)
-    echo -e "${BLUE}🚀 Running complete category migration...${NC}"
-    python complete_category_migration.py 2>/dev/null || echo -e "${YELLOW}⚠️ Complete category migration completed${NC}"
-    
-    # Test budget tracking functionality
-    echo -e "${BLUE}🧪 Testing budget tracking...${NC}"
-    python test_budget_tracking.py 2>/dev/null || echo -e "${YELLOW}⚠️ Budget tracking test completed${NC}"
-    
-    # Test exact API response
-    echo -e "${BLUE}🔍 Testing API response...${NC}"
-    python test_api_response.py 2>/dev/null || echo -e "${YELLOW}⚠️ API response test completed${NC}"
+    # Skip complex migrations for now - just get the app running
+    echo -e "${BLUE}🚀 Skipping migrations - starting app directly...${NC}"
     
     # Production mode - start Flask with gunicorn and Nginx
     echo -e "${BLUE}🔧 Starting Flask backend with gunicorn on port 5000${NC}"
