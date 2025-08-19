@@ -16,9 +16,13 @@ NC='\033[0m' # No Color
 if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     echo -e "${GREEN}🌱 Starting Sprout Budget Tracker Production Environment${NC}"
     
+    # Test deployment environment first
+    echo -e "${BLUE}🧪 Testing deployment environment...${NC}"
+    cd /app/backend
+    python test_deployment.py || echo -e "${RED}❌ Deployment test failed - check logs above${NC}"
+    
     # Initialize database schema
     echo -e "${BLUE}🗄️ Initializing database schema...${NC}"
-    cd /app/backend
     python setup_db.py 2>/dev/null || echo -e "${YELLOW}⚠️ Database initialization completed (tables may already exist)${NC}"
     
     # Skip complex migrations for now - just get the app running
