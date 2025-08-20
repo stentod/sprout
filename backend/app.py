@@ -14,6 +14,7 @@ import logging.handlers
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from functools import wraps
+import re
 
 # Load environment variables (for local development)
 load_dotenv()
@@ -126,6 +127,12 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Sessions last 7 
 #     app.config['SESSION_COOKIE_DOMAIN'] = None  # Let Flask auto-detect
 CORS(app, supports_credentials=True)
 
+# Passive security headers - won't interfere with functionality
+@app.after_request
+def add_security_headers(response):
+    """Add passive security headers"""
+    return add_security_headers_passive(response)
+
 # Email configuration
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
@@ -174,6 +181,44 @@ class NotFoundError(SproutError):
 # Legacy exception for backward compatibility
 class DatabaseConnectionError(Exception):
     pass
+
+# ==========================================
+# ULTRA-CONSERVATIVE SECURITY
+# ==========================================
+
+def log_security_event(event_type, details=None):
+    """Log security events for monitoring - passive only"""
+    logger.info(f"Security event: {event_type}", extra={
+        'security_event': event_type,
+        'ip_address': request.remote_addr if hasattr(request, 'remote_addr') else None,
+        'user_agent': request.headers.get('User-Agent') if hasattr(request, 'headers') else None,
+        'details': details
+    })
+
+def sanitize_input_passive(text):
+    """Passive input sanitization - only removes obvious malicious content"""
+    if not text or not isinstance(text, str):
+        return text
+    
+    # Only remove obvious malicious patterns
+    malicious_patterns = [
+        r'<script[^>]*>.*?</script>',  # Script tags
+        r'javascript:',  # JavaScript protocol
+        r'data:text/html',  # Data URLs
+        r'vbscript:',  # VBScript protocol
+    ]
+    
+    sanitized = text
+    for pattern in malicious_patterns:
+        sanitized = re.sub(pattern, '', sanitized, flags=re.IGNORECASE)
+    
+    return sanitized
+
+def add_security_headers_passive(response):
+    """Add basic security headers - passive only"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    return response
 
 # Configuration from environment variables
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://dstent@localhost/sprout_budget")
@@ -293,6 +338,9 @@ def validate_expense_data(data):
     description = data.get('description', '').strip()
     if len(description) > 500:
         raise ValidationError("Description too long (max 500 characters)", field="description")
+    
+    # Passive input sanitization - only removes obvious malicious content
+    description = sanitize_input_passive(description)
     
     return {
         'amount': amount,
@@ -1753,6 +1801,9 @@ def signup():
     email = validated_data['email']
     password = validated_data['password']
     
+    # Passive security logging - doesn't affect functionality
+    log_security_event('signup_attempt', {'email': email})
+    
     logger.info("Signup attempt", extra={'email': email})
     
     # Check if email already exists
@@ -1829,6 +1880,9 @@ def login():
     validated_data = validate_auth_data(data)
     email = validated_data['email']
     password = validated_data['password']
+    
+    # Passive security logging - doesn't affect functionality
+    log_security_event('login_attempt', {'email': email})
     
     logger.info("Login attempt", extra={'email': email})
     
