@@ -338,6 +338,7 @@ function renderCategoryBudgets() {
     const html = categories.map(category => {
         const hasBudget = category.daily_budget > 0;
         const budgetValue = hasBudget ? category.daily_budget.toFixed(2) : '0.00';
+        const isCustom = !category.is_default;
         
         return `
         <div class="category-budget-item ${hasBudget ? 'has-budget' : 'no-budget'}" data-category-id="${category.id}">
@@ -348,6 +349,13 @@ function renderCategoryBudgets() {
                     <div class="category-type">${category.is_default ? 'Default' : 'Custom'}</div>
                 </div>
             </div>
+            ${isCustom ? `
+            <div class="category-delete-section">
+                <button class="delete-category-btn-inline" onclick="deleteCustomCategoryInline('${category.id.toString().replace('custom_', '')}', '${category.name}')">
+                    Delete
+                </button>
+            </div>
+            ` : ''}
             <div class="budget-controls">
                 <div class="budget-toggle">
                     <label class="toggle-switch">
@@ -763,65 +771,12 @@ async function createCategory(categoryData) {
 // CUSTOM CATEGORY DELETION
 // ==========================================
 
-// Load and display custom categories for deletion
-async function loadCustomCategoriesForDeletion() {
-    try {
-        console.log('Loading custom categories for deletion...');
-        
-        const response = await fetch(`${API_BASE}/categories`, {
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('Categories response:', data);
-        
-        // Filter to only show custom categories
-        const customCategories = data.filter(cat => cat.id.toString().startsWith('custom_'));
-        
-        renderCustomCategoriesList(customCategories);
-        
-    } catch (error) {
-        console.error('Error loading custom categories:', error);
-        showDeleteCategoryStatusMessage(`Failed to load custom categories: ${error.message}`, 'error');
-    }
+async function deleteCustomCategoryInline(categoryId, categoryName) {
+    // Show confirmation modal
+    showDeleteConfirmation(categoryId, categoryName);
 }
 
-function renderCustomCategoriesList(customCategories) {
-    const container = document.getElementById('custom-categories-list');
-    
-    if (!customCategories || customCategories.length === 0) {
-        container.innerHTML = `
-            <div class="no-custom-categories">
-                <p>You haven't created any custom categories yet.</p>
-            </div>
-        `;
-        return;
-    }
-    
-    const categoriesHtml = customCategories.map(cat => {
-        const categoryId = cat.id.toString().replace('custom_', '');
-        return `
-            <div class="custom-category-item">
-                <div class="custom-category-info">
-                    <span class="custom-category-icon">${cat.icon}</span>
-                    <span class="custom-category-name">${cat.name}</span>
-                    <div class="custom-category-color" style="background-color: ${cat.color}"></div>
-                </div>
-                <button class="delete-category-btn" onclick="deleteCustomCategory('${categoryId}', '${cat.name}')">
-                    Delete
-                </button>
-            </div>
-        `;
-    }).join('');
-    
-    container.innerHTML = categoriesHtml;
-}
-
-async function deleteCustomCategory(categoryId, categoryName) {
+async function deleteCustomCategoryInline(categoryId, categoryName) {
     // Show confirmation modal
     showDeleteConfirmation(categoryId, categoryName);
 }
@@ -872,12 +827,9 @@ async function confirmDeleteCategory(categoryId, categoryName) {
         
         if (data.success) {
             closeConfirmationModal();
-            showDeleteCategoryStatusMessage('Custom category deleted successfully!', 'success');
+            showCategoryStatusMessage('Custom category deleted successfully!', 'success');
             
-            // Reload the custom categories list
-            await loadCustomCategoriesForDeletion();
-            
-            // Also reload the main categories for budget management
+            // Reload the main categories for budget management
             await loadCategories();
             renderCategoryBudgets();
         } else {
@@ -887,24 +839,8 @@ async function confirmDeleteCategory(categoryId, categoryName) {
     } catch (error) {
         console.error('Error deleting category:', error);
         closeConfirmationModal();
-        showDeleteCategoryStatusMessage(`Failed to delete category: ${error.message}`, 'error');
+        showCategoryStatusMessage(`Failed to delete category: ${error.message}`, 'error');
     }
 }
 
-function showDeleteCategoryStatusMessage(message, type) {
-    const statusElement = document.getElementById('delete-category-status-message');
-    statusElement.textContent = message;
-    statusElement.className = `status-message ${type}`;
-    statusElement.style.display = 'block';
-    
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-        statusElement.style.display = 'none';
-    }, 5000);
-}
-
-// Initialize custom category deletion on page load
-document.addEventListener('DOMContentLoaded', function() {
-    // Add this to the existing DOMContentLoaded event
-    loadCustomCategoriesForDeletion();
-}); 
+ 

@@ -1968,6 +1968,30 @@ body {
   transform: translateY(-1px);
 }
 
+/* Inline Delete Button Styles */
+.category-delete-section {
+  display: flex;
+  align-items: center;
+  margin: 0 var(--spacing-md);
+}
+
+.delete-category-btn-inline {
+  background: var(--color-error);
+  color: white;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.delete-category-btn-inline:hover {
+  background: var(--color-error-dark);
+  transform: translateY(-1px);
+}
+
 .no-custom-categories {
   text-align: center;
   padding: var(--spacing-lg);
