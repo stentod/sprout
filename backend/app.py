@@ -9,12 +9,106 @@ import os
 import bcrypt
 import secrets
 import re
+import logging
+import logging.handlers
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from functools import wraps
 
 # Load environment variables (for local development)
 load_dotenv()
+
+# ==========================================
+# LOGGING CONFIGURATION
+# ==========================================
+
+def setup_logging():
+    """Configure structured logging for the application"""
+    
+    # Create logs directory if it doesn't exist
+    os.makedirs('logs', exist_ok=True)
+    
+    # Determine log level from environment
+    log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
+    
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Create handlers
+    handlers = []
+    
+    # Console handler (always active)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    handlers.append(console_handler)
+    
+    # File handler for all logs
+    file_handler = logging.handlers.RotatingFileHandler(
+        'logs/app.log',
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5
+    )
+    file_handler.setFormatter(formatter)
+    handlers.append(file_handler)
+    
+    # Error file handler (errors only)
+    error_handler = logging.handlers.RotatingFileHandler(
+        'logs/errors.log',
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5
+    )
+    error_handler.setFormatter(formatter)
+    error_handler.setLevel(logging.ERROR)
+    handlers.append(error_handler)
+    
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, log_level))
+    
+    # Remove existing handlers to avoid duplicates
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # Add our handlers
+    for handler in handlers:
+        root_logger.addHandler(handler)
+    
+    # Create app logger
+    app_logger = logging.getLogger('sprout_app')
+    app_logger.info(f"Logging initialized at level: {log_level}")
+    
+    return app_logger
+
+# Initialize logging
+logger = setup_logging()
+
+def log_with_context(level, message, **context):
+    """Helper function for structured logging with context"""
+    extra_data = {
+        'user_id': getattr(request, 'user_id', None) if hasattr(request, 'user_id') else None,
+        'ip_address': request.remote_addr if hasattr(request, 'remote_addr') else None,
+        'user_agent': request.headers.get('User-Agent') if hasattr(request, 'headers') else None,
+        'endpoint': request.endpoint if hasattr(request, 'endpoint') else None,
+        'method': request.method if hasattr(request, 'method') else None,
+        **context
+    }
+    
+    # Filter out None values
+    extra_data = {k: v for k, v in extra_data.items() if v is not None}
+    
+    if level == 'debug':
+        logger.debug(message, extra=extra_data)
+    elif level == 'info':
+        logger.info(message, extra=extra_data)
+    elif level == 'warning':
+        logger.warning(message, extra=extra_data)
+    elif level == 'error':
+        logger.error(message, extra=extra_data)
+    elif level == 'critical':
+        logger.critical(message, extra=extra_data)
 
 # Production fix - ensure proper session handling
 app = Flask(__name__)
@@ -55,8 +149,15 @@ DEBUG = os.environ.get("FLASK_DEBUG", "False").lower() == "true"  # Debug mode
 
 def get_db_connection():
     """Get a database connection with dict cursor for easy column access"""
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        logger.debug("Database connection established successfully")
+        return conn
+    except Exception as e:
+        logger.error("Failed to establish database connection", exc_info=True, extra={
+            'database_url': DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else 'unknown'
+        })
+        raise DatabaseConnectionError(f"Database connection failed: {e}")
 
 def run_query(sql, params=None, fetch_one=False, fetch_all=True):
     """
@@ -102,11 +203,20 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
     except psycopg2.Error as e:
         if conn:
             conn.rollback()
-        print(f"Database connection error: {e}")
+        logger.error("Database query failed", exc_info=True, extra={
+            'sql': sql[:100] + '...' if len(sql) > 100 else sql,
+            'params': str(params)[:100] if params else None,
+            'error_code': e.pgcode,
+            'error_message': str(e)
+        })
         raise DatabaseConnectionError(f"Database unavailable: {e}")
     except Exception as e:
         if conn:
             conn.rollback()
+        logger.error("Unexpected error in database query", exc_info=True, extra={
+            'sql': sql[:100] + '...' if len(sql) > 100 else sql,
+            'params': str(params)[:100] if params else None
+        })
         raise e
     finally:
         if conn:
@@ -1033,43 +1143,57 @@ def get_category_budget_tracking():
 @require_auth
 def add_expense():
     try:
-        print(f"🔍 Add expense request received")
+        logger.info("Add expense request received")
         data = request.get_json()
         if not data:
-            print(f"❌ No data provided in request")
+            logger.warning("No data provided in expense request")
             return jsonify({'error': 'No data provided'}), 400
             
         amount = data.get('amount')
         description = data.get('description', '')
         category_id = data.get('category_id')  # New: category selection
         
-        print(f"📊 Request data: amount={amount}, description='{description}', category_id={category_id}")
+        logger.debug("Expense request data", extra={
+            'amount': amount,
+            'description': description,
+            'category_id': category_id
+        })
         
         if amount is None:
-            print(f"❌ Amount is missing")
+            logger.warning("Amount missing from expense request")
             return jsonify({'error': 'Amount is required'}), 400
         
         user_id = get_current_user_id()
-        print(f"👤 User ID: {user_id}")
+        logger.debug("Processing expense for user", extra={'user_id': user_id})
         
         # Check user's category requirement preference
         try:
             sql = 'SELECT require_categories FROM user_preferences WHERE user_id = %s'
             result = run_query(sql, (user_id,), fetch_one=True)
             require_categories = result['require_categories'] if result else True  # Default to True
-            print(f"🔍 User category preference: require_categories={require_categories}")
+            logger.debug("User category preference retrieved", extra={
+                'user_id': user_id,
+                'require_categories': require_categories
+            })
         except Exception as e:
-            print(f"⚠️ Error checking category preference, defaulting to required: {e}")
+            logger.warning("Error checking category preference, defaulting to required", extra={
+                'user_id': user_id,
+                'error': str(e)
+            })
             require_categories = True
         
         # Validate category_id based on user preference
         if require_categories and not category_id:
-            print(f"❌ Category ID is missing and categories are required")
+            logger.warning("Category ID missing but categories are required", extra={
+                'user_id': user_id,
+                'require_categories': require_categories
+            })
             return jsonify({'error': 'Category is required'}), 400
         elif not require_categories and not category_id:
-            print(f"ℹ️ Category ID is missing but categories are optional, proceeding without category")
+            logger.info("Category ID missing but categories are optional, proceeding without category", extra={
+                'user_id': user_id
+            })
             category_id = None
-        print(f"👤 User ID: {user_id}")
         
         # Initialize category_type
         category_type = None
@@ -1086,7 +1210,11 @@ def add_expense():
                     category_id = int(category_id)
                     category_type = 'custom'
                 
-                print(f"🔍 Checking if {category_type} category {category_id} exists for user {user_id}")
+                logger.debug("Validating category", extra={
+                    'user_id': user_id,
+                    'category_type': category_type,
+                    'category_id': category_id
+                })
                 
                 if category_type == 'default':
                     # Check if default category exists
@@ -1098,27 +1226,49 @@ def add_expense():
                     category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
                 
                 if not category_exists:
-                    print(f"❌ {category_type} category {category_id} not found for user {user_id}")
+                    logger.warning("Invalid category provided", extra={
+                        'user_id': user_id,
+                        'category_type': category_type,
+                        'category_id': category_id
+                    })
                     return jsonify({'error': 'Invalid category'}), 400
-                print(f"✅ {category_type} category {category_id} validated")
+                logger.debug("Category validated successfully", extra={
+                    'user_id': user_id,
+                    'category_type': category_type,
+                    'category_id': category_id
+                })
                 
             except (ValueError, TypeError) as e:
-                print(f"❌ Invalid category ID format: {e}")
+                logger.warning("Invalid category ID format", extra={
+                    'user_id': user_id,
+                    'category_id': category_id,
+                    'error': str(e)
+                })
                 return jsonify({'error': 'Invalid category ID'}), 400
             except Exception as db_error:
-                print(f"❌ Database error checking category: {db_error}")
-                import traceback
-                traceback.print_exc()
+                logger.error("Database error checking category", exc_info=True, extra={
+                    'user_id': user_id,
+                    'category_id': category_id
+                })
                 return jsonify({'error': 'Database connection error. Please try again.'}), 503
         else:
-            print(f"ℹ️ No category provided, expense will be saved without category")
+            logger.info("No category provided, expense will be saved without category", extra={
+                'user_id': user_id
+            })
         
         # Use UTC timestamp to ensure consistent date handling across timezones
         timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        print(f"⏰ Timestamp: {timestamp}")
+        logger.debug("Generated timestamp for expense", extra={
+            'user_id': user_id,
+            'timestamp': timestamp
+        })
         
         try:
-            print(f"💾 Inserting expense into database...")
+            logger.info("Inserting expense into database", extra={
+                'user_id': user_id,
+                'amount': amount,
+                'description': description
+            })
             
             # Convert category_id back to the full string format for storage
             if category_id:
@@ -1134,18 +1284,26 @@ def add_expense():
                 VALUES (%s, %s, %s, %s, %s)
             '''
             result = run_query(sql, (user_id, amount, description, storage_category_id, timestamp), fetch_all=False)
-            print(f"✅ Expense inserted successfully with category_id: {storage_category_id}, result: {result}")
+            logger.info("Expense inserted successfully", extra={
+                'user_id': user_id,
+                'expense_id': result,
+                'category_id': storage_category_id,
+                'amount': amount
+            })
             return jsonify({'success': True}), 201
         except Exception as db_error:
-            print(f"❌ Database error adding expense: {db_error}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Database error adding expense", exc_info=True, extra={
+                'user_id': user_id,
+                'amount': amount,
+                'description': description,
+                'category_id': storage_category_id
+            })
             return jsonify({'error': 'Failed to save expense. Please try again.'}), 503
             
     except Exception as e:
-        print(f"❌ Add expense endpoint error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Add expense endpoint error", exc_info=True, extra={
+            'user_id': getattr(request, 'user_id', None)
+        })
         return jsonify({'error': 'An unexpected error occurred. Please try again.'}), 500
 
 @app.route('/api/summary', methods=['GET'])
