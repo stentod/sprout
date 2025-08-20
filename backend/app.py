@@ -137,7 +137,41 @@ app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.co
 
 mail = Mail(app)
 
-# Custom exception for database connection errors
+# ==========================================
+# CUSTOM EXCEPTIONS FOR ROBUST ERROR HANDLING
+# ==========================================
+
+class SproutError(Exception):
+    """Base exception for Sprout application"""
+    def __init__(self, message, code=None, status_code=500, field=None):
+        self.message = message
+        self.code = code
+        self.status_code = status_code
+        self.field = field
+        super().__init__(self.message)
+
+class ValidationError(SproutError):
+    """Raised when input validation fails"""
+    def __init__(self, message, field=None):
+        super().__init__(message, code='VALIDATION_ERROR', status_code=400, field=field)
+
+class AuthenticationError(SproutError):
+    """Raised when authentication fails"""
+    def __init__(self, message):
+        super().__init__(message, code='AUTHENTICATION_ERROR', status_code=401)
+
+class DatabaseError(SproutError):
+    """Raised when database operations fail"""
+    def __init__(self, message):
+        super().__init__(message, code='DATABASE_ERROR', status_code=503)
+
+class NotFoundError(SproutError):
+    """Raised when a resource is not found"""
+    def __init__(self, message, resource_type=None):
+        super().__init__(message, code='NOT_FOUND', status_code=404)
+        self.resource_type = resource_type
+
+# Legacy exception for backward compatibility
 class DatabaseConnectionError(Exception):
     pass
 
@@ -235,6 +269,134 @@ def validate_email(email):
     """Validate email format using regex"""
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(pattern, email) is not None
+
+# ==========================================
+# VALIDATION FUNCTIONS
+# ==========================================
+
+def validate_expense_data(data):
+    """Validate expense input data"""
+    if not data:
+        raise ValidationError("No data provided", field="data")
+    
+    amount = data.get('amount')
+    if amount is None:
+        raise ValidationError("Amount is required", field="amount")
+    
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            raise ValidationError("Amount must be greater than 0", field="amount")
+    except (ValueError, TypeError):
+        raise ValidationError("Amount must be a valid number", field="amount")
+    
+    description = data.get('description', '').strip()
+    if len(description) > 500:
+        raise ValidationError("Description too long (max 500 characters)", field="description")
+    
+    return {
+        'amount': amount,
+        'description': description
+    }
+
+def validate_auth_data(data):
+    """Validate authentication input data"""
+    if not data:
+        raise ValidationError("No data provided", field="data")
+    
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    
+    if not email:
+        raise ValidationError("Email is required", field="email")
+    
+    if not password:
+        raise ValidationError("Password is required", field="password")
+    
+    if not validate_email(email):
+        raise ValidationError("Please enter a valid email address", field="email")
+    
+    if len(password) < 6:
+        raise ValidationError("Password must be at least 6 characters", field="password")
+    
+    return {
+        'email': email,
+        'password': password
+    }
+
+def validate_category_data(data):
+    """Validate category input data"""
+    if not data:
+        raise ValidationError("No data provided", field="data")
+    
+    name = data.get('name', '').strip()
+    if not name:
+        raise ValidationError("Category name is required", field="name")
+    
+    if len(name) > 100:
+        raise ValidationError("Category name too long (max 100 characters)", field="name")
+    
+    daily_budget = data.get('daily_budget', 0.0)
+    try:
+        daily_budget = float(daily_budget)
+        if daily_budget < 0:
+            raise ValidationError("Daily budget cannot be negative", field="daily_budget")
+    except (ValueError, TypeError):
+        raise ValidationError("Daily budget must be a valid number", field="daily_budget")
+    
+    return {
+        'name': name,
+        'daily_budget': daily_budget
+    }
+
+# ==========================================
+# ERROR HANDLER DECORATOR
+# ==========================================
+
+def handle_errors(f):
+    """Decorator to handle errors consistently across endpoints"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except SproutError as e:
+            logger.warning(f"Application error: {e.message}", extra={
+                'error_code': e.code,
+                'status_code': e.status_code,
+                'field': e.field
+            })
+            return jsonify({
+                'error': e.message,
+                'code': e.code,
+                'field': e.field
+            }), e.status_code
+        except psycopg2.OperationalError as e:
+            logger.error("Database connection error", exc_info=True)
+            return jsonify({
+                'error': 'Database temporarily unavailable. Please try again.',
+                'code': 'DATABASE_UNAVAILABLE'
+            }), 503
+        except psycopg2.IntegrityError as e:
+            logger.warning("Data integrity violation", extra={
+                'constraint': getattr(e.diag, 'constraint_name', 'unknown')
+            })
+            return jsonify({
+                'error': 'Invalid data provided. Please check your input.',
+                'code': 'DATA_INTEGRITY_ERROR'
+            }), 400
+        except ValueError as e:
+            logger.warning("Invalid input data", extra={'error': str(e)})
+            return jsonify({
+                'error': 'Please provide valid data.',
+                'code': 'INVALID_INPUT'
+            }), 400
+        except Exception as e:
+            logger.error("Unexpected error", exc_info=True)
+            return jsonify({
+                'error': 'An unexpected error occurred. Please try again.',
+                'code': 'INTERNAL_ERROR'
+            }), 500
+    return decorated_function
 
 def generate_reset_token():
     """Generate a secure random token for password reset"""
@@ -1141,170 +1303,124 @@ def get_category_budget_tracking():
 
 @app.route('/api/expenses', methods=['POST'])
 @require_auth
+@handle_errors
 def add_expense():
-    try:
-        logger.info("Add expense request received")
-        data = request.get_json()
-        if not data:
-            logger.warning("No data provided in expense request")
-            return jsonify({'error': 'No data provided'}), 400
-            
-        amount = data.get('amount')
-        description = data.get('description', '')
-        category_id = data.get('category_id')  # New: category selection
+    logger.info("Add expense request received")
+    
+    if not request.is_json:
+        raise ValidationError("Request must be JSON")
+    
+    data = request.get_json()
+    validated_data = validate_expense_data(data)
+    amount = validated_data['amount']
+    description = validated_data['description']
+    category_id = data.get('category_id')  # Category validation handled separately
+    
+    user_id = get_current_user_id()
+    logger.debug("Processing expense for user", extra={'user_id': user_id})
+    
+    # Check user's category requirement preference
+    sql = 'SELECT require_categories FROM user_preferences WHERE user_id = %s'
+    result = run_query(sql, (user_id,), fetch_one=True)
+    require_categories = result['require_categories'] if result else True  # Default to True
+    logger.debug("User category preference retrieved", extra={
+        'user_id': user_id,
+        'require_categories': require_categories
+    })
+    
+    # Validate category_id based on user preference
+    if require_categories and not category_id:
+        logger.warning("Category ID missing but categories are required", extra={
+            'user_id': user_id,
+            'require_categories': require_categories
+        })
+        raise ValidationError("Category is required", field="category_id")
+    elif not require_categories and not category_id:
+        logger.info("Category ID missing but categories are optional, proceeding without category", extra={
+            'user_id': user_id
+        })
+        category_id = None
+    
+    # Initialize category_type
+    category_type = None
+    
+    # Validate category_id if provided
+    if category_id:
+        # Parse category ID (format: "default_123" or "custom_456")
+        if isinstance(category_id, str) and '_' in category_id:
+            category_type, cat_id = category_id.split('_', 1)
+            category_id = int(cat_id)
+        else:
+            # Legacy format - assume it's a custom category
+            category_id = int(category_id)
+            category_type = 'custom'
         
-        logger.debug("Expense request data", extra={
-            'amount': amount,
-            'description': description,
+        logger.debug("Validating category", extra={
+            'user_id': user_id,
+            'category_type': category_type,
             'category_id': category_id
         })
         
-        if amount is None:
-            logger.warning("Amount missing from expense request")
-            return jsonify({'error': 'Amount is required'}), 400
-        
-        user_id = get_current_user_id()
-        logger.debug("Processing expense for user", extra={'user_id': user_id})
-        
-        # Check user's category requirement preference
-        try:
-            sql = 'SELECT require_categories FROM user_preferences WHERE user_id = %s'
-            result = run_query(sql, (user_id,), fetch_one=True)
-            require_categories = result['require_categories'] if result else True  # Default to True
-            logger.debug("User category preference retrieved", extra={
-                'user_id': user_id,
-                'require_categories': require_categories
-            })
-        except Exception as e:
-            logger.warning("Error checking category preference, defaulting to required", extra={
-                'user_id': user_id,
-                'error': str(e)
-            })
-            require_categories = True
-        
-        # Validate category_id based on user preference
-        if require_categories and not category_id:
-            logger.warning("Category ID missing but categories are required", extra={
-                'user_id': user_id,
-                'require_categories': require_categories
-            })
-            return jsonify({'error': 'Category is required'}), 400
-        elif not require_categories and not category_id:
-            logger.info("Category ID missing but categories are optional, proceeding without category", extra={
-                'user_id': user_id
-            })
-            category_id = None
-        
-        # Initialize category_type
-        category_type = None
-        
-        # Validate category_id if provided
-        if category_id:
-            try:
-                # Parse category ID (format: "default_123" or "custom_456")
-                if isinstance(category_id, str) and '_' in category_id:
-                    category_type, cat_id = category_id.split('_', 1)
-                    category_id = int(cat_id)
-                else:
-                    # Legacy format - assume it's a custom category
-                    category_id = int(category_id)
-                    category_type = 'custom'
-                
-                logger.debug("Validating category", extra={
-                    'user_id': user_id,
-                    'category_type': category_type,
-                    'category_id': category_id
-                })
-                
-                if category_type == 'default':
-                    # Check if default category exists
-                    check_sql = 'SELECT id FROM default_categories WHERE id = %s'
-                    category_exists = run_query(check_sql, (category_id,), fetch_one=True)
-                else:
-                    # Check if custom category exists and belongs to the user
-                    check_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
-                    category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
-                
-                if not category_exists:
-                    logger.warning("Invalid category provided", extra={
-                        'user_id': user_id,
-                        'category_type': category_type,
-                        'category_id': category_id
-                    })
-                    return jsonify({'error': 'Invalid category'}), 400
-                logger.debug("Category validated successfully", extra={
-                    'user_id': user_id,
-                    'category_type': category_type,
-                    'category_id': category_id
-                })
-                
-            except (ValueError, TypeError) as e:
-                logger.warning("Invalid category ID format", extra={
-                    'user_id': user_id,
-                    'category_id': category_id,
-                    'error': str(e)
-                })
-                return jsonify({'error': 'Invalid category ID'}), 400
-            except Exception as db_error:
-                logger.error("Database error checking category", exc_info=True, extra={
-                    'user_id': user_id,
-                    'category_id': category_id
-                })
-                return jsonify({'error': 'Database connection error. Please try again.'}), 503
+        if category_type == 'default':
+            # Check if default category exists
+            check_sql = 'SELECT id FROM default_categories WHERE id = %s'
+            category_exists = run_query(check_sql, (category_id,), fetch_one=True)
         else:
-            logger.info("No category provided, expense will be saved without category", extra={
-                'user_id': user_id
-            })
+            # Check if custom category exists and belongs to the user
+            check_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
+            category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
         
-        # Use UTC timestamp to ensure consistent date handling across timezones
-        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        logger.debug("Generated timestamp for expense", extra={
+        if not category_exists:
+            logger.warning("Invalid category provided", extra={
+                'user_id': user_id,
+                'category_type': category_type,
+                'category_id': category_id
+            })
+            raise ValidationError("Invalid category", field="category_id")
+        logger.debug("Category validated successfully", extra={
             'user_id': user_id,
-            'timestamp': timestamp
+            'category_type': category_type,
+            'category_id': category_id
         })
-        
-        try:
-            logger.info("Inserting expense into database", extra={
-                'user_id': user_id,
-                'amount': amount,
-                'description': description
-            })
-            
-            # Convert category_id back to the full string format for storage
-            if category_id:
-                if category_type == 'default':
-                    storage_category_id = f"default_{category_id}"
-                else:
-                    storage_category_id = f"custom_{category_id}"
-            else:
-                storage_category_id = None
-            
-            sql = '''
-                INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
-                VALUES (%s, %s, %s, %s, %s)
-            '''
-            result = run_query(sql, (user_id, amount, description, storage_category_id, timestamp), fetch_all=False)
-            logger.info("Expense inserted successfully", extra={
-                'user_id': user_id,
-                'expense_id': result,
-                'category_id': storage_category_id,
-                'amount': amount
-            })
-            return jsonify({'success': True}), 201
-        except Exception as db_error:
-            logger.error("Database error adding expense", exc_info=True, extra={
-                'user_id': user_id,
-                'amount': amount,
-                'description': description,
-                'category_id': storage_category_id
-            })
-            return jsonify({'error': 'Failed to save expense. Please try again.'}), 503
-            
-    except Exception as e:
-        logger.error("Add expense endpoint error", exc_info=True, extra={
-            'user_id': getattr(request, 'user_id', None)
+    else:
+        logger.info("No category provided, expense will be saved without category", extra={
+            'user_id': user_id
         })
-        return jsonify({'error': 'An unexpected error occurred. Please try again.'}), 500
+    
+    # Use UTC timestamp to ensure consistent date handling across timezones
+    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+    logger.debug("Generated timestamp for expense", extra={
+        'user_id': user_id,
+        'timestamp': timestamp
+    })
+    
+    logger.info("Inserting expense into database", extra={
+        'user_id': user_id,
+        'amount': amount,
+        'description': description
+    })
+    
+    # Convert category_id back to the full string format for storage
+    if category_id:
+        if category_type == 'default':
+            storage_category_id = f"default_{category_id}"
+        else:
+            storage_category_id = f"custom_{category_id}"
+    else:
+        storage_category_id = None
+    
+    sql = '''
+        INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
+        VALUES (%s, %s, %s, %s, %s)
+    '''
+    result = run_query(sql, (user_id, amount, description, storage_category_id, timestamp), fetch_all=False)
+    logger.info("Expense inserted successfully", extra={
+        'user_id': user_id,
+        'expense_id': result,
+        'category_id': storage_category_id,
+        'amount': amount
+    })
+    return jsonify({'success': True}), 201
 
 @app.route('/api/summary', methods=['GET'])
 @require_auth
@@ -1625,180 +1741,127 @@ def set_category_requirement():
 
 # Authentication Routes
 @app.route('/api/auth/signup', methods=['POST'])
+@handle_errors
 def signup():
     """User registration with email-only authentication"""
+    # Enhanced request parsing with better error handling
+    if not request.is_json:
+        raise ValidationError("Request must be JSON")
+        
+    data = request.get_json()
+    validated_data = validate_auth_data(data)
+    email = validated_data['email']
+    password = validated_data['password']
+    
+    logger.info("Signup attempt", extra={'email': email})
+    
+    # Check if email already exists
+    existing_email = run_query(
+        'SELECT id FROM users WHERE email = %s',
+        (email,),
+        fetch_one=True
+    )
+    if existing_email:
+        logger.warning("Signup failed - email already exists", extra={'email': email})
+        raise ValidationError("An account with this email already exists. Please use a different email or try logging in.")
+    
+    # Hash password and create user
+    password_hash = hash_password(password)
+    sql = '''
+        INSERT INTO users (email, password_hash)
+        VALUES (%s, %s)
+        RETURNING id, email
+    '''
+    result = run_query(sql, (email, password_hash), fetch_one=True)
+    
+    if not result:
+        raise DatabaseError("Failed to create account. Please try again.")
+        
+    user_id = result['id']
+    logger.info("User created successfully", extra={'user_id': user_id, 'email': email})
+    
+    # Create default categories and preferences for new user
     try:
-        # Enhanced request parsing with better error handling
-        if not request.is_json:
-            return jsonify({'error': 'Request must be JSON'}), 400
-            
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-            
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '')
-        
-        print(f"Signup attempt - Email: {email}")
-        
-        # Enhanced validation with specific error messages
-        if not email or not password:
-            missing_fields = []
-            if not email: missing_fields.append('email')
-            if not password: missing_fields.append('password')
-            return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
-        
-        if len(password) < 6:
-            return jsonify({'error': 'Password must be at least 6 characters'}), 400
-        
-        if not validate_email(email):
-            return jsonify({'error': 'Please enter a valid email address'}), 400
-        
-        # Check if email already exists with better error handling
+        create_default_categories(user_id)
+        logger.info("Default categories created", extra={'user_id': user_id})
+    except Exception as cat_error:
+        # If categories creation fails, delete the user to maintain consistency
+        logger.error("Failed to create default categories, rolling back user creation", extra={
+            'user_id': user_id,
+            'error': str(cat_error)
+        })
         try:
-            existing_email = run_query(
-                'SELECT id FROM users WHERE email = %s',
-                (email,),
-                fetch_one=True
-            )
-            if existing_email:
-                print(f"Signup failed - Email already exists: {email}")
-                return jsonify({'error': 'An account with this email already exists. Please use a different email or try logging in.'}), 409
-        except Exception as db_error:
-            print(f"Database error checking email: {db_error}")
-            return jsonify({'error': 'Database connection error. Please try again.'}), 503
-        
-        # Hash password and create user with enhanced error handling
-        try:
-            password_hash = hash_password(password)
-            sql = '''
-                INSERT INTO users (email, password_hash)
-                VALUES (%s, %s)
-                RETURNING id, email
-            '''
-            result = run_query(sql, (email, password_hash), fetch_one=True)
-            
-            if not result:
-                print(f"Failed to create user account for {email}")
-                return jsonify({'error': 'Failed to create account. Please try again.'}), 500
-                
-            user_id = result['id']
-            print(f"User created successfully - ID: {user_id}, Email: {email}")
-            
-            # Create default categories and preferences for new user
-            try:
-                create_default_categories(user_id)
-                print(f"Default categories created for user {user_id}")
-            except Exception as cat_error:
-                # If categories creation fails, delete the user to maintain consistency
-                print(f"Failed to create default categories for user {user_id}: {cat_error}")
-                try:
-                    delete_sql = 'DELETE FROM users WHERE id = %s'
-                    run_query(delete_sql, (user_id,), fetch_all=False)
-                    print(f"Rolled back user creation for {user_id}")
-                except Exception as delete_error:
-                    print(f"Failed to rollback user creation: {delete_error}")
-                return jsonify({'error': 'Failed to set up account. Please try again.'}), 500
-            
-            # Automatically log the user in after successful signup
-            session.clear()  # Clear any existing session
-            session['user_id'] = user_id
-            session.permanent = True  # Make session persistent
-            
-            print(f"User {user_id} automatically logged in after signup")
-            
-            return jsonify({
-                'message': 'Account created successfully! You are now logged in.',
-                'user': {
-                    'id': result['id'],
-                    'email': result['email']
-                },
-                'auto_login': True
-            }), 201
-            
-        except Exception as create_error:
-            print(f"Error creating user account: {create_error}")
-            import traceback
-            traceback.print_exc()
-            return jsonify({'error': 'Failed to create account. Please try again.'}), 500
-            
-    except Exception as e:
-        print(f"Unexpected signup error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': 'An unexpected error occurred. Please try again later.'}), 500
+            delete_sql = 'DELETE FROM users WHERE id = %s'
+            run_query(delete_sql, (user_id,), fetch_all=False)
+            logger.info("User creation rolled back", extra={'user_id': user_id})
+        except Exception as delete_error:
+            logger.error("Failed to rollback user creation", extra={
+                'user_id': user_id,
+                'error': str(delete_error)
+            })
+        raise DatabaseError("Failed to set up account. Please try again.")
+    
+    # Automatically log the user in after successful signup
+    session.clear()  # Clear any existing session
+    session['user_id'] = user_id
+    session.permanent = True  # Make session persistent
+    
+    logger.info("User automatically logged in after signup", extra={'user_id': user_id})
+    
+    return jsonify({
+        'message': 'Account created successfully! You are now logged in.',
+        'user': {
+            'id': result['id'],
+            'email': result['email']
+        },
+        'auto_login': True
+    }), 201
 
 @app.route('/api/auth/login', methods=['POST'])
+@handle_errors
 def login():
     """User login with email and password"""
-    try:
-        # Enhanced request parsing with better error handling
-        if not request.is_json:
-            return jsonify({'error': 'Request must be JSON'}), 400
-            
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No login data provided'}), 400
-            
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '')
+    # Enhanced request parsing with better error handling
+    if not request.is_json:
+        raise ValidationError("Request must be JSON")
         
-        print(f"Login attempt for: {email}")
+    data = request.get_json()
+    validated_data = validate_auth_data(data)
+    email = validated_data['email']
+    password = validated_data['password']
+    
+    logger.info("Login attempt", extra={'email': email})
+    
+    # Login with email
+    sql = 'SELECT id, email, password_hash FROM users WHERE email = %s'
+    user = run_query(sql, (email,), fetch_one=True)
+    
+    if not user:
+        logger.warning("Login failed - no user found", extra={'email': email})
+        raise AuthenticationError("Invalid email or password")
         
-        if not email or not password:
-            missing_fields = []
-            if not email: missing_fields.append('email')
-            if not password: missing_fields.append('password')
-            return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
-        
-        if not validate_email(email):
-            return jsonify({'error': 'Please enter a valid email address'}), 400
-        
-        # Login with email
-        try:
-            sql = 'SELECT id, email, password_hash FROM users WHERE email = %s'
-            print(f"Attempting email login for: {email}")
-            
-            user = run_query(sql, (email,), fetch_one=True)
-            
-            if not user:
-                print(f"No user found for: {email}")
-                return jsonify({'error': 'Invalid email or password'}), 401
-                
-            print(f"User found - ID: {user['id']}, Email: {user['email']}")
-            
-            # Verify password
-            if not verify_password(password, user['password_hash']):
-                print(f"Invalid password for user: {email}")
-                return jsonify({'error': 'Invalid email or password'}), 401
-            
-            # Set session with enhanced session management
-            session.clear()  # Clear any existing session data
-            session['user_id'] = user['id']
-            session['email'] = user['email']
-            session.permanent = True  # Make session permanent
-            
-            print(f"Login successful for user {user['id']} ({user['email']})")
-            
-            return jsonify({
-                'message': 'Login successful',
-                'user': {
-                    'id': user['id'],
-                    'email': user['email']
-                }
-            }), 200
-            
-        except Exception as db_error:
-            print(f"Database error during login: {db_error}")
-            import traceback
-            traceback.print_exc()
-            return jsonify({'error': 'Database connection error. Please try again.'}), 503
-        
-    except Exception as e:
-        print(f"Unexpected login error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': 'An unexpected error occurred. Please try again later.'}), 500
+    logger.debug("User found", extra={'user_id': user['id'], 'email': user['email']})
+    
+    # Verify password
+    if not verify_password(password, user['password_hash']):
+        logger.warning("Login failed - invalid password", extra={'email': email})
+        raise AuthenticationError("Invalid email or password")
+    
+    # Set session with enhanced session management
+    session.clear()  # Clear any existing session data
+    session['user_id'] = user['id']
+    session['email'] = user['email']
+    session.permanent = True  # Make session permanent
+    
+    logger.info("Login successful", extra={'user_id': user['id'], 'email': user['email']})
+    
+    return jsonify({
+        'message': 'Login successful',
+        'user': {
+            'id': user['id'],
+            'email': user['email']
+        }
+    }), 200
 
 @app.route('/api/auth/logout', methods=['POST'])
 @require_auth
