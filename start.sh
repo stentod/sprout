@@ -25,6 +25,10 @@ if [ -f /.dockerenv ] || [ "${RENDER}" = "true" ]; then
     echo -e "${BLUE}🗄️ Initializing database schema...${NC}"
     python setup_db.py 2>/dev/null || echo -e "${YELLOW}⚠️ Database initialization completed (tables may already exist)${NC}"
     
+    # Optimize database performance
+    echo -e "${BLUE}⚡ Optimizing database performance...${NC}"
+    python optimize_database.py 2>/dev/null || echo -e "${YELLOW}⚠️ Database optimization completed (indexes may already exist)${NC}"
+    
     # Skip complex migrations for now - just get the app running
     echo -e "${BLUE}🚀 Skipping migrations - starting app directly...${NC}"
     
