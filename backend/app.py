@@ -1,12 +1,10 @@
 from flask import Flask, request, jsonify, send_from_directory, session
-from flask_compress import Compress
 from flask_cors import CORS
 from flask_mail import Mail, Message
 import sendgrid
 from sendgrid.helpers.mail import Mail as SendGridMail
 import psycopg2
 import psycopg2.extras
-from psycopg2 import pool
 import os
 import bcrypt
 import secrets
@@ -119,59 +117,6 @@ def clear_cache():
     _cache.clear()
     _cache_timestamps.clear()
 
-# ==========================================
-# DATABASE CONNECTION POOLING
-# ==========================================
-
-# Global connection pool
-_connection_pool = None
-
-def init_connection_pool():
-    """Initialize the database connection pool"""
-    global _connection_pool
-    try:
-        DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://dstent@localhost/sprout_budget")
-        
-        # Create connection pool with reasonable defaults
-        _connection_pool = pool.SimpleConnectionPool(
-            minconn=1,      # Minimum connections
-            maxconn=10,     # Maximum connections
-            dsn=DATABASE_URL
-        )
-        logger.info("Database connection pool initialized successfully")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to initialize connection pool: {e}")
-        return False
-
-def get_pooled_connection():
-    """Get a connection from the pool"""
-    global _connection_pool
-    if _connection_pool is None:
-        # Fallback to direct connection if pool not initialized
-        return get_db_connection()
-    
-    try:
-        return _connection_pool.getconn()
-    except Exception as e:
-        logger.error(f"Failed to get connection from pool: {e}")
-        # Fallback to direct connection
-        return get_db_connection()
-
-def return_pooled_connection(conn):
-    """Return a connection to the pool"""
-    global _connection_pool
-    if _connection_pool is not None and conn is not None:
-        try:
-            _connection_pool.putconn(conn)
-        except Exception as e:
-            logger.error(f"Failed to return connection to pool: {e}")
-            # Close connection if we can't return it to pool
-            try:
-                conn.close()
-            except:
-                pass
-
 def log_with_context(level, message, **context):
     """Helper function for structured logging with context"""
     extra_data = {
@@ -206,13 +151,6 @@ app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Sessions last 7 days
-
-# ==========================================
-# RESPONSE COMPRESSION
-# ==========================================
-
-# Initialize compression for better performance
-Compress(app)
 
 # Set session cookie domain for custom domains (commented out for now)
 # if os.environ.get('FLASK_ENV') == 'production':
@@ -335,7 +273,7 @@ def get_db_connection():
 
 def run_query(sql, params=None, fetch_one=False, fetch_all=True):
     """
-    Helper function to run database queries with proper connection handling and pooling
+    Helper function to run database queries with proper connection handling
     
     Args:
         sql (str): SQL query string
@@ -348,8 +286,7 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
     """
     conn = None
     try:
-        # Use connection pool if available, fallback to direct connection
-        conn = get_pooled_connection()
+        conn = get_db_connection()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(sql, params or ())
             
@@ -395,8 +332,7 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
         raise e
     finally:
         if conn:
-            # Return connection to pool instead of closing
-            return_pooled_connection(conn)
+            conn.close()
 
 # Authentication Helper Functions
 def hash_password(password):
@@ -1667,141 +1603,48 @@ def get_summary():
 @app.route('/api/history', methods=['GET'])
 @require_auth
 def get_history():
-    """Get expense history with pagination and optimized queries - PHASE 3"""
     try:
-        # Get parameters with pagination support
+        # Get all expenses from the last 7 days (including today)
         day_offset = int(request.args.get('dayOffset', 0))
         period = int(request.args.get('period', 7))  # Default to 7 days
         category_id = request.args.get('category_id')  # Optional category filter
-        page = int(request.args.get('page', 1))  # Page number (1-based)
-        per_page = int(request.args.get('per_page', 50))  # Items per page (max 100)
-        
-        # Limit per_page to prevent abuse
-        per_page = min(per_page, 100)
-        per_page = max(per_page, 1)
         
         user_id = get_current_user_id()
         start_date, _ = get_day_bounds(day_offset - (period - 1))
         _, end_date = get_day_bounds(day_offset)
         
         try:
-            # OPTIMIZED: Use pagination and more efficient query
-            offset = (page - 1) * per_page
-            
-            if category_id:
-                # Filtered query with pagination
-                history_sql = '''
-                    SELECT e.amount, e.description, e.timestamp, e.category_id,
-                           COALESCE(dc.name, cc.name) as category_name,
-                           COALESCE(dc.icon, cc.icon) as category_icon,
-                           COALESCE(dc.color, cc.color) as category_color,
-                           COUNT(*) OVER() as total_count
-                    FROM expenses e
-                    LEFT JOIN default_categories dc ON e.category_id = CONCAT('default_', dc.id::text)
-                    LEFT JOIN custom_categories cc ON e.category_id = CONCAT('custom_', cc.id::text) AND cc.user_id = e.user_id
-                    WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s AND e.category_id = %s
-                    ORDER BY e.timestamp DESC
-                    LIMIT %s OFFSET %s
-                '''
-                params = (user_id, start_date.isoformat(), end_date.isoformat(), category_id, per_page, offset)
-            else:
-                # Unfiltered query with pagination
-                history_sql = '''
-                    SELECT e.amount, e.description, e.timestamp, e.category_id,
-                           COALESCE(dc.name, cc.name) as category_name,
-                           COALESCE(dc.icon, cc.icon) as category_icon,
-                           COALESCE(dc.color, cc.color) as category_color,
-                           COUNT(*) OVER() as total_count
-                    FROM expenses e
-                    LEFT JOIN default_categories dc ON e.category_id = CONCAT('default_', dc.id::text)
-                    LEFT JOIN custom_categories cc ON e.category_id = CONCAT('custom_', cc.id::text) AND cc.user_id = e.user_id
-                    WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
-                    ORDER BY e.timestamp DESC
-                    LIMIT %s OFFSET %s
-                '''
-                params = (user_id, start_date.isoformat(), end_date.isoformat(), per_page, offset)
-            
-            expenses_raw = run_query(history_sql, params, fetch_all=True)
-            
-            if not expenses_raw:
-                return jsonify({
-                    'data': [],
-                    'pagination': {
-                        'page': page,
-                        'per_page': per_page,
-                        'total_count': 0,
-                        'total_pages': 0,
-                        'has_next': False,
-                        'has_prev': False
-                    }
-                })
-            
-            # Get total count from first row
-            total_count = expenses_raw[0]['total_count'] if expenses_raw else 0
-            total_pages = (total_count + per_page - 1) // per_page
-            
-            # Process expenses
-            expenses = []
-            for e in expenses_raw:
-                expense_data = {
-                    'amount': float(e['amount']),
-                    'description': e['description'],
-                    'timestamp': e['timestamp'].isoformat() if hasattr(e['timestamp'], 'isoformat') else str(e['timestamp'])
-                }
-                
-                # Add category information if present
-                if e['category_id'] and e['category_name']:
-                    expense_data['category'] = {
-                        'id': e['category_id'],
-                        'name': e['category_name'],
-                        'icon': e['category_icon'],
-                        'color': e['category_color']
-                    }
-                else:
-                    expense_data['category'] = None
-                    
-                expenses.append(expense_data)
-            
-            # Group by date (YYYY-MM-DD)
-            grouped = {}
-            for e in expenses:
-                date = e['timestamp'][:10]  # 'YYYY-MM-DD'
-                if date not in grouped:
-                    grouped[date] = []
-                grouped[date].append(e)
-            
-            # Sort by date descending
-            grouped_sorted = [
-                {'date': date, 'expenses': grouped[date]}
-                for date in sorted(grouped.keys(), reverse=True)
-            ]
-            
-            return jsonify({
-                'data': grouped_sorted,
-                'pagination': {
-                    'page': page,
-                    'per_page': per_page,
-                    'total_count': total_count,
-                    'total_pages': total_pages,
-                    'has_next': page < total_pages,
-                    'has_prev': page > 1
-                }
-            })
-            
+            expenses = get_expenses_between(start_date, end_date, user_id, category_id)
         except Exception as e:
-            print(f"Error getting paginated expenses: {e}")
-            # Return empty history with pagination info instead of crashing
-            return jsonify({
-                'data': [],
-                'pagination': {
-                    'page': page,
-                    'per_page': per_page,
-                    'total_count': 0,
-                    'total_pages': 0,
-                    'has_next': False,
-                    'has_prev': False
-                }
-            })
+            print(f"Error getting expenses: {e}")
+            # Return empty history instead of crashing
+            return jsonify([])
+        
+        # Group by date (YYYY-MM-DD)
+        grouped = {}
+        for e in expenses:
+            date = e['timestamp'][:10]  # 'YYYY-MM-DD' (timestamp is already a string from helper)
+            if date not in grouped:
+                grouped[date] = []
+            expense_data = {
+                'amount': e['amount'],  # Already converted to float in helper
+                'description': e['description'],
+                'timestamp': e['timestamp']  # Already converted to string in helper
+            }
+            
+            # Add category information if present
+            if e.get('category'):
+                expense_data['category'] = e['category']
+            else:
+                expense_data['category'] = None
+                
+            grouped[date].append(expense_data)
+        # Sort by date descending
+        grouped_sorted = [
+            {'date': date, 'expenses': grouped[date]}
+            for date in sorted(grouped.keys(), reverse=True)
+        ]
+        return jsonify(grouped_sorted)
         
     except Exception as e:
         print(f"History endpoint error: {e}")
@@ -2590,13 +2433,6 @@ def serve_static(filename):
     return response
 
 if __name__ == '__main__':
-    # Initialize connection pool before starting the server
-    print("🌱 Initializing database connection pool...")
-    if init_connection_pool():
-        print("✅ Connection pool initialized successfully")
-    else:
-        print("⚠️  Connection pool initialization failed, using direct connections")
-    
     # Only run the development server if this file is run directly
     # In production, gunicorn will import and run the app
     app.run(debug=DEBUG, port=PORT, host='0.0.0.0') 
