@@ -220,6 +220,8 @@ def add_security_headers_passive(response):
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     return response
 
+
+
 # Configuration from environment variables
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://dstent@localhost/sprout_budget")
 BUDGET = float(os.environ.get("DAILY_BUDGET", "30.0"))  # Daily budget amount
@@ -801,70 +803,56 @@ def get_expenses():
 @app.route('/api/categories', methods=['GET'])
 @require_auth
 def get_categories():
-    """Get all categories for the current user (default + custom)"""
+    """Get all categories for the current user (default + custom) - OPTIMIZED VERSION"""
     try:
         user_id = get_current_user_id()
         
         try:
-            # Get default categories (shared by all users)
-            default_sql = '''
-                SELECT id, name, icon, color, created_at
-                FROM default_categories 
+            # OPTIMIZED: Single query with UNION to get all categories and budgets
+            optimized_sql = '''
+                SELECT 
+                    'default_' || dc.id as id,
+                    dc.name,
+                    dc.icon,
+                    dc.color,
+                    dc.created_at,
+                    COALESCE(ucb.daily_budget, 0.0) as daily_budget,
+                    true as is_default,
+                    false as is_custom
+                FROM default_categories dc
+                LEFT JOIN user_category_budgets ucb ON ucb.category_id = dc.id AND ucb.category_type = 'default' AND ucb.user_id = %s
+                
+                UNION ALL
+                
+                SELECT 
+                    'custom_' || cc.id as id,
+                    cc.name,
+                    cc.icon,
+                    cc.color,
+                    cc.created_at,
+                    COALESCE(ucb.daily_budget, cc.daily_budget) as daily_budget,
+                    false as is_default,
+                    true as is_custom
+                FROM custom_categories cc
+                LEFT JOIN user_category_budgets ucb ON ucb.category_id = cc.id AND ucb.category_type = 'custom' AND ucb.user_id = %s
+                WHERE cc.user_id = %s
+                
                 ORDER BY name ASC
             '''
-            default_categories = run_query(default_sql, fetch_all=True)
             
-            # Get custom categories for this user
-            custom_sql = '''
-                SELECT id, name, icon, color, daily_budget, created_at
-                FROM custom_categories 
-                WHERE user_id = %s
-                ORDER BY name ASC
-            '''
-            custom_categories = run_query(custom_sql, (user_id,), fetch_all=True)
+            categories_raw = run_query(optimized_sql, (user_id, user_id, user_id), fetch_all=True)
             
-            # Get user's budget settings for all categories
-            budget_sql = '''
-                SELECT category_id, category_type, daily_budget
-                FROM user_category_budgets 
-                WHERE user_id = %s
-            '''
-            user_budgets = run_query(budget_sql, (user_id,), fetch_all=True)
-            
-            # Create a lookup for user budgets
-            budget_lookup = {}
-            for budget in user_budgets:
-                key = f"{budget['category_type']}_{budget['category_id']}"
-                budget_lookup[key] = float(budget['daily_budget'])
-            
-            # Combine and format categories
+            # Format the results
             categories = []
-            
-            # Add default categories
-            for cat in default_categories:
-                budget_key = f"default_{cat['id']}"
+            for cat in categories_raw:
                 categories.append({
-                    'id': f"default_{cat['id']}",  # Prefix to distinguish from custom
+                    'id': cat['id'],
                     'name': cat['name'],
                     'icon': cat['icon'],
                     'color': cat['color'],
-                    'daily_budget': budget_lookup.get(budget_key, 0.0),
-                    'is_default': True,
-                    'is_custom': False,
-                    'created_at': cat['created_at'].isoformat() if hasattr(cat['created_at'], 'isoformat') else str(cat['created_at'])
-                })
-            
-            # Add custom categories
-            for cat in custom_categories:
-                budget_key = f"custom_{cat['id']}"
-                categories.append({
-                    'id': f"custom_{cat['id']}",  # Prefix to distinguish from default
-                    'name': cat['name'],
-                    'icon': cat['icon'],
-                    'color': cat['color'],
-                    'daily_budget': budget_lookup.get(budget_key, float(cat['daily_budget'])),
-                    'is_default': False,
-                    'is_custom': True,
+                    'daily_budget': float(cat['daily_budget']),
+                    'is_default': cat['is_default'],
+                    'is_custom': cat['is_custom'],
                     'created_at': cat['created_at'].isoformat() if hasattr(cat['created_at'], 'isoformat') else str(cat['created_at'])
                 })
             
