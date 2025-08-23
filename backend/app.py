@@ -13,8 +13,9 @@ import logging
 import logging.handlers
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
-from functools import wraps
+from functools import wraps, lru_cache
 import re
+import time
 
 # Load environment variables (for local development)
 load_dotenv()
@@ -85,6 +86,36 @@ def setup_logging():
 
 # Initialize logging
 logger = setup_logging()
+
+# ==========================================
+# CACHING CONFIGURATION
+# ==========================================
+
+# Simple in-memory cache for frequently accessed data
+_cache = {}
+_cache_timestamps = {}
+
+def get_cached_data(key, max_age_seconds=300):  # 5 minutes default
+    """Get data from cache if it's still valid"""
+    if key in _cache and key in _cache_timestamps:
+        age = time.time() - _cache_timestamps[key]
+        if age < max_age_seconds:
+            return _cache[key]
+        else:
+            # Cache expired, remove it
+            del _cache[key]
+            del _cache_timestamps[key]
+    return None
+
+def set_cached_data(key, data, max_age_seconds=300):
+    """Store data in cache with timestamp"""
+    _cache[key] = data
+    _cache_timestamps[key] = time.time()
+
+def clear_cache():
+    """Clear all cached data"""
+    _cache.clear()
+    _cache_timestamps.clear()
 
 def log_with_context(level, message, **context):
     """Helper function for structured logging with context"""
@@ -1474,19 +1505,45 @@ def get_summary():
             print(f"Error getting user daily limit: {e}, using default")
             user_daily_limit = 30.0
         
-        # Calculate daily surplus for the last 7 days
-        deltas = []
-        for i in range(7):
-            offset = day_offset - i
-            day_start, day_end = get_day_bounds(offset)
-            try:
-                expenses = get_expenses_between(day_start, day_end, user_id)
-                total_spent = sum(e['amount'] for e in expenses)
-                daily_surplus = user_daily_limit - total_spent
+        # OPTIMIZED: Get 7-day spending data in a single query
+        start_date, _ = get_day_bounds(day_offset - 6)  # 7 days ago
+        _, end_date = get_day_bounds(day_offset + 1)    # Tomorrow
+        
+        try:
+            # Single query to get daily spending for the last 7 days
+            summary_sql = '''
+                SELECT 
+                    DATE(timestamp) as date,
+                    SUM(amount) as daily_total
+                FROM expenses 
+                WHERE user_id = %s 
+                AND timestamp >= %s 
+                AND timestamp < %s
+                GROUP BY DATE(timestamp)
+                ORDER BY date DESC
+            '''
+            
+            daily_spending = run_query(summary_sql, (user_id, start_date.isoformat(), end_date.isoformat()), fetch_all=True)
+            
+            # Create a lookup for daily spending
+            spending_lookup = {}
+            for day in daily_spending:
+                spending_lookup[day['date'].strftime('%Y-%m-%d')] = float(day['daily_total'])
+            
+            # Calculate daily surplus for the last 7 days
+            deltas = []
+            for i in range(7):
+                offset = day_offset - i
+                day_start, day_end = get_day_bounds(offset)
+                date_key = day_start.strftime('%Y-%m-%d')
+                daily_spent = spending_lookup.get(date_key, 0.0)
+                daily_surplus = user_daily_limit - daily_spent
                 deltas.append(daily_surplus)
-            except Exception as e:
-                print(f"Error calculating day {i}: {e}, using default")
-                deltas.append(user_daily_limit)  # Assume no spending
+                
+        except Exception as e:
+            print(f"Error getting 7-day spending data: {e}, using defaults")
+            # Fallback to default values
+            deltas = [user_daily_limit] * 7
         
         # Today's balance and averages
         today_balance = deltas[0] if deltas else user_daily_limit
@@ -1596,14 +1653,21 @@ def get_history():
         # Return empty history instead of crashing
         return jsonify([])
 
-# Helper function to get user's daily spending limit
+# Helper function to get user's daily spending limit (OPTIMIZED with caching)
 def get_user_daily_limit(user_id=0):
-    """Get the user's daily spending limit from preferences"""
+    """Get the user's daily spending limit from preferences with caching"""
+    cache_key = f"daily_limit_{user_id}"
+    
+    # Check cache first
+    cached_value = get_cached_data(cache_key, max_age_seconds=600)  # 10 minutes
+    if cached_value is not None:
+        return cached_value
+    
     try:
         sql = 'SELECT daily_spending_limit FROM user_preferences WHERE user_id = %s'
         result = run_query(sql, (user_id,), fetch_one=True)
         if result:
-            return float(result['daily_spending_limit'])
+            daily_limit = float(result['daily_spending_limit'])
         else:
             # If no preference found, create default and return it
             sql = '''
@@ -1612,7 +1676,12 @@ def get_user_daily_limit(user_id=0):
                 RETURNING daily_spending_limit
             '''
             result = run_query(sql, (user_id, 30.0), fetch_one=True)
-            return float(result['daily_spending_limit']) if result else 30.0
+            daily_limit = float(result['daily_spending_limit']) if result else 30.0
+        
+        # Cache the result
+        set_cached_data(cache_key, daily_limit, max_age_seconds=600)
+        return daily_limit
+        
     except Exception as e:
         print(f"Error getting user daily limit: {e}")
         return 30.0  # Fallback to default
@@ -1675,6 +1744,13 @@ def set_daily_limit():
         result = run_query(sql, (user_id, daily_limit), fetch_one=True)
         
         if result:
+            # Clear cache for this user's daily limit
+            cache_key = f"daily_limit_{user_id}"
+            if cache_key in _cache:
+                del _cache[cache_key]
+            if cache_key in _cache_timestamps:
+                del _cache_timestamps[cache_key]
+            
             return jsonify({
                 'daily_limit': float(result['daily_spending_limit']),
                 'success': True,
