@@ -489,7 +489,7 @@ def send_password_reset_email_sendgrid(user_email, username, reset_token):
         # Get SendGrid API key from environment
         sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
         if not sendgrid_api_key:
-            print("SendGrid API key not configured, falling back to Gmail")
+            logger.info("SendGrid API key not configured, falling back to Gmail")
             return send_password_reset_email_gmail(user_email, username, reset_token)
         
         # Create the reset URL (dynamic for production)
@@ -545,12 +545,9 @@ def send_password_reset_email_sendgrid(user_email, username, reset_token):
         
         # Send email
         response = sg.send(message)
-        print(f"✅ SendGrid: Password reset email sent to {user_email}")
         return True
         
     except Exception as e:
-        print(f"❌ SendGrid failed: {e}")
-        print("🔄 Falling back to Gmail...")
         return send_password_reset_email_gmail(user_email, username, reset_token)
 
 def send_password_reset_email_gmail(user_email, username, reset_token):
@@ -583,26 +580,16 @@ This is an automated message. Please do not reply to this email."""
         )
         
         mail.send(msg)
-        print(f"📧 Gmail: Password reset email sent to {user_email}")
         return True
     except Exception as e:
-        print(f"❌ Gmail failed: {e}")
         return False
 
 def send_password_reset_email(user_email, username, reset_token):
     """Send password reset email (tries SendGrid first, falls back to Gmail)"""
-    print(f"📧 Starting email send process for {user_email}")
-    print(f"🔧 Using username: {username}")
-    print(f"🔑 Token: {reset_token[:10]}...")
-    
     # Check environment variables
     sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
     mail_username = os.environ.get('MAIL_USERNAME')
     mail_password = os.environ.get('MAIL_PASSWORD')
-    
-    print(f"🔍 SendGrid API key: {'SET' if sendgrid_api_key else 'NOT SET'}")
-    print(f"🔍 Gmail username: {'SET' if mail_username else 'NOT SET'}")
-    print(f"🔍 Gmail password: {'SET' if mail_password else 'NOT SET'}")
     
     return send_password_reset_email_sendgrid(user_email, username, reset_token)
 
@@ -629,10 +616,7 @@ def create_default_categories(user_id):
     )
     
     if existing_count and existing_count['count'] > 0:
-        print(f"User {user_id} already has {existing_count['count']} categories, skipping default creation")
         return
-    
-    print(f"Creating default categories for new user {user_id}")
     default_categories = [
         ('Food & Dining', '🍽️', '#FF6B6B'),
         ('Transportation', '🚗', '#4ECDC4'),
@@ -658,7 +642,7 @@ def create_default_categories(user_id):
             '''
             run_query(sql, (user_id, name, icon, color), fetch_all=False)
         else:
-            print(f"Category '{name}' already exists for user {user_id}, skipping")
+            pass
     
     # Create default user preferences (use ON CONFLICT to handle duplicates)
     sql = '''
@@ -890,7 +874,7 @@ def get_categories():
             return jsonify(categories)
             
         except Exception as db_error:
-            print(f"Database error getting categories: {db_error}")
+            logger.error(f"Database error getting categories: {db_error}")
             # Return basic default categories if database fails
             return jsonify([
                 {
@@ -959,7 +943,7 @@ def get_categories():
             ])
             
     except Exception as e:
-        print(f"Error in get_categories: {e}")
+        logger.error(f"Error in get_categories: {e}")
         return jsonify({'error': 'Failed to load categories'}), 500
 
 @app.route('/api/categories', methods=['POST'])
@@ -1027,7 +1011,7 @@ def create_category():
             return jsonify({'error': 'Failed to create category'}), 500
             
     except Exception as e:
-        print(f"Error creating category: {e}")
+        logger.error(f"Error creating category: {e}")
         return jsonify({'error': 'Failed to create category'}), 500
 
 @app.route('/api/categories/<int:category_id>/budget', methods=['PUT', 'POST'])
@@ -1207,7 +1191,6 @@ def get_category_budget_tracking():
         user_id = get_current_user_id()
         
         try:
-            print(f"🔍 Budget tracking for user_id: {user_id}")
             # Get all categories with their budgets for the current user (new normalized structure)
             categories_sql = '''
                 SELECT 
@@ -1238,11 +1221,9 @@ def get_category_budget_tracking():
                 ORDER BY name ASC
             '''
             categories = run_query(categories_sql, (user_id, user_id, user_id), fetch_all=True)
-            print(f"📊 Found {len(categories)} categories for user {user_id}")
             budgeted_count = sum(1 for cat in categories if cat['daily_budget'] > 0)
-            print(f"💰 {budgeted_count} categories have budgets")
         except Exception as db_error:
-            print(f"Database error getting categories for budget tracking: {db_error}")
+            logger.error(f"Database error getting categories for budget tracking: {db_error}")
             # Return empty budget tracking if database fails
             return jsonify({
                 'budgeted_categories': [],
@@ -1281,17 +1262,15 @@ def get_category_budget_tracking():
             '''
             spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()), fetch_all=True)
         except Exception as db_error:
-            print(f"Database error getting spending data: {db_error}")
+            logger.error(f"Database error getting spending data: {db_error}")
             spending_data = []
         
-        # Create spending lookup with debugging
+        # Create spending lookup
         spending_by_category = {}
-        print(f"💸 Found {len(spending_data)} spending records")
         for row in spending_data:
             category_id = row['category_id']
             spent = float(row['total_spent'])
             spending_by_category[category_id] = spent
-            print(f"   💸 Spending: {category_id} = ${spent}")
         
         # Separate budgeted and unbedgeted categories
         budgeted_categories = []
@@ -1317,8 +1296,6 @@ def get_category_budget_tracking():
                 remaining = budget - spent
                 total_budget += budget
                 total_spent_budgeted += spent
-                print(f"   💰 {cat['name']} ({cat['id']}): ${budget} budget, ${spent} spent, ${remaining} remaining")
-                print(f"      🔍 Debug: budget={budget} (type: {type(budget)}), spent={spent} (type: {type(spent)}), remaining={remaining}")
                 
                 category_data.update({
                     'daily_budget': budget,
@@ -1349,9 +1326,7 @@ def get_category_budget_tracking():
         })
         
     except Exception as e:
-        print(f"Category budget tracking endpoint error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Category budget tracking endpoint error: {e}")
         return jsonify({
             'budgeted_categories': [],
             'unbedgeted_categories': [],
@@ -1502,7 +1477,7 @@ def get_summary():
         try:
             user_daily_limit = get_user_daily_limit(user_id)
         except Exception as e:
-            print(f"Error getting user daily limit: {e}, using default")
+            logger.error(f"Error getting user daily limit: {e}, using default")
             user_daily_limit = 30.0
         
         # OPTIMIZED: Get 7-day spending data in a single query
@@ -1541,7 +1516,7 @@ def get_summary():
                 deltas.append(daily_surplus)
                 
         except Exception as e:
-            print(f"Error getting 7-day spending data: {e}, using defaults")
+            logger.error(f"Error getting 7-day spending data: {e}, using defaults")
             # Fallback to default values
             deltas = [user_daily_limit] * 7
         
@@ -1551,32 +1526,23 @@ def get_summary():
         projection_30 = avg_daily_surplus * 30  # 30-day projection based on average daily surplus
         
         # Plant state logic - prioritize today's spending over 7-day average
-        print(f"DEBUG: today_balance={today_balance}, avg_daily_surplus={avg_daily_surplus}")
-        
         if today_balance < 0:
             # Today's spending exceeded the daily limit
             if today_balance >= -5:
                 plant = 'wilting'
                 plant_emoji = '🥀'
-                print(f"DEBUG: Plant set to wilting (today_balance={today_balance})")
             else:
                 plant = 'dead'
                 plant_emoji = '☠️'
-                print(f"DEBUG: Plant set to dead (today_balance={today_balance})")
         elif today_balance >= 10 and avg_daily_surplus >= 2:
             plant = 'thriving'
             plant_emoji = '🌳'
-            print(f"DEBUG: Plant set to thriving")
         elif today_balance >= 0 and avg_daily_surplus >= -2:
             plant = 'healthy'
             plant_emoji = '🌱'
-            print(f"DEBUG: Plant set to healthy")
         else:
             plant = 'struggling'
             plant_emoji = '🌿'
-            print(f"DEBUG: Plant set to struggling")
-        
-        print(f"DEBUG: Final plant state={plant}, emoji={plant_emoji}")
         
         return jsonify({
             'balance': round(today_balance, 2),
@@ -1587,9 +1553,7 @@ def get_summary():
         })
         
     except Exception as e:
-        print(f"Summary endpoint error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Summary endpoint error: {e}")
         
         # Return a safe fallback response instead of crashing
         return jsonify({
@@ -1616,7 +1580,7 @@ def get_history():
         try:
             expenses = get_expenses_between(start_date, end_date, user_id, category_id)
         except Exception as e:
-            print(f"Error getting expenses: {e}")
+            logger.error(f"Error getting expenses: {e}")
             # Return empty history instead of crashing
             return jsonify([])
         
@@ -1647,9 +1611,7 @@ def get_history():
         return jsonify(grouped_sorted)
         
     except Exception as e:
-        print(f"History endpoint error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"History endpoint error: {e}")
         # Return empty history instead of crashing
         return jsonify([])
 
@@ -1683,7 +1645,7 @@ def get_user_daily_limit(user_id=0):
         return daily_limit
         
     except Exception as e:
-        print(f"Error getting user daily limit: {e}")
+        logger.error(f"Error getting user daily limit: {e}")
         return 30.0  # Fallback to default
 
 @app.route('/api/preferences/daily-limit', methods=['GET'])
@@ -2008,7 +1970,7 @@ def get_current_user():
         }), 200
         
     except Exception as e:
-        print(f"Get current user error: {e}")
+        logger.error(f"Get current user error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 # @app.route('/api/auth/debug-session', methods=['GET'])
@@ -2038,21 +2000,14 @@ def get_current_user():
 def forgot_password():
     """Initiate password reset process"""
     try:
-        print("🔍 Forgot password request received")
         data = request.get_json()
         email = data.get('email', '').strip().lower()
         
-        print(f"📧 Email provided: {email}")
-        
         if not email:
-            print("❌ No email provided")
             return jsonify({'error': 'Email address is required'}), 400
         
         if not validate_email(email):
-            print("❌ Invalid email format")
             return jsonify({'error': 'Please enter a valid email address'}), 400
-        
-        print("✅ Email validation passed")
         
         # Check if user exists
         user = run_query(
@@ -2062,13 +2017,9 @@ def forgot_password():
         )
         
         if user:
-            print(f"✅ User found: ID {user['id']}, Email {user['email']}")
-            
             # Generate reset token
             reset_token = generate_reset_token()
             expires_at = datetime.now(timezone.utc) + timedelta(hours=1)  # Token expires in 1 hour
-            
-            print(f"🔑 Generated reset token: {reset_token[:10]}...")
             
             # Store token in database
             sql = '''
@@ -2076,18 +2027,9 @@ def forgot_password():
                 VALUES (%s, %s, %s)
             '''
             run_query(sql, (user['id'], reset_token, expires_at), fetch_all=False)
-            print("💾 Token stored in database")
             
             # Send email (use email as display name since no username)
-            print("📧 Attempting to send password reset email...")
             email_sent = send_password_reset_email(user['email'], user['email'], reset_token)
-            
-            if email_sent:
-                print(f"✅ Password reset email sent successfully to {user['email']}")
-            else:
-                print(f"❌ Failed to send password reset email to {user['email']}")
-        else:
-            print(f"⚠️ No user found with email: {email}")
         
         # Always return the same message for security
         return jsonify({
@@ -2095,9 +2037,6 @@ def forgot_password():
         }), 200
         
     except Exception as e:
-        print(f"❌ Forgot password error: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/auth/reset-password', methods=['POST'])
@@ -2145,12 +2084,9 @@ def reset_password():
             fetch_all=False
         )
         
-        print(f"Password reset completed for user {token_data['user_id']} ({token_data['email']})")
-        
         return jsonify({'message': 'Password reset successful! You can now log in with your new password.'}), 200
         
     except Exception as e:
-        print(f"Reset password error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 # Get the frontend directory path relative to this file
@@ -2188,165 +2124,9 @@ def serve_history():
 def serve_settings():
     return send_from_directory(FRONTEND_DIR, 'settings.html')
 
-@app.route('/debug-api.html')
-def serve_debug_api():
-    return send_from_directory(FRONTEND_DIR, 'debug-api.html')
 
-@app.route('/api/debug/email-config')
-def debug_email_config():
-    """Debug endpoint to check email configuration"""
-    try:
-        # Check Gmail configuration
-        mail_server = os.environ.get('MAIL_SERVER')
-        mail_port = os.environ.get('MAIL_PORT')
-        mail_username = os.environ.get('MAIL_USERNAME')
-        mail_password = os.environ.get('MAIL_PASSWORD')
-        mail_default_sender = os.environ.get('MAIL_DEFAULT_SENDER')
-        
-        # Check SendGrid configuration
-        sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
-        from_email = os.environ.get('FROM_EMAIL')
-        
-        # Check app configuration
-        base_url = os.environ.get('BASE_URL')
-        flask_env = os.environ.get('FLASK_ENV')
-        
-        config = {
-            'gmail': {
-                'server': mail_server,
-                'port': mail_port,
-                'username': mail_username,
-                'password_set': bool(mail_password),
-                'default_sender': mail_default_sender,
-                'configured': all([mail_server, mail_username, mail_password])
-            },
-            'sendgrid': {
-                'api_key_set': bool(sendgrid_api_key),
-                'from_email': from_email,
-                'configured': bool(sendgrid_api_key)
-            },
-            'app': {
-                'base_url': base_url,
-                'flask_env': flask_env
-            },
-            'summary': {
-                'gmail_configured': all([mail_server, mail_username, mail_password]),
-                'sendgrid_configured': bool(sendgrid_api_key),
-                'email_should_work': all([mail_server, mail_username, mail_password]) or bool(sendgrid_api_key)
-            }
-        }
-        
-        return jsonify(config)
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
-@app.route('/api/debug/budget-tracking')
-@require_auth
-def debug_budget_tracking():
-    """Debug endpoint to show budget tracking data in a readable format"""
-    try:
-        user_id = get_current_user_id()
-        day_offset = int(request.args.get('dayOffset', 0))
-        today_start, today_end = get_day_bounds(day_offset)
-        
-        # Get categories with budgets
-        categories_sql = '''
-            SELECT 
-                'default_' || dc.id as id,
-                dc.name,
-                dc.icon,
-                dc.color,
-                COALESCE(ucb.daily_budget, 0.0) as daily_budget
-            FROM default_categories dc
-            LEFT JOIN user_category_budgets ucb ON ucb.category_id = dc.id 
-                AND ucb.category_type = 'default' 
-                AND ucb.user_id = %s
-            
-            UNION ALL
-            
-            SELECT 
-                'custom_' || cc.id as id,
-                cc.name,
-                cc.icon,
-                cc.color,
-                COALESCE(ucb.daily_budget, cc.daily_budget, 0.0) as daily_budget
-            FROM custom_categories cc
-            LEFT JOIN user_category_budgets ucb ON ucb.category_id = cc.id 
-                AND ucb.category_type = 'custom' 
-                AND ucb.user_id = %s
-            WHERE cc.user_id = %s
-            
-            ORDER BY name ASC
-        '''
-        categories = run_query(categories_sql, (user_id, user_id, user_id), fetch_all=True)
-        
-        # Get spending data
-        spending_sql = '''
-            SELECT 
-                CASE 
-                    WHEN e.category_id LIKE 'default_%%' THEN e.category_id
-                    WHEN e.category_id LIKE 'custom_%%' THEN e.category_id
-                    ELSE CONCAT('default_', e.category_id)
-                END as category_id,
-                SUM(e.amount) as total_spent
-            FROM expenses e
-            WHERE e.user_id = %s AND e.timestamp >= %s AND e.timestamp < %s
-            GROUP BY 
-                CASE 
-                    WHEN e.category_id LIKE 'default_%%' THEN e.category_id
-                    WHEN e.category_id LIKE 'custom_%%' THEN e.category_id
-                    ELSE CONCAT('default_', e.category_id)
-                END
-        '''
-        spending_data = run_query(spending_sql, (user_id, today_start.isoformat(), today_end.isoformat()), fetch_all=True)
-        
-        spending_by_category = {row['category_id']: float(row['total_spent']) for row in spending_data}
-        
-        # Build debug response
-        debug_data = {
-            'user_id': user_id,
-            'date_range': {
-                'start': today_start.isoformat(),
-                'end': today_end.isoformat()
-            },
-            'categories': [],
-            'spending_by_category': spending_by_category,
-            'summary': {
-                'total_categories': len(categories),
-                'categories_with_budgets': 0,
-                'total_budget': 0,
-                'total_spent': sum(spending_by_category.values())
-            }
-        }
-        
-        for cat in categories:
-            budget = float(cat['daily_budget']) if cat['daily_budget'] else 0.0
-            spent = spending_by_category.get(cat['id'], 0.0)
-            remaining = budget - spent if budget > 0 else 0
-            
-            category_debug = {
-                'id': cat['id'],
-                'name': cat['name'],
-                'budget': budget,
-                'spent': spent,
-                'remaining': remaining,
-                'has_budget': budget > 0
-            }
-            
-            debug_data['categories'].append(category_debug)
-            
-            if budget > 0:
-                debug_data['summary']['categories_with_budgets'] += 1
-                debug_data['summary']['total_budget'] += budget
-        
-        return jsonify(debug_data)
-        
-    except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
+
 
 @app.route('/api/categories/<int:category_id>', methods=['DELETE'])
 @require_auth
@@ -2414,7 +2194,7 @@ def delete_custom_category(category_id):
             }), 500
             
     except Exception as e:
-        print(f"Error deleting custom category: {e}")
+        logger.error(f"Error deleting custom category: {e}")
         return jsonify({
             'error': str(e),
             'success': False
