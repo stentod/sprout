@@ -721,51 +721,7 @@ def get_expenses_between(start, end, user_id, category_id=None):
 def health():
     return {'status': 'ok'}
 
-@app.route('/api/test-db')
-def test_database():
-    """Test database schema and connection"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Check if users table exists and get its schema
-        cursor.execute("""
-            SELECT column_name, data_type, is_nullable 
-            FROM information_schema.columns 
-            WHERE table_name = 'users' 
-            ORDER BY ordinal_position
-        """)
-        
-        columns = cursor.fetchall()
-        column_names = [col[0] for col in columns]
-        
-        # Check if username column exists
-        has_username = 'username' in column_names
-        
-        # Get user count
-        cursor.execute("SELECT COUNT(*) FROM users")
-        user_count = cursor.fetchone()[0]
-        
-        cursor.close()
-        conn.close()
-        
-        return jsonify({
-            'status': 'ok',
-            'database': 'connected',
-            'users_table_columns': column_names,
-            'has_username_column': has_username,
-            'user_count': user_count,
-            'needs_migration': has_username,
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        }), 200
-        
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'database': 'disconnected',
-            'error': str(e),
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        }), 500
+
 
 # Error handlers for database connection issues
 @app.errorhandler(DatabaseConnectionError)
@@ -1973,28 +1929,7 @@ def get_current_user():
         logger.error(f"Get current user error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
-# @app.route('/api/auth/debug-session', methods=['GET'])
-# def debug_session():
-#     """Debug endpoint to check session status"""
-#     try:
-#         session_data = {
-#             'has_session': 'user_id' in session,
-#             'user_id': session.get('user_id'),
-#             'email': session.get('email'),
-#             'session_keys': list(session.keys()),
-#             'request_headers': dict(request.headers),
-#             'cookies': dict(request.cookies),
-#             'flask_env': os.environ.get('FLASK_ENV'),
-#             'session_secure': app.config.get('SESSION_COOKIE_SECURE'),
-#             'session_httponly': app.config.get('SESSION_COOKIE_HTTPONLY'),
-#             'session_samesite': app.config.get('SESSION_COOKIE_SAMESITE'),
-#             'session_domain': app.config.get('SESSION_COOKIE_DOMAIN')
-#         }
-#         
-#         return jsonify(session_data), 200
-#         
-#     except Exception as e:
-#         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/auth/forgot-password', methods=['POST'])
 def forgot_password():
@@ -2112,9 +2047,7 @@ def serve_auth():
 def serve_reset_password():
     return send_from_directory(FRONTEND_DIR, 'reset-password.html')
 
-# @app.route('/debug-session.html')
-# def serve_debug_session():
-#     return send_from_directory(FRONTEND_DIR, 'debug-session.html')
+
 
 @app.route('/history.html')
 def serve_history():
