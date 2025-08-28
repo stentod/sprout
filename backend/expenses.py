@@ -1,0 +1,316 @@
+from flask import Blueprint, request, jsonify
+from datetime import datetime, timezone
+
+from utils import (
+    logger, run_query, validate_expense_data, handle_errors, 
+    get_day_bounds, get_expenses_between, get_user_daily_limit,
+    ValidationError
+)
+from auth import require_auth, get_current_user_id
+
+# Create Blueprint for expense routes
+expenses_bp = Blueprint('expenses', __name__)
+
+@expenses_bp.route('/expenses', methods=['GET'])
+@require_auth
+def get_expenses():
+    """Get expenses for a specific day"""
+    # Get dayOffset from query string (?dayOffset=N), default to 0 (today)
+    day_offset = int(request.args.get('dayOffset', 0))
+    start, end = get_day_bounds(day_offset)
+    
+    user_id = get_current_user_id()
+    sql = '''
+        SELECT id, amount, description, timestamp 
+        FROM expenses 
+        WHERE user_id = %s AND timestamp >= %s AND timestamp < %s 
+        ORDER BY timestamp DESC
+    '''
+    raw_expenses = run_query(sql, (user_id, start.isoformat(), end.isoformat()))
+    
+    # Convert data types for consistent API response
+    expenses = []
+    for e in raw_expenses:
+        expenses.append({
+            'id': e['id'],
+            'amount': float(e['amount']),
+            'description': e['description'],
+            'timestamp': e['timestamp'].isoformat() if hasattr(e['timestamp'], 'isoformat') else str(e['timestamp'])
+        })
+    
+    return jsonify(expenses)
+
+@expenses_bp.route('/expenses', methods=['POST'])
+@require_auth
+@handle_errors
+def add_expense():
+    """Add a new expense"""
+    logger.info("Add expense request received")
+    
+    if not request.is_json:
+        raise ValidationError("Request must be JSON")
+    
+    data = request.get_json()
+    validated_data = validate_expense_data(data)
+    amount = validated_data['amount']
+    description = validated_data['description']
+    category_id = data.get('category_id')  # Category validation handled separately
+    
+    user_id = get_current_user_id()
+    logger.debug("Processing expense for user", extra={'user_id': user_id})
+    
+    # Check user's category requirement preference
+    sql = 'SELECT require_categories FROM user_preferences WHERE user_id = %s'
+    result = run_query(sql, (user_id,), fetch_one=True)
+    require_categories = result['require_categories'] if result else True  # Default to True
+    logger.debug("User category preference retrieved", extra={
+        'user_id': user_id,
+        'require_categories': require_categories
+    })
+    
+    # Validate category_id based on user preference
+    if require_categories and not category_id:
+        logger.warning("Category ID missing but categories are required", extra={
+            'user_id': user_id,
+            'require_categories': require_categories
+        })
+        raise ValidationError("Category is required", field="category_id")
+    elif not require_categories and not category_id:
+        logger.info("Category ID missing but categories are optional, proceeding without category", extra={
+            'user_id': user_id
+        })
+        category_id = None
+    
+    # Initialize category_type
+    category_type = None
+    
+    # Validate category_id if provided
+    if category_id:
+        # Parse category ID (format: "default_123" or "custom_456")
+        if isinstance(category_id, str) and '_' in category_id:
+            category_type, cat_id = category_id.split('_', 1)
+            category_id = int(cat_id)
+        else:
+            # Legacy format - assume it's a custom category
+            category_id = int(category_id)
+            category_type = 'custom'
+        
+        logger.debug("Validating category", extra={
+            'user_id': user_id,
+            'category_type': category_type,
+            'category_id': category_id
+        })
+        
+        if category_type == 'default':
+            # Check if default category exists
+            check_sql = 'SELECT id FROM default_categories WHERE id = %s'
+            category_exists = run_query(check_sql, (category_id,), fetch_one=True)
+        else:
+            # Check if custom category exists and belongs to the user
+            check_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
+            category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+        
+        if not category_exists:
+            logger.warning("Invalid category provided", extra={
+                'user_id': user_id,
+                'category_type': category_type,
+                'category_id': category_id
+            })
+            raise ValidationError("Invalid category", field="category_id")
+        logger.debug("Category validated successfully", extra={
+            'user_id': user_id,
+            'category_type': category_type,
+            'category_id': category_id
+        })
+    else:
+        logger.info("No category provided, expense will be saved without category", extra={
+            'user_id': user_id
+        })
+    
+    # Use UTC timestamp to ensure consistent date handling across timezones
+    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+    logger.debug("Generated timestamp for expense", extra={
+        'user_id': user_id,
+        'timestamp': timestamp
+    })
+    
+    logger.info("Inserting expense into database", extra={
+        'user_id': user_id,
+        'amount': amount,
+        'description': description
+    })
+    
+    # Convert category_id back to the full string format for storage
+    if category_id:
+        if category_type == 'default':
+            storage_category_id = f"default_{category_id}"
+        else:
+            storage_category_id = f"custom_{category_id}"
+    else:
+        storage_category_id = None
+    
+    sql = '''
+        INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
+        VALUES (%s, %s, %s, %s, %s)
+    '''
+    result = run_query(sql, (user_id, amount, description, storage_category_id, timestamp), fetch_all=False)
+    logger.info("Expense inserted successfully", extra={
+        'user_id': user_id,
+        'expense_id': result,
+        'category_id': storage_category_id,
+        'amount': amount
+    })
+    return jsonify({'success': True}), 201
+
+@expenses_bp.route('/summary', methods=['GET'])
+@require_auth
+def get_summary():
+    """Get spending summary and plant state"""
+    try:
+        day_offset = int(request.args.get('dayOffset', 0))
+        today_start, today_end = get_day_bounds(day_offset)
+        
+        user_id = get_current_user_id()
+        
+        # Get user's daily limit with fallback
+        try:
+            user_daily_limit = get_user_daily_limit(user_id)
+        except Exception as e:
+            logger.error(f"Error getting user daily limit: {e}, using default")
+            user_daily_limit = 30.0
+        
+        # OPTIMIZED: Get 7-day spending data in a single query
+        start_date, _ = get_day_bounds(day_offset - 6)  # 7 days ago
+        _, end_date = get_day_bounds(day_offset + 1)    # Tomorrow
+        
+        try:
+            # Single query to get daily spending for the last 7 days
+            summary_sql = '''
+                SELECT 
+                    DATE(timestamp) as date,
+                    SUM(amount) as daily_total
+                FROM expenses 
+                WHERE user_id = %s 
+                AND timestamp >= %s 
+                AND timestamp < %s
+                GROUP BY DATE(timestamp)
+                ORDER BY date DESC
+            '''
+            
+            daily_spending = run_query(summary_sql, (user_id, start_date.isoformat(), end_date.isoformat()), fetch_all=True)
+            
+            # Create a lookup for daily spending
+            spending_lookup = {}
+            for day in daily_spending:
+                spending_lookup[day['date'].strftime('%Y-%m-%d')] = float(day['daily_total'])
+            
+            # Calculate daily surplus for the last 7 days
+            deltas = []
+            for i in range(7):
+                offset = day_offset - i
+                day_start, day_end = get_day_bounds(offset)
+                date_key = day_start.strftime('%Y-%m-%d')
+                daily_spent = spending_lookup.get(date_key, 0.0)
+                daily_surplus = user_daily_limit - daily_spent
+                deltas.append(daily_surplus)
+                
+        except Exception as e:
+            logger.error(f"Error getting 7-day spending data: {e}, using defaults")
+            # Fallback to default values
+            deltas = [user_daily_limit] * 7
+        
+        # Today's balance and averages
+        today_balance = deltas[0] if deltas else user_daily_limit
+        avg_daily_surplus = sum(deltas) / 7 if deltas else user_daily_limit  # Always divide by 7 days
+        projection_30 = avg_daily_surplus * 30  # 30-day projection based on average daily surplus
+        
+        # Plant state logic - prioritize today's spending over 7-day average
+        if today_balance < 0:
+            # Today's spending exceeded the daily limit
+            if today_balance >= -5:
+                plant = 'wilting'
+                plant_emoji = '🥀'
+            else:
+                plant = 'dead'
+                plant_emoji = '☠️'
+        elif today_balance >= 10 and avg_daily_surplus >= 2:
+            plant = 'thriving'
+            plant_emoji = '🌳'
+        elif today_balance >= 0 and avg_daily_surplus >= -2:
+            plant = 'healthy'
+            plant_emoji = '🌱'
+        else:
+            plant = 'struggling'
+            plant_emoji = '🌿'
+        
+        return jsonify({
+            'balance': round(today_balance, 2),
+            'avg_7day': round(avg_daily_surplus, 2),
+            'projection_30': round(projection_30, 2),
+            'plant_state': plant,
+            'plant_emoji': plant_emoji
+        })
+        
+    except Exception as e:
+        logger.error(f"Summary endpoint error: {e}")
+        
+        # Return a safe fallback response instead of crashing
+        return jsonify({
+            'balance': 30.0,
+            'avg_7day': 30.0,
+            'projection_30': 900.0,
+            'plant_state': 'healthy',
+            'plant_emoji': '🌱'
+        })
+
+@expenses_bp.route('/history', methods=['GET'])
+@require_auth
+def get_history():
+    """Get expense history grouped by date"""
+    try:
+        # Get all expenses from the last 7 days (including today)
+        day_offset = int(request.args.get('dayOffset', 0))
+        period = int(request.args.get('period', 7))  # Default to 7 days
+        category_id = request.args.get('category_id')  # Optional category filter
+        
+        user_id = get_current_user_id()
+        start_date, _ = get_day_bounds(day_offset - (period - 1))
+        _, end_date = get_day_bounds(day_offset)
+        
+        try:
+            expenses = get_expenses_between(start_date, end_date, user_id, category_id)
+        except Exception as e:
+            logger.error(f"Error getting expenses: {e}")
+            # Return empty history instead of crashing
+            return jsonify([])
+        
+        # Group by date (YYYY-MM-DD)
+        grouped = {}
+        for e in expenses:
+            date = e['timestamp'][:10]  # 'YYYY-MM-DD' (timestamp is already a string from helper)
+            if date not in grouped:
+                grouped[date] = []
+            expense_data = {
+                'amount': e['amount'],  # Already converted to float in helper
+                'description': e['description'],
+                'timestamp': e['timestamp']  # Already converted to string in helper
+            }
+            
+            # Add category information if present
+            if e.get('category'):
+                expense_data['category'] = e['category']
+            else:
+                expense_data['category'] = None
+                
+            grouped[date].append(expense_data)
+        # Sort by date descending
+        grouped_sorted = [
+            {'date': date, 'expenses': grouped[date]}
+            for date in sorted(grouped.keys(), reverse=True)
+        ]
+        return jsonify(grouped_sorted)
+        
+    except Exception as e:
+        logger.error(f"History endpoint error: {e}")
+        # Return empty history instead of crashing
+        return jsonify([])
