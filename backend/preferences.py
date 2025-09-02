@@ -172,3 +172,82 @@ def set_category_requirement():
             'error': str(e),
             'success': False
         }), 500
+
+@preferences_bp.route('/preferences/budgets', methods=['GET'])
+@require_auth
+def get_budgets():
+    """Get weekly, monthly, and yearly budgets based on daily limit with spending data"""
+    try:
+        user_id = get_current_user_id()
+        daily_limit = get_user_daily_limit(user_id)
+        
+        # Calculate budget periods
+        weekly_budget = daily_limit * 7
+        monthly_budget = daily_limit * 30  # Using 30 days for consistency
+        yearly_budget = daily_limit * 365
+        
+        # Get spending data for different periods
+        # Weekly spending (last 7 days)
+        weekly_sql = '''
+            SELECT COALESCE(SUM(amount), 0) as spent
+            FROM expenses 
+            WHERE user_id = %s 
+            AND timestamp >= CURRENT_DATE - INTERVAL '7 days'
+            AND timestamp < CURRENT_DATE + INTERVAL '1 day'
+        '''
+        weekly_result = run_query(weekly_sql, (user_id,), fetch_one=True)
+        weekly_spent = float(weekly_result['spent']) if weekly_result else 0.0
+        
+        # Monthly spending (last 30 days)
+        monthly_sql = '''
+            SELECT COALESCE(SUM(amount), 0) as spent
+            FROM expenses 
+            WHERE user_id = %s 
+            AND timestamp >= CURRENT_DATE - INTERVAL '30 days'
+            AND timestamp < CURRENT_DATE + INTERVAL '1 day'
+        '''
+        monthly_result = run_query(monthly_sql, (user_id,), fetch_one=True)
+        monthly_spent = float(monthly_result['spent']) if monthly_result else 0.0
+        
+        # Yearly spending (last 365 days)
+        yearly_sql = '''
+            SELECT COALESCE(SUM(amount), 0) as spent
+            FROM expenses 
+            WHERE user_id = %s 
+            AND timestamp >= CURRENT_DATE - INTERVAL '365 days'
+            AND timestamp < CURRENT_DATE + INTERVAL '1 day'
+        '''
+        yearly_result = run_query(yearly_sql, (user_id,), fetch_one=True)
+        yearly_spent = float(yearly_result['spent']) if yearly_result else 0.0
+        
+        return jsonify({
+            'success': True,
+            'daily_limit': daily_limit,
+            'budgets': {
+                'weekly': {
+                    'budget': weekly_budget,
+                    'spent': weekly_spent,
+                    'remaining': weekly_budget - weekly_spent,
+                    'percentage_used': (weekly_spent / weekly_budget * 100) if weekly_budget > 0 else 0
+                },
+                'monthly': {
+                    'budget': monthly_budget,
+                    'spent': monthly_spent,
+                    'remaining': monthly_budget - monthly_spent,
+                    'percentage_used': (monthly_spent / monthly_budget * 100) if monthly_budget > 0 else 0
+                },
+                'yearly': {
+                    'budget': yearly_budget,
+                    'spent': yearly_spent,
+                    'remaining': yearly_budget - yearly_spent,
+                    'percentage_used': (yearly_spent / yearly_budget * 100) if yearly_budget > 0 else 0
+                }
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting budgets: {e}")
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
