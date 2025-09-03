@@ -89,38 +89,38 @@ def add_expense():
         # Parse category ID (format: "default_123" or "custom_456")
         if isinstance(category_id, str) and '_' in category_id:
             category_type, cat_id = category_id.split('_', 1)
-            category_id = int(cat_id)
+            numeric_id = int(cat_id)
         else:
             # Legacy format - assume it's a custom category
-            category_id = int(category_id)
+            numeric_id = int(category_id)
             category_type = 'custom'
         
         logger.debug("Validating category", extra={
             'user_id': user_id,
             'category_type': category_type,
-            'category_id': category_id
+            'numeric_id': numeric_id
         })
         
         if category_type == 'default':
             # Check if default category exists
             check_sql = 'SELECT id FROM default_categories WHERE id = %s'
-            category_exists = run_query(check_sql, (category_id,), fetch_one=True)
+            category_exists = run_query(check_sql, (numeric_id,), fetch_one=True)
         else:
             # Check if custom category exists and belongs to the user
             check_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
-            category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+            category_exists = run_query(check_sql, (numeric_id, user_id), fetch_one=True)
         
         if not category_exists:
             logger.warning("Invalid category provided", extra={
                 'user_id': user_id,
                 'category_type': category_type,
-                'category_id': category_id
+                'numeric_id': numeric_id
             })
             raise ValidationError("Invalid category", field="category_id")
         logger.debug("Category validated successfully", extra={
             'user_id': user_id,
             'category_type': category_type,
-            'category_id': category_id
+            'numeric_id': numeric_id
         })
     else:
         logger.info("No category provided, expense will be saved without category", extra={
@@ -143,9 +143,9 @@ def add_expense():
     # Convert category_id back to the full string format for storage
     if category_id:
         if category_type == 'default':
-            storage_category_id = f"default_{category_id}"
+            storage_category_id = f"default_{numeric_id}"
         else:
-            storage_category_id = f"custom_{category_id}"
+            storage_category_id = f"custom_{numeric_id}"
     else:
         storage_category_id = None
     
@@ -353,31 +353,31 @@ def update_expense(expense_id):
             # Parse category ID (format: "default_123" or "custom_456")
             if isinstance(category_id, str) and '_' in category_id:
                 category_type, cat_id = category_id.split('_', 1)
-                category_id = int(cat_id)
+                numeric_id = int(cat_id)
             else:
                 # Legacy format - assume it's a custom category
-                category_id = int(category_id)
+                numeric_id = int(category_id)
                 category_type = 'custom'
             
-            logger.debug(f"Parsed category - type: {category_type}, id: {category_id}")
+            logger.debug(f"Parsed category - type: {category_type}, numeric_id: {numeric_id}")
             
             # Validate the category exists and belongs to the user
             if category_type == 'default':
                 check_sql = 'SELECT id FROM default_categories WHERE id = %s'
-                category_exists = run_query(check_sql, (category_id,), fetch_one=True)
+                category_exists = run_query(check_sql, (numeric_id,), fetch_one=True)
             else:
                 check_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
-                category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+                category_exists = run_query(check_sql, (numeric_id, user_id), fetch_one=True)
             
             if not category_exists:
-                logger.warning(f"Invalid category {category_id} provided for expense update")
+                logger.warning(f"Invalid category {numeric_id} provided for expense update")
                 raise ValidationError("Invalid category", field="category_id")
             
             # Convert category_id back to the full string format for storage
             if category_type == 'default':
-                storage_category_id = f"default_{category_id}"
+                storage_category_id = f"default_{numeric_id}"
             else:
-                storage_category_id = f"custom_{category_id}"
+                storage_category_id = f"custom_{numeric_id}"
             
             logger.debug(f"Final storage_category_id: {storage_category_id}")
         
