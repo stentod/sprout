@@ -224,7 +224,7 @@ function renderHistory(days) {
               ${categoryInfo}
             </div>
             <div class="expense-actions">
-              <button class="edit-expense-btn" data-expense-id="${exp.id}" data-amount="${exp.amount}" data-description="${exp.description}" data-category-id="${exp.category ? (exp.category.is_default ? 'default_' + exp.category.id : 'custom_' + exp.category.id) : 'none'}">✏️ Edit</button>
+              <button class="edit-expense-btn" data-expense-id="${exp.id}" data-amount="${exp.amount}" data-description="${exp.description}" data-category-id="${exp.category ? (exp.category.is_default ? 'default_' + exp.category.id : 'custom_' + exp.category.id) : 'none'}" data-category-type="${exp.category ? (exp.category.is_default ? 'default' : 'custom') : 'none'}">✏️ Edit</button>
               <button class="delete-expense-btn" data-expense-id="${exp.id}">🗑️ Delete</button>
             </div>
           </div>
@@ -283,8 +283,10 @@ function setupEventHandlers() {
       const expenseId = e.target.dataset.expenseId;
       const amount = e.target.dataset.amount;
       const description = e.target.dataset.description;
-              const categoryId = e.target.dataset.categoryId === 'none' ? '' : e.target.dataset.categoryId;
-        editExpense(expenseId, amount, description, categoryId);
+      const categoryId = e.target.dataset.categoryId === 'none' ? '' : e.target.dataset.categoryId;
+      const categoryType = e.target.dataset.categoryType;
+      console.log('Button clicked - categoryId:', categoryId, 'categoryType:', categoryType);
+      editExpense(expenseId, amount, description, categoryId);
     } else if (e.target.classList.contains('delete-expense-btn')) {
       const expenseId = e.target.dataset.expenseId;
       deleteExpense(expenseId);
@@ -340,6 +342,7 @@ async function loadHistory() {
 
 // Edit expense functionality
 async function editExpense(expenseId, amount, description, categoryId) {
+  console.log('editExpense called with:', { expenseId, amount, description, categoryId });
   try {
     // Load categories first to ensure we have them for the dropdown
     await loadCategories();
@@ -368,6 +371,7 @@ async function editExpense(expenseId, amount, description, categoryId) {
                 ${categories.map(cat => {
                   const catValue = cat.is_default ? 'default_' + cat.id : 'custom_' + cat.id;
                   const isSelected = categoryId === catValue;
+                  console.log('Category comparison:', { catValue, categoryId, isSelected, catName: cat.name });
                   return `<option value="${catValue}" ${isSelected ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`;
                 }).join('')}
               </select>
