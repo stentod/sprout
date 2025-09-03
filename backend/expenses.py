@@ -291,6 +291,7 @@ def get_history():
             if date not in grouped:
                 grouped[date] = []
             expense_data = {
+                'id': e['id'],  # Add the expense ID for edit/delete functionality
                 'amount': e['amount'],  # Already converted to float in helper
                 'description': e['description'],
                 'timestamp': e['timestamp']  # Already converted to string in helper
@@ -314,3 +315,106 @@ def get_history():
         logger.error(f"History endpoint error: {e}")
         # Return empty history instead of crashing
         return jsonify([])
+
+@expenses_bp.route('/expenses/<int:expense_id>', methods=['PUT', 'POST'])
+@require_auth
+@handle_errors
+def update_expense(expense_id):
+    """Update an existing expense"""
+    logger.info(f"Update expense request received for expense {expense_id}")
+    
+    if not request.is_json:
+        raise ValidationError("Request must be JSON")
+    
+    data = request.get_json()
+    validated_data = validate_expense_data(data)
+    amount = validated_data['amount']
+    description = validated_data['description']
+    category_id = data.get('category_id')
+    
+    user_id = get_current_user_id()
+    logger.debug(f"Processing expense update for user {user_id}, expense {expense_id}")
+    
+    # First, verify the expense exists and belongs to the user
+    check_sql = 'SELECT id FROM expenses WHERE id = %s AND user_id = %s'
+    existing_expense = run_query(check_sql, (expense_id, user_id), fetch_one=True)
+    
+    if not existing_expense:
+        logger.warning(f"Expense {expense_id} not found or doesn't belong to user {user_id}")
+        raise ValidationError("Expense not found or access denied")
+    
+    # Validate category_id if provided
+    if category_id:
+        # Parse category ID (format: "default_123" or "custom_456")
+        if isinstance(category_id, str) and '_' in category_id:
+            category_type, cat_id = category_id.split('_', 1)
+            category_id = int(cat_id)
+        else:
+            # Legacy format - assume it's a custom category
+            category_id = int(category_id)
+            category_type = 'custom'
+        
+        # Validate the category exists and belongs to the user
+        if category_type == 'default':
+            check_sql = 'SELECT id FROM default_categories WHERE id = %s'
+            category_exists = run_query(check_sql, (category_id,), fetch_one=True)
+        else:
+            check_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
+            category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+        
+        if not category_exists:
+            logger.warning(f"Invalid category {category_id} provided for expense update")
+            raise ValidationError("Invalid category", field="category_id")
+        
+        # Convert category_id back to the full string format for storage
+        if category_type == 'default':
+            storage_category_id = f"default_{category_id}"
+        else:
+            storage_category_id = f"custom_{category_id}"
+    else:
+        storage_category_id = None
+    
+    # Update the expense
+    update_sql = '''
+        UPDATE expenses 
+        SET amount = %s, description = %s, category_id = %s
+        WHERE id = %s AND user_id = %s
+    '''
+    
+    result = run_query(update_sql, (amount, description, storage_category_id, expense_id, user_id), fetch_all=False)
+    
+    if result == 0:
+        logger.error(f"No rows updated for expense {expense_id}")
+        raise ValidationError("Failed to update expense")
+    
+    logger.info(f"Expense {expense_id} updated successfully for user {user_id}")
+    return jsonify({'success': True, 'message': 'Expense updated successfully'})
+
+@expenses_bp.route('/expenses/<int:expense_id>', methods=['DELETE'])
+@require_auth
+@handle_errors
+def delete_expense(expense_id):
+    """Delete an existing expense"""
+    logger.info(f"Delete expense request received for expense {expense_id}")
+    
+    user_id = get_current_user_id()
+    logger.debug(f"Processing expense deletion for user {user_id}, expense {expense_id}")
+    
+    # First, verify the expense exists and belongs to the user
+    check_sql = 'SELECT id FROM expenses WHERE id = %s AND user_id = %s'
+    existing_expense = run_query(check_sql, (expense_id, user_id), fetch_one=True)
+    
+    if not existing_expense:
+        logger.warning(f"Expense {expense_id} not found or doesn't belong to user {user_id}")
+        raise ValidationError("Expense not found or access denied")
+    
+    # Delete the expense
+    delete_sql = 'DELETE FROM expenses WHERE id = %s AND user_id = %s'
+    result = run_query(delete_sql, (expense_id, user_id), fetch_all=False)
+    
+    if result == 0:
+        logger.error(f"No rows deleted for expense {expense_id}")
+        raise ValidationError("Failed to delete expense")
+    
+    logger.info(f"Expense {expense_id} deleted successfully for user {user_id}")
+    return jsonify({'success': True, 'message': 'Expense deleted successfully'})

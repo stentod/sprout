@@ -222,6 +222,10 @@ function renderHistory(days) {
             <div class="expense-meta">
               ${categoryInfo}
             </div>
+            <div class="expense-actions">
+              <button class="edit-expense-btn" data-expense-id="${exp.id}" data-amount="${exp.amount}" data-description="${exp.description}" data-category-id="${exp.category ? (exp.category.is_default ? 'default_' + exp.category.id : 'custom_' + exp.category.id) : ''}">✏️ Edit</button>
+              <button class="delete-expense-btn" data-expense-id="${exp.id}">🗑️ Delete</button>
+            </div>
           </div>
         `;
       }
@@ -244,7 +248,7 @@ function renderHistory(days) {
   setupEventHandlers();
 }
 
-// Setup event handlers for filters
+// Setup event handlers for filters and expense actions
 function setupEventHandlers() {
   const periodFilter = document.getElementById('period-filter');
   const categoryFilter = document.getElementById('category-filter');
@@ -271,6 +275,20 @@ function setupEventHandlers() {
       loadHistory();
     });
   }
+
+  // Add event delegation for edit and delete buttons
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('edit-expense-btn')) {
+      const expenseId = e.target.dataset.expenseId;
+      const amount = e.target.dataset.amount;
+      const description = e.target.dataset.description;
+      const categoryId = e.target.dataset.categoryId;
+      editExpense(expenseId, amount, description, categoryId);
+    } else if (e.target.classList.contains('delete-expense-btn')) {
+      const expenseId = e.target.dataset.expenseId;
+      deleteExpense(expenseId);
+    }
+  });
 }
 
 // Load history with current filters
@@ -317,6 +335,154 @@ async function loadHistory() {
       </div>
     `;
   }
+}
+
+// Edit expense functionality
+async function editExpense(expenseId, amount, description, categoryId) {
+  try {
+    // Load categories first to ensure we have them for the dropdown
+    await loadCategories();
+    
+    // Create modal HTML
+    const modalHtml = `
+      <div class="edit-modal" id="editModal">
+        <div class="edit-modal-content">
+          <div class="edit-modal-header">
+            <h3>✏️ Edit Expense</h3>
+            <button class="close-modal-btn">&times;</button>
+          </div>
+          <form id="editExpenseForm">
+            <div class="form-group">
+              <label for="editAmount">Amount ($):</label>
+              <input type="number" id="editAmount" name="amount" step="0.01" min="0.01" value="${amount}" required>
+            </div>
+            <div class="form-group">
+              <label for="editDescription">Description:</label>
+              <input type="text" id="editDescription" name="description" value="${description || ''}" required>
+            </div>
+            <div class="form-group">
+              <label for="editCategory">Category:</label>
+              <select id="editCategory" name="category_id">
+                <option value="">No Category</option>
+                ${categories.map(cat => 
+                  `<option value="${cat.is_default ? 'default_' + cat.id : 'custom_' + cat.id}" ${categoryId === (cat.is_default ? 'default_' + cat.id : 'custom_' + cat.id) ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`
+                ).join('')}
+              </select>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="cancel-edit-btn">Cancel</button>
+              <button type="submit" class="save-edit-btn">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = document.getElementById('editModal');
+    modal.style.display = 'block';
+    
+    // Setup modal event handlers
+    const closeBtn = modal.querySelector('.close-modal-btn');
+    const cancelBtn = modal.querySelector('.cancel-edit-btn');
+    const form = modal.querySelector('#editExpenseForm');
+    
+    closeBtn.addEventListener('click', () => {
+      modal.remove();
+    });
+    
+    cancelBtn.addEventListener('click', () => {
+      modal.remove();
+    });
+    
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(form);
+      const updateData = {
+        amount: parseFloat(formData.get('amount')),
+        description: formData.get('description'),
+        category_id: formData.get('category_id') || null
+      };
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/expenses/${expenseId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify(updateData)
+        });
+        
+        if (response.ok) {
+          showSuccessMessage('Expense updated successfully!');
+          modal.remove();
+          loadHistory(); // Refresh the history
+        } else {
+          const errorData = await response.json();
+          showErrorMessage(`Failed to update expense: ${errorData.message || 'Unknown error'}`);
+        }
+      } catch (error) {
+        showErrorMessage(`Failed to update expense: ${error.message}`);
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error setting up edit modal:', error);
+    showErrorMessage('Failed to open edit form');
+  }
+}
+
+// Delete expense functionality
+async function deleteExpense(expenseId) {
+  if (!confirm('Are you sure you want to delete this expense? This action cannot be undone.')) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/expenses/${expenseId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+    
+    if (response.ok) {
+      showSuccessMessage('Expense deleted successfully!');
+      loadHistory(); // Refresh the history
+    } else {
+      const errorData = await response.json();
+      showErrorMessage(`Failed to delete expense: ${errorData.message || 'Unknown error'}`);
+    }
+  } catch (error) {
+    showErrorMessage(`Failed to delete expense: ${error.message}`);
+  }
+}
+
+// Show success message
+function showSuccessMessage(message) {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = 'success-message';
+  messageDiv.textContent = message;
+  document.body.appendChild(messageDiv);
+  
+  setTimeout(() => {
+    messageDiv.remove();
+  }, 3000);
+}
+
+// Show error message
+function showErrorMessage(message) {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = 'error-message';
+  messageDiv.textContent = message;
+  document.body.appendChild(messageDiv);
+  
+  setTimeout(() => {
+    messageDiv.remove();
+  }, 3000);
 }
 
 // Initialize the page with authentication check
