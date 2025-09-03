@@ -370,7 +370,16 @@ async function editExpense(expenseId, amount, description, categoryId) {
               <select id="editCategory" name="category_id">
                 <option value="">No Category</option>
                 ${categories.map(cat => {
-                  const catValue = cat.is_default ? 'default_' + cat.id : 'custom_' + cat.id;
+                  // Check if cat.id already has the prefix
+                  let catValue;
+                  if (typeof cat.id === 'string' && (cat.id.startsWith('default_') || cat.id.startsWith('custom_'))) {
+                    // cat.id already has the prefix, use it as-is
+                    catValue = cat.id;
+                  } else {
+                    // cat.id is numeric, construct the prefix
+                    catValue = cat.is_default ? 'default_' + cat.id : 'custom_' + cat.id;
+                  }
+                  
                   const isSelected = categoryId === catValue;
                   console.log('Category comparison:', { 
                     catValue, 
@@ -379,7 +388,8 @@ async function editExpense(expenseId, amount, description, categoryId) {
                     catName: cat.name,
                     catId: cat.id,
                     catIsDefault: cat.is_default,
-                    comparison: `${categoryId} === ${catValue}`
+                    comparison: `${categoryId} === ${catValue}`,
+                    catIdType: typeof cat.id
                   });
                   return `<option value="${catValue}" ${isSelected ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`;
                 }).join('')}
