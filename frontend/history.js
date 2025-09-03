@@ -223,7 +223,7 @@ function renderHistory(days) {
               ${categoryInfo}
             </div>
             <div class="expense-actions">
-              <button class="edit-expense-btn" data-expense-id="${exp.id}" data-amount="${exp.amount}" data-description="${exp.description}" data-category-id="${exp.category ? (exp.category.is_default ? 'default_' + exp.category.id : 'custom_' + exp.category.id) : ''}">✏️ Edit</button>
+              <button class="edit-expense-btn" data-expense-id="${exp.id}" data-amount="${exp.amount}" data-description="${exp.description}" data-category-id="${exp.category ? (exp.category.is_default ? 'default_' + exp.category.id : 'custom_' + exp.category.id) : 'none'}">✏️ Edit</button>
               <button class="delete-expense-btn" data-expense-id="${exp.id}">🗑️ Delete</button>
             </div>
           </div>
@@ -282,8 +282,8 @@ function setupEventHandlers() {
       const expenseId = e.target.dataset.expenseId;
       const amount = e.target.dataset.amount;
       const description = e.target.dataset.description;
-      const categoryId = e.target.dataset.categoryId;
-      editExpense(expenseId, amount, description, categoryId);
+              const categoryId = e.target.dataset.categoryId === 'none' ? '' : e.target.dataset.categoryId;
+        editExpense(expenseId, amount, description, categoryId);
     } else if (e.target.classList.contains('delete-expense-btn')) {
       const expenseId = e.target.dataset.expenseId;
       deleteExpense(expenseId);
@@ -402,12 +402,14 @@ async function editExpense(expenseId, amount, description, categoryId) {
       e.preventDefault();
       
       const formData = new FormData(form);
+      const categoryId = formData.get('category_id');
       const updateData = {
         amount: parseFloat(formData.get('amount')),
         description: formData.get('description'),
-        category_id: formData.get('category_id') || null
+        category_id: categoryId && categoryId.trim() !== '' ? categoryId : null
       };
       
+      console.log('Sending update data:', updateData);
       try {
         const response = await fetch(`${API_BASE_URL}/api/expenses/${expenseId}`, {
           method: 'PUT',
