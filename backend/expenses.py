@@ -327,68 +327,83 @@ def update_expense(expense_id):
         raise ValidationError("Request must be JSON")
     
     data = request.get_json()
-    validated_data = validate_expense_data(data)
-    amount = validated_data['amount']
-    description = validated_data['description']
-    category_id = data.get('category_id')
+    logger.debug(f"Update data received: {data}")
     
-    user_id = get_current_user_id()
-    logger.debug(f"Processing expense update for user {user_id}, expense {expense_id}")
-    
-    # First, verify the expense exists and belongs to the user
-    check_sql = 'SELECT id FROM expenses WHERE id = %s AND user_id = %s'
-    existing_expense = run_query(check_sql, (expense_id, user_id), fetch_one=True)
-    
-    if not existing_expense:
-        logger.warning(f"Expense {expense_id} not found or doesn't belong to user {user_id}")
-        raise ValidationError("Expense not found or access denied")
-    
-    # Validate category_id if provided
-    if category_id:
-        # Parse category ID (format: "default_123" or "custom_456")
-        if isinstance(category_id, str) and '_' in category_id:
-            category_type, cat_id = category_id.split('_', 1)
-            category_id = int(cat_id)
-        else:
-            # Legacy format - assume it's a custom category
-            category_id = int(category_id)
-            category_type = 'custom'
+    try:
+        validated_data = validate_expense_data(data)
+        amount = validated_data['amount']
+        description = validated_data['description']
+        category_id = data.get('category_id')
         
-        # Validate the category exists and belongs to the user
-        if category_type == 'default':
-            check_sql = 'SELECT id FROM default_categories WHERE id = %s'
-            category_exists = run_query(check_sql, (category_id,), fetch_one=True)
-        else:
-            check_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
-            category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+        user_id = get_current_user_id()
+        logger.debug(f"Processing expense update for user {user_id}, expense {expense_id}")
         
-        if not category_exists:
-            logger.warning(f"Invalid category {category_id} provided for expense update")
-            raise ValidationError("Invalid category", field="category_id")
+        # First, verify the expense exists and belongs to the user
+        check_sql = 'SELECT id FROM expenses WHERE id = %s AND user_id = %s'
+        existing_expense = run_query(check_sql, (expense_id, user_id), fetch_one=True)
         
-        # Convert category_id back to the full string format for storage
-        if category_type == 'default':
-            storage_category_id = f"default_{category_id}"
-        else:
-            storage_category_id = f"custom_{category_id}"
-    else:
+        if not existing_expense:
+            logger.warning(f"Expense {expense_id} not found or doesn't belong to user {user_id}")
+            raise ValidationError("Expense not found or access denied")
+        
+        # Validate category_id if provided
         storage_category_id = None
-    
-    # Update the expense
-    update_sql = '''
-        UPDATE expenses 
-        SET amount = %s, description = %s, category_id = %s
-        WHERE id = %s AND user_id = %s
-    '''
-    
-    result = run_query(update_sql, (amount, description, storage_category_id, expense_id, user_id), fetch_all=False)
-    
-    if result == 0:
-        logger.error(f"No rows updated for expense {expense_id}")
-        raise ValidationError("Failed to update expense")
-    
-    logger.info(f"Expense {expense_id} updated successfully for user {user_id}")
-    return jsonify({'success': True, 'message': 'Expense updated successfully'})
+        if category_id:
+            logger.debug(f"Processing category_id: {category_id}")
+            # Parse category ID (format: "default_123" or "custom_456")
+            if isinstance(category_id, str) and '_' in category_id:
+                category_type, cat_id = category_id.split('_', 1)
+                category_id = int(cat_id)
+            else:
+                # Legacy format - assume it's a custom category
+                category_id = int(category_id)
+                category_type = 'custom'
+            
+            logger.debug(f"Parsed category - type: {category_type}, id: {category_id}")
+            
+            # Validate the category exists and belongs to the user
+            if category_type == 'default':
+                check_sql = 'SELECT id FROM default_categories WHERE id = %s'
+                category_exists = run_query(check_sql, (category_id,), fetch_one=True)
+            else:
+                check_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
+                category_exists = run_query(check_sql, (category_id, user_id), fetch_one=True)
+            
+            if not category_exists:
+                logger.warning(f"Invalid category {category_id} provided for expense update")
+                raise ValidationError("Invalid category", field="category_id")
+            
+            # Convert category_id back to the full string format for storage
+            if category_type == 'default':
+                storage_category_id = f"default_{category_id}"
+            else:
+                storage_category_id = f"custom_{category_id}"
+            
+            logger.debug(f"Final storage_category_id: {storage_category_id}")
+        
+        # Update the expense
+        update_sql = '''
+            UPDATE expenses 
+            SET amount = %s, description = %s, category_id = %s
+            WHERE id = %s AND user_id = %s
+        '''
+        
+        logger.debug(f"Executing update SQL with params: amount={amount}, description={description}, category_id={storage_category_id}, expense_id={expense_id}, user_id={user_id}")
+        
+        result = run_query(update_sql, (amount, description, storage_category_id, expense_id, user_id), fetch_all=False)
+        
+        logger.debug(f"Update result: {result}")
+        
+        if result == 0:
+            logger.error(f"No rows updated for expense {expense_id}")
+            raise ValidationError("Failed to update expense")
+        
+        logger.info(f"Expense {expense_id} updated successfully for user {user_id}")
+        return jsonify({'success': True, 'message': 'Expense updated successfully'})
+        
+    except Exception as e:
+        logger.error(f"Error updating expense {expense_id}: {str(e)}", exc_info=True)
+        raise ValidationError(f"Failed to update expense: {str(e)}")
 
 @expenses_bp.route('/expenses/<int:expense_id>', methods=['DELETE'])
 @require_auth
