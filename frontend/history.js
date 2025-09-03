@@ -92,6 +92,7 @@ async function loadCategories() {
     }
     if (response.ok) {
       categories = await response.json();
+      console.log('Loaded categories in history.js:', categories);
     }
   } catch (error) {
     console.error('Error loading categories:', error);
@@ -371,7 +372,15 @@ async function editExpense(expenseId, amount, description, categoryId) {
                 ${categories.map(cat => {
                   const catValue = cat.is_default ? 'default_' + cat.id : 'custom_' + cat.id;
                   const isSelected = categoryId === catValue;
-                  console.log('Category comparison:', { catValue, categoryId, isSelected, catName: cat.name });
+                  console.log('Category comparison:', { 
+                    catValue, 
+                    categoryId, 
+                    isSelected, 
+                    catName: cat.name,
+                    catId: cat.id,
+                    catIsDefault: cat.is_default,
+                    comparison: `${categoryId} === ${catValue}`
+                  });
                   return `<option value="${catValue}" ${isSelected ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`;
                 }).join('')}
               </select>
