@@ -470,7 +470,7 @@ def get_expenses_between(start, end, user_id, category_id=None):
     if category_id:
         # Filter by specific category
         sql = '''
-            SELECT e.amount, e.description, e.timestamp, e.category_id,
+            SELECT e.id, e.amount, e.description, e.timestamp, e.category_id,
                    COALESCE(dc.name, cc.name) as category_name,
                    COALESCE(dc.icon, cc.icon) as category_icon,
                    COALESCE(dc.color, cc.color) as category_color
@@ -484,7 +484,7 @@ def get_expenses_between(start, end, user_id, category_id=None):
     else:
         # Get all expenses with category information
         sql = '''
-            SELECT e.amount, e.description, e.timestamp, e.category_id,
+            SELECT e.id, e.amount, e.description, e.timestamp, e.category_id,
                    COALESCE(dc.name, cc.name) as category_name,
                    COALESCE(dc.icon, cc.icon) as category_icon,
                    COALESCE(dc.color, cc.color) as category_color
@@ -502,6 +502,7 @@ def get_expenses_between(start, end, user_id, category_id=None):
     expenses = []
     for e in raw_expenses:
         expense_data = {
+            'id': e['id'],  # Include the expense ID
             'amount': float(e['amount']),
             'description': e['description'],
             'timestamp': e['timestamp'].isoformat() if hasattr(e['timestamp'], 'isoformat') else str(e['timestamp'])
