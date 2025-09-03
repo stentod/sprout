@@ -209,6 +209,7 @@ function renderHistory(days) {
       `;
 
       for (const exp of day.expenses) {
+        console.log('Expense data:', exp); // Debug log
         const categoryInfo = exp.category ? 
           `<span class="expense-category" style="color: ${exp.category.color}">${exp.category.icon} ${exp.category.name}</span>` :
           `<span class="expense-category no-category">📝 Uncategorized</span>`;
@@ -364,9 +365,11 @@ async function editExpense(expenseId, amount, description, categoryId) {
               <label for="editCategory">Category:</label>
               <select id="editCategory" name="category_id">
                 <option value="">No Category</option>
-                ${categories.map(cat => 
-                  `<option value="${cat.is_default ? 'default_' + cat.id : 'custom_' + cat.id}" ${categoryId === (cat.is_default ? 'default_' + cat.id : 'custom_' + cat.id) ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`
-                ).join('')}
+                ${categories.map(cat => {
+                  const catValue = cat.is_default ? 'default_' + cat.id : 'custom_' + cat.id;
+                  const isSelected = categoryId === catValue;
+                  return `<option value="${catValue}" ${isSelected ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`;
+                }).join('')}
               </select>
             </div>
             <div class="form-actions">

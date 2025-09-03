@@ -510,11 +510,24 @@ def get_expenses_between(start, end, user_id, category_id=None):
         
         # Add category information if present
         if e['category_id'] and e['category_name']:
+            # Determine if this is a default or custom category
+            if e['category_id'].startswith('default_'):
+                is_default = True
+                numeric_id = e['category_id'].replace('default_', '')
+            elif e['category_id'].startswith('custom_'):
+                is_default = False
+                numeric_id = e['category_id'].replace('custom_', '')
+            else:
+                # Legacy format, assume custom
+                is_default = False
+                numeric_id = e['category_id']
+            
             expense_data['category'] = {
-                'id': e['category_id'],
+                'id': numeric_id,
                 'name': e['category_name'],
                 'icon': e['category_icon'],
-                'color': e['category_color']
+                'color': e['category_color'],
+                'is_default': is_default
             }
         else:
             expense_data['category'] = None
