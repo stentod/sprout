@@ -61,6 +61,10 @@ let resetBudgetsButton;
 let requireCategoriesToggle;
 let preferenceStatusMessage;
 
+// Rollover elements
+let rolloverToggle;
+let rolloverStatusMessage;
+
 // State
 let originalLimit = 30.00;
 let isLoading = false;
@@ -107,10 +111,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     requireCategoriesToggle = document.getElementById('require-categories-toggle');
     preferenceStatusMessage = document.getElementById('preference-status-message');
     
+    // Rollover elements
+    rolloverToggle = document.getElementById('rollover-toggle');
+    rolloverStatusMessage = document.getElementById('rollover-status-message');
+    
     // Load current daily limit, categories, and preferences
     loadCurrentDailyLimit();
     loadCategories();
     loadCategoryPreference();
+    loadRolloverSettings();
     
     // Set up event listeners
     setupEventListeners();
@@ -132,6 +141,9 @@ function setupEventListeners() {
     
     // Category preference toggle
     requireCategoriesToggle.addEventListener('change', handleCategoryPreferenceChange);
+    
+    // Rollover toggle
+    rolloverToggle.addEventListener('change', handleRolloverChange);
 }
 
 async function loadCurrentDailyLimit() {
@@ -841,6 +853,87 @@ async function confirmDeleteCategory(categoryId, categoryName) {
         closeConfirmationModal();
         showCategoryStatusMessage(`Failed to delete category: ${error.message}`, 'error');
     }
+}
+
+// ==========================================
+// ROLLOVER FUNCTIONALITY
+// ==========================================
+
+async function loadRolloverSettings() {
+    try {
+        console.log('Loading rollover settings...');
+        const response = await fetch(`${API_BASE}/preferences/rollover-settings`, {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Rollover settings data:', data);
+        
+        if (data.success) {
+            rolloverToggle.checked = data.daily_rollover_enabled;
+        } else {
+            throw new Error(data.error || 'Failed to load rollover settings');
+        }
+        
+    } catch (error) {
+        console.error('Error loading rollover settings:', error);
+        showRolloverStatusMessage('Failed to load rollover settings. Please refresh the page.', 'error');
+    }
+}
+
+async function handleRolloverChange(event) {
+    try {
+        const enabled = event.target.checked;
+        console.log('Updating rollover settings:', { daily_rollover_enabled: enabled });
+        
+        const response = await fetch(`${API_BASE}/preferences/rollover-settings`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                daily_rollover_enabled: enabled
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Rollover settings response:', data);
+        
+        if (data.success) {
+            showRolloverStatusMessage(
+                enabled ? 'Daily budget rollover enabled!' : 'Daily budget rollover disabled!', 
+                'success'
+            );
+        } else {
+            throw new Error(data.error || 'Failed to update rollover settings');
+        }
+        
+    } catch (error) {
+        console.error('Error updating rollover settings:', error);
+        // Revert the toggle to its previous state
+        event.target.checked = !event.target.checked;
+        showRolloverStatusMessage(`Failed to update rollover settings: ${error.message}`, 'error');
+    }
+}
+
+function showRolloverStatusMessage(message, type) {
+    rolloverStatusMessage.textContent = message;
+    rolloverStatusMessage.className = `status-message ${type}`;
+    rolloverStatusMessage.style.display = 'block';
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        rolloverStatusMessage.style.display = 'none';
+    }, 5000);
 }
 
  

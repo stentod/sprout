@@ -49,6 +49,27 @@
       </section>
 
       <section class="settings-section">
+        <h2>Daily Budget Rollover</h2>
+        <p class="section-description">Enable rollover to carry over unspent daily budget to the next day:</p>
+        <div class="setting-item">
+          <div class="preference-toggle">
+            <label class="toggle-switch">
+              <input type="checkbox" id="rollover-toggle">
+              <span class="toggle-slider"></span>
+            </label>
+            <div class="preference-info">
+              <span class="preference-label">Enable daily budget rollover</span>
+              <p class="preference-description">
+                When enabled, any unspent amount from your daily budget will be added to tomorrow's budget. 
+                For example: if you have $30 daily budget and only spend $20, tomorrow you'll have $40 to spend.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div id="rollover-status-message" class="status-message" style="display: none;"></div>
+      </section>
+
+      <section class="settings-section">
         <h2>Expense Preferences</h2>
         <p class="section-description">Customize how you add expenses:</p>
         <div class="setting-item">

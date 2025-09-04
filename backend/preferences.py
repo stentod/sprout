@@ -181,10 +181,25 @@ def get_budgets():
         user_id = get_current_user_id()
         daily_limit = get_user_daily_limit(user_id)
         
+        # Check if rollover is enabled and get today's rollover amount
+        rollover_sql = '''
+            SELECT daily_rollover_enabled, 
+                   COALESCE((SELECT rollover_amount FROM daily_rollovers WHERE user_id = %s AND date = CURRENT_DATE), 0.00) as today_rollover
+            FROM user_preferences 
+            WHERE user_id = %s
+        '''
+        rollover_result = run_query(rollover_sql, (user_id, user_id), fetch_one=True)
+        
+        daily_rollover_enabled = rollover_result.get('daily_rollover_enabled', False) if rollover_result else False
+        today_rollover = float(rollover_result.get('today_rollover', 0.00)) if rollover_result else 0.0
+        
+        # Calculate adjusted daily limit (including rollover)
+        adjusted_daily_limit = daily_limit + today_rollover
+        
         # Calculate budget periods
-        weekly_budget = daily_limit * 7
-        monthly_budget = daily_limit * 30  # Using 30 days for consistency
-        yearly_budget = daily_limit * 365
+        weekly_budget = adjusted_daily_limit * 7
+        monthly_budget = adjusted_daily_limit * 30  # Using 30 days for consistency
+        yearly_budget = adjusted_daily_limit * 365
         
         # Get spending data for different periods
         # Weekly spending (last 7 days)
@@ -223,6 +238,9 @@ def get_budgets():
         return jsonify({
             'success': True,
             'daily_limit': daily_limit,
+            'daily_rollover_enabled': daily_rollover_enabled,
+            'today_rollover': today_rollover,
+            'adjusted_daily_limit': adjusted_daily_limit,
             'budgets': {
                 'weekly': {
                     'budget': weekly_budget,
@@ -247,6 +265,109 @@ def get_budgets():
         
     except Exception as e:
         logger.error(f"Error getting budgets: {e}")
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@preferences_bp.route('/preferences/rollover-settings', methods=['GET'])
+@require_auth
+def get_rollover_settings():
+    """Get the user's rollover settings"""
+    try:
+        user_id = get_current_user_id()
+        
+        # Get rollover setting
+        sql = 'SELECT daily_rollover_enabled FROM user_preferences WHERE user_id = %s'
+        result = run_query(sql, (user_id,), fetch_one=True)
+        
+        if result:
+            return jsonify({
+                'daily_rollover_enabled': result['daily_rollover_enabled'],
+                'success': True
+            })
+        else:
+            return jsonify({
+                'daily_rollover_enabled': False,
+                'success': True
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@preferences_bp.route('/preferences/rollover-settings', methods=['POST', 'PUT'])
+@require_auth
+def update_rollover_settings():
+    """Update the user's rollover settings"""
+    try:
+        data = request.get_json()
+        daily_rollover_enabled = data.get('daily_rollover_enabled', False)
+        
+        user_id = get_current_user_id()
+        
+        # Update rollover setting
+        sql = '''
+            INSERT INTO user_preferences (user_id, daily_rollover_enabled, updated_at)
+            VALUES (%s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) DO UPDATE SET
+                daily_rollover_enabled = EXCLUDED.daily_rollover_enabled,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING daily_rollover_enabled
+        '''
+        result = run_query(sql, (user_id, daily_rollover_enabled), fetch_one=True)
+        
+        if result:
+            return jsonify({
+                'daily_rollover_enabled': result['daily_rollover_enabled'],
+                'success': True,
+                'message': 'Rollover settings updated successfully'
+            })
+        else:
+            return jsonify({
+                'error': 'Failed to update rollover settings',
+                'success': False
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@preferences_bp.route('/preferences/rollover-amounts', methods=['GET'])
+@require_auth
+def get_rollover_amounts():
+    """Get current rollover amounts for daily budget"""
+    try:
+        user_id = get_current_user_id()
+        
+        # Get user's rollover setting
+        settings_sql = 'SELECT daily_rollover_enabled FROM user_preferences WHERE user_id = %s'
+        settings_result = run_query(settings_sql, (user_id,), fetch_one=True)
+        
+        if not settings_result or not settings_result['daily_rollover_enabled']:
+            return jsonify({
+                'daily_rollover': 0.0,
+                'success': True
+            })
+        
+        # Get today's rollover amount
+        daily_sql = '''
+            SELECT rollover_amount FROM daily_rollovers 
+            WHERE user_id = %s AND date = CURRENT_DATE
+        '''
+        daily_result = run_query(daily_sql, (user_id,), fetch_one=True)
+        daily_rollover = float(daily_result['rollover_amount']) if daily_result else 0.0
+        
+        return jsonify({
+            'daily_rollover': daily_rollover,
+            'success': True
+        })
+        
+    except Exception as e:
         return jsonify({
             'error': str(e),
             'success': False

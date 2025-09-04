@@ -69,12 +69,24 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   user_id INTEGER NOT NULL DEFAULT 0 UNIQUE,
   daily_spending_limit DECIMAL(10,2) DEFAULT 30.00,
   require_categories BOOLEAN DEFAULT TRUE,
+  daily_rollover_enabled BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Insert default preference for user 0
-INSERT INTO user_preferences (user_id, daily_spending_limit, require_categories) 
-VALUES (0, 30.00, TRUE) 
+INSERT INTO user_preferences (user_id, daily_spending_limit, require_categories, daily_rollover_enabled) 
+VALUES (0, 30.00, TRUE, FALSE) 
 ON CONFLICT (user_id) DO NOTHING;
+
+-- Daily rollover table to track rollover amounts
+CREATE TABLE IF NOT EXISTS daily_rollovers (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL DEFAULT 0,
+  date DATE NOT NULL,
+  rollover_amount DECIMAL(10,2) DEFAULT 0.00,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(user_id, date)
+);
