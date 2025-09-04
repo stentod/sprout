@@ -87,8 +87,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     categorySelect = document.getElementById('category');
     frequencySelect = document.getElementById('frequency');
     startDateInput = document.getElementById('start-date');
-    processBtn = document.getElementById('process-btn');
-    setupTableBtn = document.getElementById('setup-table-btn');
     formStatusMessage = document.getElementById('form-status-message');
     expensesContainer = document.getElementById('recurring-expenses-container');
     expensesStatusMessage = document.getElementById('expenses-status-message');
@@ -108,12 +106,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 function setupEventListeners() {
     // Form submission
     recurringExpenseForm.addEventListener('submit', handleFormSubmit);
-    
-    // Process button
-    processBtn.addEventListener('click', handleProcessExpenses);
-    
-    // Setup table button
-    setupTableBtn.addEventListener('click', handleSetupTable);
 }
 
 async function loadCategories() {
@@ -327,73 +319,6 @@ async function deleteRecurringExpense(expenseId) {
     }
 }
 
-async function handleProcessExpenses() {
-    try {
-        console.log('Processing recurring expenses...');
-        
-        const response = await fetch(`${API_BASE}/recurring-expenses/process`, {
-            method: 'POST',
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('Process expenses response:', data);
-        
-        if (data.success) {
-            showFormStatusMessage(`Processed ${data.processed_count} recurring expenses!`, 'success');
-        } else {
-            throw new Error(data.error || 'Failed to process recurring expenses');
-        }
-        
-    } catch (error) {
-        console.error('Error processing recurring expenses:', error);
-        showFormStatusMessage(`Failed to process recurring expenses: ${error.message}`, 'error');
-    }
-}
-
-async function handleSetupTable() {
-    try {
-        console.log('Setting up recurring expenses table...');
-        
-        // Disable the button during setup
-        setupTableBtn.disabled = true;
-        setupTableBtn.textContent = 'Setting up...';
-        
-        const response = await fetch(`${API_BASE}/recurring-expenses/setup-table`, {
-            method: 'POST',
-            credentials: 'include'
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('Setup table response:', data);
-        
-        if (data.success) {
-            showFormStatusMessage('Database table created successfully! You can now add recurring expenses.', 'success');
-            // Try to reload expenses to test the table
-            setTimeout(() => {
-                loadRecurringExpenses();
-            }, 1000);
-        } else {
-            throw new Error(data.error || 'Failed to setup table');
-        }
-        
-    } catch (error) {
-        console.error('Error setting up table:', error);
-        showFormStatusMessage(`Failed to setup table: ${error.message}`, 'error');
-    } finally {
-        // Re-enable the button
-        setupTableBtn.disabled = false;
-        setupTableBtn.textContent = 'Setup Database Table';
-    }
-}
 
 function showFormStatusMessage(message, type) {
     formStatusMessage.textContent = message;
