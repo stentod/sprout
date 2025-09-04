@@ -238,6 +238,19 @@ def process_recurring_expenses():
         logger.info("Processing recurring expenses...")
         today = date.today()
         
+        # First check if the table exists
+        check_table_sql = '''
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'recurring_expenses'
+            )
+        '''
+        table_exists = run_query(check_table_sql, (), fetch_one=True)
+        
+        if not table_exists or not table_exists['exists']:
+            logger.info("Recurring expenses table does not exist yet, skipping processing")
+            return 0
+        
         # Get all active recurring expenses
         sql = '''
             SELECT 
@@ -362,6 +375,19 @@ def setup_recurring_expenses_table():
         import time
         time.sleep(0.5)  # Give the database a moment to commit
         
+        # First check if table exists in information_schema
+        check_sql = '''
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'recurring_expenses'
+            )
+        '''
+        table_check = run_query(check_sql, (), fetch_one=True)
+        
+        if not table_check or not table_check['exists']:
+            raise Exception("Table was not created successfully")
+        
+        # Now try to query the table
         test_sql = 'SELECT COUNT(*) FROM recurring_expenses'
         result = run_query(test_sql, (), fetch_one=True)
         
