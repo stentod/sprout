@@ -152,9 +152,8 @@ function renderCategoryOptions() {
     
     categories.forEach(category => {
         const option = document.createElement('option');
-        // Use the proper ID format (default_123 or custom_456)
-        const categoryValue = category.is_default ? `default_${category.id}` : `custom_${category.id}`;
-        option.value = categoryValue;
+        // category.id already has the prefix from the API (default_123 or custom_456)
+        option.value = category.id;
         option.textContent = `${category.icon} ${category.name}`;
         categorySelect.appendChild(option);
     });
@@ -263,13 +262,6 @@ async function handleFormSubmit(event) {
     
     try {
         console.log('Creating recurring expense:', expenseData);
-        console.log('Form data details:', {
-            description: formData.get('description'),
-            amount: formData.get('amount'),
-            category: formData.get('category'),
-            frequency: formData.get('frequency'),
-            start_date: formData.get('start_date')
-        });
         
         const response = await fetch(`${API_BASE}/recurring-expenses`, {
             method: 'POST',
