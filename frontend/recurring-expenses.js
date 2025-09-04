@@ -125,12 +125,16 @@ async function loadCategories() {
         const data = await response.json();
         console.log('Categories loaded:', data);
         
-        if (data.success) {
+        // Handle both old and new category response formats
+        if (data.success && data.categories) {
             categories = data.categories;
-            renderCategoryOptions();
+        } else if (Array.isArray(data)) {
+            categories = data;
         } else {
-            throw new Error(data.error || 'Failed to load categories');
+            throw new Error('Invalid categories response format');
         }
+        
+        renderCategoryOptions();
         
     } catch (error) {
         console.error('Error loading categories:', error);
@@ -143,7 +147,9 @@ function renderCategoryOptions() {
     
     categories.forEach(category => {
         const option = document.createElement('option');
-        option.value = category.id;
+        // Use the proper ID format (default_123 or custom_456)
+        const categoryValue = category.is_default ? `default_${category.id}` : `custom_${category.id}`;
+        option.value = categoryValue;
         option.textContent = `${category.icon} ${category.name}`;
         categorySelect.appendChild(option);
     });

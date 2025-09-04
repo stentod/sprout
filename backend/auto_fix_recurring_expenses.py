@@ -22,7 +22,7 @@ def fix_recurring_expenses_database():
                     user_id INTEGER NOT NULL DEFAULT 0,
                     description TEXT NOT NULL,
                     amount DECIMAL(10,2) NOT NULL,
-                    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+                    category_id TEXT,
                     frequency VARCHAR(20) NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly')),
                     start_date DATE NOT NULL,
                     is_active BOOLEAN DEFAULT TRUE,

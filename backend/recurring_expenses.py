@@ -24,16 +24,12 @@ def get_recurring_expenses():
                 re.id,
                 re.description,
                 re.amount,
+                re.category_id,
                 re.frequency,
                 re.start_date,
                 re.is_active,
-                re.created_at,
-                c.name as category_name,
-                c.icon as category_icon,
-                c.color as category_color,
-                c.is_default as category_is_default
+                re.created_at
             FROM recurring_expenses re
-            LEFT JOIN categories c ON re.category_id = c.id
             WHERE re.user_id = %s
             ORDER BY re.created_at DESC
         '''
@@ -52,14 +48,38 @@ def get_recurring_expenses():
                 'created_at': row['created_at'].isoformat() if row['created_at'] else None
             }
             
-            if row['category_name']:
-                expense_data['category'] = {
-                    'id': row['category_id'],
-                    'name': row['category_name'],
-                    'icon': row['category_icon'],
-                    'color': row['category_color'],
-                    'is_default': row['category_is_default']
-                }
+            # Get category info if category_id exists
+            if row['category_id']:
+                try:
+                    # Parse category ID to determine type and get details
+                    if isinstance(row['category_id'], str) and '_' in row['category_id']:
+                        category_type, cat_id = row['category_id'].split('_', 1)
+                        numeric_id = int(cat_id)
+                    else:
+                        numeric_id = int(row['category_id'])
+                        category_type = 'custom'
+                    
+                    # Get category details
+                    if category_type == 'default':
+                        cat_sql = 'SELECT name, icon, color FROM default_categories WHERE id = %s'
+                        cat_result = run_query(cat_sql, (numeric_id,), fetch_one=True)
+                        is_default = True
+                    else:
+                        cat_sql = 'SELECT name, icon, color FROM custom_categories WHERE id = %s AND user_id = %s'
+                        cat_result = run_query(cat_sql, (numeric_id, user_id), fetch_one=True)
+                        is_default = False
+                    
+                    if cat_result:
+                        expense_data['category'] = {
+                            'id': row['category_id'],
+                            'name': cat_result['name'],
+                            'icon': cat_result['icon'],
+                            'color': cat_result['color'],
+                            'is_default': is_default
+                        }
+                except (ValueError, TypeError):
+                    # If parsing fails, just skip the category
+                    pass
             
             recurring_expenses.append(expense_data)
         
@@ -114,8 +134,22 @@ def create_recurring_expense():
         
         # Validate category if provided
         if category_id:
-            category_sql = 'SELECT id FROM categories WHERE id = %s AND (user_id = %s OR is_default = TRUE)'
-            category_result = run_query(category_sql, (category_id, user_id), fetch_one=True)
+            # Parse category ID to check if it's default or custom
+            if isinstance(category_id, str) and '_' in category_id:
+                category_type, cat_id = category_id.split('_', 1)
+                numeric_id = int(cat_id)
+            else:
+                numeric_id = int(category_id)
+                category_type = 'custom'
+            
+            # Check if category exists
+            if category_type == 'default':
+                category_sql = 'SELECT id FROM default_categories WHERE id = %s'
+                category_result = run_query(category_sql, (numeric_id,), fetch_one=True)
+            else:
+                category_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
+                category_result = run_query(category_sql, (numeric_id, user_id), fetch_one=True)
+            
             if not category_result:
                 return jsonify({
                     'error': 'Invalid category',
