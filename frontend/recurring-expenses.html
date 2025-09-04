@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Recurring Expenses - Sprout Budget</title>
+  <link rel="stylesheet" href="style.css?v=3.2">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+</head>
+<body>
+  <div class="page-container">
+    <header class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <a href="/" class="back-button">
+            <span class="back-icon">←</span>
+            Back to Dashboard
+          </a>
+        </div>
+        <h1>🔄 Recurring Expenses</h1>
+        <div class="header-right">
+          <a href="/history.html" class="back-button">History</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="page-main">
+      <!-- Add Recurring Expense Form -->
+      <section class="form-section">
+        <h2>Add New Recurring Expense</h2>
+        <form id="recurring-expense-form" class="expense-form">
+          <div class="form-group">
+            <label for="description">Description</label>
+            <input type="text" id="description" name="description" required placeholder="e.g., Netflix Subscription">
+          </div>
+          
+          <div class="form-group">
+            <label for="amount">Amount ($)</label>
+            <input type="number" id="amount" name="amount" step="0.01" min="0.01" required placeholder="15.99">
+          </div>
+          
+          <div class="form-group">
+            <label for="category">Category</label>
+            <select id="category" name="category">
+              <option value="">Select a category (optional)</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="frequency">Frequency</label>
+            <select id="frequency" name="frequency" required>
+              <option value="">Select frequency</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="start-date">Start Date</label>
+            <input type="date" id="start-date" name="start_date" required>
+          </div>
+          
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add Recurring Expense</button>
+            <button type="button" id="process-btn" class="btn btn-secondary">Process Today's Expenses</button>
+          </div>
+        </form>
+        <div id="form-status-message" class="status-message" style="display: none;"></div>
+      </section>
+
+      <!-- Recurring Expenses List -->
+      <section class="expenses-section">
+        <h2>Your Recurring Expenses</h2>
+        <div id="recurring-expenses-container" class="expenses-container">
+          <!-- Recurring expenses will be loaded here -->
+        </div>
+        <div id="expenses-status-message" class="status-message" style="display: none;"></div>
+      </section>
+    </main>
+
+    <div id="messageContainer" class="message-container"></div>
+  </div>
+
+  <script src="recurring-expenses.js?v=3.2"></script>
+</body>
+</html>

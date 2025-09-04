@@ -14,6 +14,7 @@ from auth import auth_bp
 from expenses import expenses_bp
 from categories import categories_bp
 from preferences import preferences_bp
+from recurring_expenses import recurring_expenses_bp
 
 # Initialize logging
 logger = setup_logging()
@@ -28,6 +29,26 @@ try:
         logger.warning("⚠️ Rollover database fix had issues, but app will continue")
 except Exception as e:
     logger.warning(f"⚠️ Could not run rollover database fix: {e}. App will continue.")
+
+# Auto-fix recurring expenses database on app startup
+try:
+    from auto_fix_recurring_expenses import fix_recurring_expenses_database
+    logger.info("Running automatic recurring expenses database fix...")
+    if fix_recurring_expenses_database():
+        logger.info("✅ Recurring expenses database fix completed successfully")
+    else:
+        logger.warning("⚠️ Recurring expenses database fix had issues, but app will continue")
+except Exception as e:
+    logger.warning(f"⚠️ Could not run recurring expenses database fix: {e}. App will continue.")
+
+# Process recurring expenses on app startup
+try:
+    from recurring_expenses import process_recurring_expenses
+    logger.info("Processing recurring expenses on startup...")
+    processed_count = process_recurring_expenses()
+    logger.info(f"✅ Processed {processed_count} recurring expenses on startup")
+except Exception as e:
+    logger.warning(f"⚠️ Could not process recurring expenses: {e}. App will continue.")
 
 # Production fix - ensure proper session handling
 app = Flask(__name__)
@@ -72,6 +93,7 @@ app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(expenses_bp, url_prefix='/api')
 app.register_blueprint(categories_bp, url_prefix='/api')
 app.register_blueprint(preferences_bp, url_prefix='/api')
+app.register_blueprint(recurring_expenses_bp, url_prefix='/api')
 
 # Error handlers for database connection issues
 @app.errorhandler(DatabaseConnectionError)
