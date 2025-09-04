@@ -119,6 +119,8 @@ def create_recurring_expense():
         start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
         category_id = data.get('category_id')
         
+        logger.info(f"Parsed start_date: {start_date} from input: {data['start_date']}")
+        
         # Validate frequency
         if frequency not in ['daily', 'weekly', 'monthly']:
             return jsonify({
@@ -271,7 +273,11 @@ def process_recurring_expenses():
         processed_count = 0
         
         for expense in recurring_expenses:
-            if is_recurring_expense_due(expense, today):
+            logger.info(f"Checking expense: {expense['description']}, start_date: {expense['start_date']}, frequency: {expense['frequency']}")
+            is_due = is_recurring_expense_due(expense, today)
+            logger.info(f"Is due today ({today}): {is_due}")
+            
+            if is_due:
                 # Check if expense already exists for today
                 existing_sql = '''
                     SELECT id FROM expenses 
@@ -286,6 +292,8 @@ def process_recurring_expenses():
                     expense['amount'],
                     today
                 ), fetch_one=True)
+                
+                logger.info(f"Existing expense check result: {existing}")
                 
                 if not existing:
                     # Add the expense
