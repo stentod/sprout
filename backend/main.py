@@ -41,8 +41,10 @@ try:
 except Exception as e:
     logger.warning(f"⚠️ Could not run recurring expenses database fix: {e}. App will continue.")
 
-# Process recurring expenses on app startup
+# Process recurring expenses on app startup (with delay to ensure table is committed)
 try:
+    import time
+    time.sleep(1)  # Give the database a moment to commit the table creation
     from recurring_expenses import process_recurring_expenses
     logger.info("Processing recurring expenses on startup...")
     processed_count = process_recurring_expenses()

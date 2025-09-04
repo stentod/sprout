@@ -359,6 +359,9 @@ def setup_recurring_expenses_table():
         run_query(create_sql, (), fetch_one=False, fetch_all=False)
         
         # Test if table exists by trying to query it
+        import time
+        time.sleep(0.5)  # Give the database a moment to commit
+        
         test_sql = 'SELECT COUNT(*) FROM recurring_expenses'
         result = run_query(test_sql, (), fetch_one=True)
         
@@ -366,7 +369,8 @@ def setup_recurring_expenses_table():
         return jsonify({
             'success': True,
             'message': 'Recurring expenses table created successfully',
-            'table_exists': True
+            'table_exists': True,
+            'count': result['count'] if result else 0
         })
         
     except Exception as e:
