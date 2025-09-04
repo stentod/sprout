@@ -103,10 +103,13 @@ def create_recurring_expense():
         data = request.get_json()
         user_id = get_current_user_id()
         
+        logger.info(f"Creating recurring expense for user {user_id} with data: {data}")
+        
         # Validate required fields
         required_fields = ['description', 'amount', 'frequency', 'start_date']
         for field in required_fields:
             if field not in data or not data[field]:
+                logger.error(f"Missing required field: {field}")
                 return jsonify({
                     'error': f'Missing required field: {field}',
                     'success': False
@@ -134,6 +137,7 @@ def create_recurring_expense():
         
         # Validate category if provided
         if category_id:
+            logger.info(f"Validating category_id: {category_id}")
             try:
                 # Parse category ID to check if it's default or custom
                 if isinstance(category_id, str) and '_' in category_id:
@@ -143,6 +147,8 @@ def create_recurring_expense():
                     numeric_id = int(category_id)
                     category_type = 'custom'
                 
+                logger.info(f"Parsed category - type: {category_type}, numeric_id: {numeric_id}")
+                
                 # Check if category exists
                 if category_type == 'default':
                     category_sql = 'SELECT id FROM default_categories WHERE id = %s'
@@ -151,7 +157,10 @@ def create_recurring_expense():
                     category_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
                     category_result = run_query(category_sql, (numeric_id, user_id), fetch_one=True)
                 
+                logger.info(f"Category validation result: {category_result}")
+                
                 if not category_result:
+                    logger.error(f"Category not found: {category_id}")
                     return jsonify({
                         'error': 'Invalid category',
                         'success': False

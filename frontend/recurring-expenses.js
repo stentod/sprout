@@ -263,6 +263,13 @@ async function handleFormSubmit(event) {
     
     try {
         console.log('Creating recurring expense:', expenseData);
+        console.log('Form data details:', {
+            description: formData.get('description'),
+            amount: formData.get('amount'),
+            category: formData.get('category'),
+            frequency: formData.get('frequency'),
+            start_date: formData.get('start_date')
+        });
         
         const response = await fetch(`${API_BASE}/recurring-expenses`, {
             method: 'POST',
