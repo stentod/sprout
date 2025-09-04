@@ -18,6 +18,17 @@ from preferences import preferences_bp
 # Initialize logging
 logger = setup_logging()
 
+# Auto-fix rollover database on app startup
+try:
+    from auto_fix_rollover import fix_rollover_database
+    logger.info("Running automatic rollover database fix...")
+    if fix_rollover_database():
+        logger.info("✅ Rollover database fix completed successfully")
+    else:
+        logger.warning("⚠️ Rollover database fix had issues, but app will continue")
+except Exception as e:
+    logger.warning(f"⚠️ Could not run rollover database fix: {e}. App will continue.")
+
 # Production fix - ensure proper session handling
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
