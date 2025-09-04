@@ -134,25 +134,32 @@ def create_recurring_expense():
         
         # Validate category if provided
         if category_id:
-            # Parse category ID to check if it's default or custom
-            if isinstance(category_id, str) and '_' in category_id:
-                category_type, cat_id = category_id.split('_', 1)
-                numeric_id = int(cat_id)
-            else:
-                numeric_id = int(category_id)
-                category_type = 'custom'
-            
-            # Check if category exists
-            if category_type == 'default':
-                category_sql = 'SELECT id FROM default_categories WHERE id = %s'
-                category_result = run_query(category_sql, (numeric_id,), fetch_one=True)
-            else:
-                category_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
-                category_result = run_query(category_sql, (numeric_id, user_id), fetch_one=True)
-            
-            if not category_result:
+            try:
+                # Parse category ID to check if it's default or custom
+                if isinstance(category_id, str) and '_' in category_id:
+                    category_type, cat_id = category_id.split('_', 1)
+                    numeric_id = int(cat_id)
+                else:
+                    numeric_id = int(category_id)
+                    category_type = 'custom'
+                
+                # Check if category exists
+                if category_type == 'default':
+                    category_sql = 'SELECT id FROM default_categories WHERE id = %s'
+                    category_result = run_query(category_sql, (numeric_id,), fetch_one=True)
+                else:
+                    category_sql = 'SELECT id FROM custom_categories WHERE id = %s AND user_id = %s'
+                    category_result = run_query(category_sql, (numeric_id, user_id), fetch_one=True)
+                
+                if not category_result:
+                    return jsonify({
+                        'error': 'Invalid category',
+                        'success': False
+                    }), 400
+            except (ValueError, TypeError) as e:
+                logger.error(f"Error validating category {category_id}: {e}")
                 return jsonify({
-                    'error': 'Invalid category',
+                    'error': 'Invalid category format',
                     'success': False
                 }), 400
         
@@ -321,6 +328,49 @@ def manual_process_recurring_expenses():
         })
     except Exception as e:
         logger.error(f"Error in manual processing: {e}")
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@recurring_expenses_bp.route('/recurring-expenses/setup-table', methods=['POST'])
+@require_auth
+def setup_recurring_expenses_table():
+    """Manually create the recurring_expenses table - for production setup"""
+    try:
+        logger.info("Manual table creation requested...")
+        
+        # Create the table
+        create_sql = '''
+            CREATE TABLE IF NOT EXISTS recurring_expenses (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL DEFAULT 0,
+                description TEXT NOT NULL,
+                amount DECIMAL(10,2) NOT NULL,
+                category_id TEXT,
+                frequency VARCHAR(20) NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly')),
+                start_date DATE NOT NULL,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        '''
+        run_query(create_sql, (), fetch_one=False, fetch_all=False)
+        
+        # Test if table exists by trying to query it
+        test_sql = 'SELECT COUNT(*) FROM recurring_expenses'
+        result = run_query(test_sql, (), fetch_one=True)
+        
+        logger.info("✅ Table created and verified successfully")
+        return jsonify({
+            'success': True,
+            'message': 'Recurring expenses table created successfully',
+            'table_exists': True
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating table: {e}")
         return jsonify({
             'error': str(e),
             'success': False

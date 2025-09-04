@@ -31,7 +31,7 @@ def fix_recurring_expenses_database():
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
             '''
-            run_query(create_recurring_sql, ())
+            run_query(create_recurring_sql, (), fetch_one=False, fetch_all=False)
             logger.info("✅ Created recurring_expenses table")
         except Exception as e:
             logger.error(f"Error creating recurring_expenses table: {e}", exc_info=True)
