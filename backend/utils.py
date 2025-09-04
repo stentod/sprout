@@ -257,7 +257,7 @@ def run_query(sql, params=None, fetch_one=False, fetch_all=True):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(sql, params or ())
             
-            if sql.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE')):
+            if sql.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP')):
                 conn.commit()
                 # Check if query has RETURNING clause
                 if 'RETURNING' in sql.upper():

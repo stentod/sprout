@@ -369,25 +369,10 @@ def setup_recurring_expenses_table():
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         '''
+        # Create the table (now properly commits due to utils.py fix)
         run_query(create_sql, (), fetch_one=False, fetch_all=False)
         
         # Test if table exists by trying to query it
-        import time
-        time.sleep(0.5)  # Give the database a moment to commit
-        
-        # First check if table exists in information_schema
-        check_sql = '''
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'recurring_expenses'
-            )
-        '''
-        table_check = run_query(check_sql, (), fetch_one=True)
-        
-        if not table_check or not table_check['exists']:
-            raise Exception("Table was not created successfully")
-        
-        # Now try to query the table
         test_sql = 'SELECT COUNT(*) FROM recurring_expenses'
         result = run_query(test_sql, (), fetch_one=True)
         
