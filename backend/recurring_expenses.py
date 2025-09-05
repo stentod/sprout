@@ -174,6 +174,30 @@ def create_recurring_expense():
         result = run_query(insert_sql, (user_id, description, amount, category_id, frequency, start_date), fetch_one=True)
         
         if result:
+            # Check if this recurring expense should be processed today
+            today = datetime.now().date()
+            if start_date <= today and is_recurring_expense_due({
+                'start_date': start_date,
+                'frequency': frequency
+            }, today):
+                # Add the expense to the expenses table immediately
+                try:
+                    insert_expense_sql = '''
+                        INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
+                        VALUES (%s, %s, %s, %s, %s)
+                    '''
+                    run_query(insert_expense_sql, (
+                        user_id,
+                        amount,
+                        description,
+                        category_id,
+                        datetime.now()
+                    ))
+                    logger.info(f"Immediately processed recurring expense: {description} for user {user_id}")
+                except Exception as e:
+                    logger.error(f"Error processing recurring expense immediately: {e}")
+                    # Don't fail the creation if immediate processing fails
+            
             return jsonify({
                 'success': True,
                 'message': 'Recurring expense created successfully',
