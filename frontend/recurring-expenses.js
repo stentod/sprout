@@ -91,8 +91,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     expensesContainer = document.getElementById('recurring-expenses-container');
     expensesStatusMessage = document.getElementById('expenses-status-message');
     
-    // Set default start date to today
-    startDateInput.value = new Date().toISOString().split('T')[0];
+    // Set default start date to today (in local timezone)
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    startDateInput.value = `${year}-${month}-${day}`;
     
     // Load data and set up event listeners
     await Promise.all([
