@@ -224,7 +224,9 @@ function getFrequencyText(frequency) {
 }
 
 function formatDate(dateString) {
-    const date = new Date(dateString);
+    // Parse the date string as local date to avoid timezone issues
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(year, month - 1, day); // month is 0-indexed
     return date.toLocaleDateString();
 }
 
