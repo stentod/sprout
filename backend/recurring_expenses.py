@@ -257,6 +257,85 @@ def delete_recurring_expense(expense_id):
             'success': False
         }), 500
 
+def process_recurring_expenses_for_date(target_date):
+    """Process recurring expenses for a specific date (used for date simulation)"""
+    try:
+        logger.info(f"Processing recurring expenses for date: {target_date}")
+        
+        # First check if the table exists
+        check_table_sql = '''
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'recurring_expenses'
+            )
+        '''
+        table_exists = run_query(check_table_sql, (), fetch_one=True)
+        
+        if not table_exists or not table_exists['exists']:
+            logger.info("Recurring expenses table does not exist yet, skipping processing")
+            return 0
+        
+        # Get all active recurring expenses
+        sql = '''
+            SELECT 
+                re.id,
+                re.user_id,
+                re.description,
+                re.amount,
+                re.category_id,
+                re.frequency,
+                re.start_date
+            FROM recurring_expenses re
+            WHERE re.is_active = TRUE
+        '''
+        
+        recurring_expenses = run_query(sql, (), fetch_all=True)
+        
+        processed_count = 0
+        
+        for expense in recurring_expenses:
+            if is_recurring_expense_due(expense, target_date):
+                # Check if this expense already exists for this date
+                existing_expense_sql = '''
+                    SELECT id FROM expenses 
+                    WHERE user_id = %s AND amount = %s AND description = %s 
+                    AND DATE(timestamp) = %s
+                '''
+                existing = run_query(existing_expense_sql, (
+                    expense['user_id'],
+                    expense['amount'],
+                    expense['description'],
+                    target_date
+                ), fetch_one=True)
+                
+                if not existing:
+                    # Add the expense with the target date
+                    insert_sql = '''
+                        INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
+                        VALUES (%s, %s, %s, %s, %s)
+                    '''
+                    # Create timestamp with target date but current time
+                    from datetime import datetime, timezone
+                    current_time = datetime.now(timezone.utc).time()
+                    target_timestamp = datetime.combine(target_date, current_time)
+                    
+                    run_query(insert_sql, (
+                        expense['user_id'],
+                        expense['amount'],
+                        expense['description'],
+                        expense['category_id'],
+                        target_timestamp
+                    ))
+                    processed_count += 1
+                    logger.info(f"Added recurring expense: {expense['description']} for user {expense['user_id']} on {target_date}")
+        
+        logger.info(f"Processed {processed_count} recurring expenses for {target_date}")
+        return processed_count
+        
+    except Exception as e:
+        logger.error(f"Error processing recurring expenses for date {target_date}: {e}")
+        return 0
+
 def process_recurring_expenses():
     """Process recurring expenses and add them to the expenses table if due"""
     try:
