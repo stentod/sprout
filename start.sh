@@ -152,11 +152,13 @@ cd backend
 # Set development environment variables (will be overridden by .env file if present)
 export FLASK_ENV=development
 export FLASK_DEBUG=${FLASK_DEBUG:-true}
+export DEBUG_MODE=${DEBUG_MODE:-true}  # Enable debug features in development
 export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"
 
 # Get port from environment or default to 5001
 BACKEND_PORT=${PORT:-5001}
 echo -e "${GREEN}🔧 Backend will start on http://localhost:${BACKEND_PORT}${NC}"
+echo -e "${YELLOW}🐛 Debug mode enabled - date travel buttons will be visible${NC}"
 
 python app.py &
 BACKEND_PID=$!
