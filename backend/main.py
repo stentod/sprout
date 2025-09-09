@@ -6,7 +6,7 @@ import os
 
 from utils import (
     logger, setup_logging, add_security_headers_passive, 
-    DatabaseConnectionError, DEBUG, PORT
+    DatabaseConnectionError, DEBUG, DEBUG_MODE, PORT
 )
 
 # Import blueprints
@@ -114,6 +114,16 @@ def handle_internal_error(e):
 @app.route('/health')
 def health():
     return {'status': 'ok'}
+
+@app.route('/api/config')
+def get_config():
+    """Get application configuration including debug mode"""
+    # Read DEBUG_MODE directly from environment to ensure it's current
+    current_debug_mode = os.environ.get("DEBUG_MODE", "False").lower() == "true"
+    return jsonify({
+        'debug': current_debug_mode,
+        'flask_debug': DEBUG
+    })
 
 # Get the frontend directory path relative to this file
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend')

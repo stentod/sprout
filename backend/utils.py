@@ -225,6 +225,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://dstent@localhost/spr
 BUDGET = float(os.environ.get("DAILY_BUDGET", "30.0"))  # Daily budget amount
 PORT = int(os.environ.get("PORT", "5001"))  # Server port
 DEBUG = os.environ.get("FLASK_DEBUG", "False").lower() == "true"  # Debug mode
+DEBUG_MODE = os.environ.get("DEBUG_MODE", "False").lower() == "true"  # Debug mode for UI features
 
 def get_db_connection():
     """Get a database connection with dict cursor for easy column access"""
