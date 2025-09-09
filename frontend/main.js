@@ -24,6 +24,30 @@ function getApiBaseUrl() {
 const dayOffset = getDayOffset();
 const API_BASE_URL = getApiBaseUrl();
 
+// Global debug mode flag
+let DEBUG_MODE = false;
+
+// Fetch application configuration
+async function fetchConfig() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/config`, {
+      credentials: 'include'
+    });
+    
+    if (response.ok) {
+      const config = await response.json();
+      DEBUG_MODE = config.debug || false;
+      console.log('🔧 Debug mode:', DEBUG_MODE);
+    } else {
+      console.warn('⚠️ Could not fetch config, defaulting to debug mode off');
+      DEBUG_MODE = false;
+    }
+  } catch (error) {
+    console.warn('⚠️ Error fetching config:', error);
+    DEBUG_MODE = false;
+  }
+}
+
 // Debug API URL detection
 console.log('🔍 API URL Debug:');
 console.log('  Hostname:', window.location.hostname);
@@ -219,7 +243,8 @@ function renderMainUI(summary) {
         ` : ''}
       </div>
       
-      <!-- Compact Date Simulation Controls (Top Right) -->
+      <!-- Compact Date Simulation Controls (Top Right) - Only in Debug Mode -->
+      ${DEBUG_MODE ? `
       <div class="compact-date-controls">
         <div class="date-display-compact">
           <span id="current-date-value" class="current-date-value-compact">Loading...</span>
@@ -230,6 +255,7 @@ function renderMainUI(summary) {
           <button id="reset-date-btn" class="btn btn-tiny btn-primary" title="Reset to Today">Today</button>
         </div>
       </div>
+      ` : ''}
       
       <!-- Main Content Grid -->
       <div class="main-grid">
@@ -745,8 +771,10 @@ async function loadSummaryWithFallbacks() {
   renderMainUI(summary);
   renderAddExpenseForm();
   
-  // Setup date simulation controls
-  setupDateSimulationControls();
+  // Setup date simulation controls (only in debug mode)
+  if (DEBUG_MODE) {
+    setupDateSimulationControls();
+  }
     
   } catch (error) {
     console.error('❌ API call failed with error:', error.message);
@@ -766,11 +794,20 @@ async function loadSummaryWithFallbacks() {
 
 
 
+// Initialize app with config first
+async function initApp() {
+  // Fetch config first to set debug mode
+  await fetchConfig();
+  
+  // Then load the summary and render the UI
+  await loadSummaryWithFallbacks();
+}
+
 // On page load - wait for DOM to be ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', loadSummaryWithFallbacks);
+  document.addEventListener('DOMContentLoaded', initApp);
 } else {
-  loadSummaryWithFallbacks();
+  initApp();
 } 
 
 // Force deployment refresh - production fix for blank screen issue
