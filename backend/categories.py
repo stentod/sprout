@@ -382,8 +382,8 @@ def get_category_budget_tracking():
     """Get category budget tracking for today - spending vs. budget for each category"""
     try:
         day_offset = int(request.args.get('dayOffset', 0))
-        today_start, today_end = get_day_bounds(day_offset)
         user_id = get_current_user_id()
+        today_start, today_end = get_day_bounds(day_offset, user_id)
         
         try:
             # Get all categories with their budgets for the current user (new normalized structure)

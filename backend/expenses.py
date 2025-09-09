@@ -17,9 +17,8 @@ def get_expenses():
     """Get expenses for a specific day"""
     # Get dayOffset from query string (?dayOffset=N), default to 0 (today)
     day_offset = int(request.args.get('dayOffset', 0))
-    start, end = get_day_bounds(day_offset)
-    
     user_id = get_current_user_id()
+    start, end = get_day_bounds(day_offset, user_id)
     sql = '''
         SELECT id, amount, description, timestamp 
         FROM expenses 
@@ -128,11 +127,31 @@ def add_expense():
         })
     
     # Use UTC timestamp to ensure consistent date handling across timezones
-    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-    logger.debug("Generated timestamp for expense", extra={
-        'user_id': user_id,
-        'timestamp': timestamp
-    })
+    # Check if user has a simulated date set
+    simulated_date_result = run_query("""
+        SELECT simulated_date 
+        FROM user_preferences 
+        WHERE user_id = %s AND simulated_date IS NOT NULL
+    """, (user_id,), fetch_one=True)
+    
+    if simulated_date_result and simulated_date_result['simulated_date']:
+        # Use simulated date for the timestamp
+        simulated_date = simulated_date_result['simulated_date']
+        # Create timestamp with simulated date but current time
+        current_time = datetime.now(timezone.utc).time()
+        timestamp = datetime.combine(simulated_date, current_time).strftime('%Y-%m-%d %H:%M:%S')
+        logger.debug("Using simulated date for expense timestamp", extra={
+            'user_id': user_id,
+            'simulated_date': simulated_date,
+            'timestamp': timestamp
+        })
+    else:
+        # Use current UTC timestamp
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        logger.debug("Using current UTC timestamp for expense", extra={
+            'user_id': user_id,
+            'timestamp': timestamp
+        })
     
     logger.info("Inserting expense into database", extra={
         'user_id': user_id,
@@ -168,9 +187,8 @@ def get_summary():
     """Get spending summary and plant state"""
     try:
         day_offset = int(request.args.get('dayOffset', 0))
-        today_start, today_end = get_day_bounds(day_offset)
-        
         user_id = get_current_user_id()
+        today_start, today_end = get_day_bounds(day_offset, user_id)
         
         # Get user's daily limit with fallback
         try:
@@ -180,8 +198,8 @@ def get_summary():
             user_daily_limit = 30.0
         
         # OPTIMIZED: Get 7-day spending data in a single query
-        start_date, _ = get_day_bounds(day_offset - 6)  # 7 days ago
-        _, end_date = get_day_bounds(day_offset + 1)    # Tomorrow
+        start_date, _ = get_day_bounds(day_offset - 6, user_id)  # 7 days ago
+        _, end_date = get_day_bounds(day_offset + 1, user_id)    # Tomorrow
         
         try:
             # Single query to get daily spending for the last 7 days
@@ -208,7 +226,7 @@ def get_summary():
             deltas = []
             for i in range(7):
                 offset = day_offset - i
-                day_start, day_end = get_day_bounds(offset)
+                day_start, day_end = get_day_bounds(offset, user_id)
                 date_key = day_start.strftime('%Y-%m-%d')
                 daily_spent = spending_lookup.get(date_key, 0.0)
                 daily_surplus = user_daily_limit - daily_spent
@@ -274,8 +292,8 @@ def get_history():
         category_id = request.args.get('category_id')  # Optional category filter
         
         user_id = get_current_user_id()
-        start_date, _ = get_day_bounds(day_offset - (period - 1))
-        _, end_date = get_day_bounds(day_offset)
+        start_date, _ = get_day_bounds(day_offset - (period - 1), user_id)
+        _, end_date = get_day_bounds(day_offset, user_id)
         
         try:
             expenses = get_expenses_between(start_date, end_date, user_id, category_id)

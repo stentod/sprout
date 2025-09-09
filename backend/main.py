@@ -15,20 +15,11 @@ from expenses import expenses_bp
 from categories import categories_bp
 from preferences import preferences_bp
 from recurring_expenses import recurring_expenses_bp
+from rollover_api import rollover_bp
 
 # Initialize logging
 logger = setup_logging()
 
-# Auto-fix rollover database on app startup
-try:
-    from auto_fix_rollover import fix_rollover_database
-    logger.info("Running automatic rollover database fix...")
-    if fix_rollover_database():
-        logger.info("✅ Rollover database fix completed successfully")
-    else:
-        logger.warning("⚠️ Rollover database fix had issues, but app will continue")
-except Exception as e:
-    logger.warning(f"⚠️ Could not run rollover database fix: {e}. App will continue.")
 
 # Auto-fix recurring expenses database on app startup
 try:
@@ -40,6 +31,8 @@ try:
         logger.warning("⚠️ Recurring expenses database fix had issues, but app will continue")
 except Exception as e:
     logger.warning(f"⚠️ Could not run recurring expenses database fix: {e}. App will continue.")
+
+# Rollover migration already completed - tables should exist
 
 # Process recurring expenses on app startup (with delay to ensure table is committed)
 try:
@@ -96,6 +89,7 @@ app.register_blueprint(expenses_bp, url_prefix='/api')
 app.register_blueprint(categories_bp, url_prefix='/api')
 app.register_blueprint(preferences_bp, url_prefix='/api')
 app.register_blueprint(recurring_expenses_bp, url_prefix='/api')
+app.register_blueprint(rollover_bp, url_prefix='/api')
 
 # Error handlers for database connection issues
 @app.errorhandler(DatabaseConnectionError)

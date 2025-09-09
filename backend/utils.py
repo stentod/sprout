@@ -457,8 +457,29 @@ def handle_errors(f):
 # HELPER FUNCTIONS
 # ==========================================
 
-def get_day_bounds(day_offset=0):
+def get_day_bounds(day_offset=0, user_id=None):
     """Get the start and end of the target day (using dayOffset)"""
+    # Check if user has a simulated date set
+    if user_id:
+        try:
+            simulated_date_result = run_query("""
+                SELECT simulated_date 
+                FROM user_preferences 
+                WHERE user_id = %s AND simulated_date IS NOT NULL
+            """, (user_id,), fetch_one=True)
+            
+            if simulated_date_result and simulated_date_result['simulated_date']:
+                # Use simulated date as the base
+                simulated_date = simulated_date_result['simulated_date']
+                target_day = datetime.combine(simulated_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+                target_day = target_day + timedelta(days=day_offset)
+                start = target_day
+                end = target_day + timedelta(days=1)
+                return start, end
+        except Exception as e:
+            logger.warning(f"Could not check simulated date for user {user_id}: {e}")
+    
+    # Fallback to real current date
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     target_day = today + timedelta(days=day_offset)
     start = target_day

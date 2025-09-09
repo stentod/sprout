@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from datetime import datetime, date
 
 from utils import (
     logger, run_query, get_user_daily_limit, _cache, _cache_timestamps
@@ -181,25 +182,11 @@ def get_budgets():
         user_id = get_current_user_id()
         daily_limit = get_user_daily_limit(user_id)
         
-        # Check if rollover is enabled and get today's rollover amount
-        rollover_sql = '''
-            SELECT daily_rollover_enabled, 
-                   COALESCE((SELECT rollover_amount FROM daily_rollovers WHERE user_id = %s AND date = CURRENT_DATE), 0.00) as today_rollover
-            FROM user_preferences 
-            WHERE user_id = %s
-        '''
-        rollover_result = run_query(rollover_sql, (user_id, user_id), fetch_one=True)
-        
-        daily_rollover_enabled = rollover_result.get('daily_rollover_enabled', False) if rollover_result else False
-        today_rollover = float(rollover_result.get('today_rollover', 0.00)) if rollover_result else 0.0
-        
-        # Calculate adjusted daily limit (including rollover)
-        adjusted_daily_limit = daily_limit + today_rollover
         
         # Calculate budget periods
-        weekly_budget = adjusted_daily_limit * 7
-        monthly_budget = adjusted_daily_limit * 30  # Using 30 days for consistency
-        yearly_budget = adjusted_daily_limit * 365
+        weekly_budget = daily_limit * 7
+        monthly_budget = daily_limit * 30  # Using 30 days for consistency
+        yearly_budget = daily_limit * 365
         
         # Get spending data for different periods
         # Weekly spending (last 7 days)
@@ -238,9 +225,7 @@ def get_budgets():
         return jsonify({
             'success': True,
             'daily_limit': daily_limit,
-            'daily_rollover_enabled': daily_rollover_enabled,
-            'today_rollover': today_rollover,
-            'adjusted_daily_limit': adjusted_daily_limit,
+            'adjusted_daily_limit': daily_limit,
             'budgets': {
                 'weekly': {
                     'budget': weekly_budget,
@@ -270,104 +255,175 @@ def get_budgets():
             'success': False
         }), 500
 
-@preferences_bp.route('/preferences/rollover-settings', methods=['GET'])
-@require_auth
-def get_rollover_settings():
-    """Get the user's rollover settings"""
-    try:
-        user_id = get_current_user_id()
-        
-        # Get rollover setting
-        sql = 'SELECT daily_rollover_enabled FROM user_preferences WHERE user_id = %s'
-        result = run_query(sql, (user_id,), fetch_one=True)
-        
-        if result:
-            return jsonify({
-                'daily_rollover_enabled': result['daily_rollover_enabled'],
-                'success': True
-            })
-        else:
-            return jsonify({
-                'daily_rollover_enabled': False,
-                'success': True
-            })
-            
-    except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'success': False
-        }), 500
 
-@preferences_bp.route('/preferences/rollover-settings', methods=['POST', 'PUT'])
+
+
+# ==========================================
+# DATE SIMULATION ENDPOINTS
+# ==========================================
+
+@preferences_bp.route('/preferences/date-simulation', methods=['GET'])
 @require_auth
-def update_rollover_settings():
-    """Update the user's rollover settings"""
+def get_date_simulation():
+    """Get the current date simulation status"""
     try:
-        data = request.get_json()
-        daily_rollover_enabled = data.get('daily_rollover_enabled', False)
-        
         user_id = get_current_user_id()
         
-        # Update rollover setting
-        sql = '''
-            INSERT INTO user_preferences (user_id, daily_rollover_enabled, updated_at)
-            VALUES (%s, %s, CURRENT_TIMESTAMP)
-            ON CONFLICT (user_id) DO UPDATE SET
-                daily_rollover_enabled = EXCLUDED.daily_rollover_enabled,
-                updated_at = CURRENT_TIMESTAMP
-            RETURNING daily_rollover_enabled
-        '''
-        result = run_query(sql, (user_id, daily_rollover_enabled), fetch_one=True)
+        # Check if user has a simulated date set
+        result = run_query("""
+            SELECT simulated_date 
+            FROM user_preferences 
+            WHERE user_id = %s AND simulated_date IS NOT NULL
+        """, (user_id,))
         
-        if result:
+        if result and len(result) > 0:
+            simulated_date = result[0]['simulated_date']
             return jsonify({
-                'daily_rollover_enabled': result['daily_rollover_enabled'],
                 'success': True,
-                'message': 'Rollover settings updated successfully'
+                'is_simulated': True,
+                'simulated_date': simulated_date.strftime('%Y-%m-%d') if simulated_date else None
             })
         else:
             return jsonify({
-                'error': 'Failed to update rollover settings',
-                'success': False
-            }), 500
+                'success': True,
+                'is_simulated': False,
+                'simulated_date': None
+            })
             
     except Exception as e:
+        logger.error(f"Error getting date simulation: {e}")
         return jsonify({
             'error': str(e),
             'success': False
         }), 500
 
-@preferences_bp.route('/preferences/rollover-amounts', methods=['GET'])
+@preferences_bp.route('/preferences/date-simulation', methods=['POST'])
 @require_auth
-def get_rollover_amounts():
-    """Get current rollover amounts for daily budget"""
+def set_date_simulation():
+    """Set a simulated date for testing"""
     try:
         user_id = get_current_user_id()
+        data = request.get_json()
+        simulated_date_str = data.get('simulated_date')
         
-        # Get user's rollover setting
-        settings_sql = 'SELECT daily_rollover_enabled FROM user_preferences WHERE user_id = %s'
-        settings_result = run_query(settings_sql, (user_id,), fetch_one=True)
-        
-        if not settings_result or not settings_result['daily_rollover_enabled']:
+        if not simulated_date_str:
             return jsonify({
-                'daily_rollover': 0.0,
-                'success': True
-            })
+                'error': 'simulated_date is required',
+                'success': False
+            }), 400
         
-        # Get today's rollover amount
-        daily_sql = '''
-            SELECT rollover_amount FROM daily_rollovers 
-            WHERE user_id = %s AND date = CURRENT_DATE
-        '''
-        daily_result = run_query(daily_sql, (user_id,), fetch_one=True)
-        daily_rollover = float(daily_result['rollover_amount']) if daily_result else 0.0
+        try:
+            # Parse and validate the date
+            simulated_date = datetime.strptime(simulated_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({
+                'error': 'Invalid date format. Use YYYY-MM-DD',
+                'success': False
+            }), 400
+        
+        # Get the previous simulated date BEFORE updating the database
+        prev_result = run_query("""
+            SELECT simulated_date 
+            FROM user_preferences 
+            WHERE user_id = %s AND simulated_date IS NOT NULL
+        """, (user_id,), fetch_one=True)
+        
+        # Determine the date to process rollover for
+        date_to_process = None
+        if prev_result and prev_result['simulated_date']:
+            # If there was a previous simulated date, use that
+            date_to_process = prev_result['simulated_date']
+        else:
+            # If no previous simulated date, use today (real date)
+            from datetime import date
+            date_to_process = date.today()
+        
+        # Process rollover when changing dates (BEFORE updating the database)
+        try:
+            from rollover_service import RolloverService
+            rollover_service = RolloverService()
+            
+            # Always process rollover when changing dates
+            if date_to_process != simulated_date:
+                logger.info(f"🔄 Processing rollover for date transition: {date_to_process} -> {simulated_date}")
+                rollover_service.process_end_of_day_rollover(user_id, date_to_process)
+                logger.info(f"✅ Processed rollover for date transition: {date_to_process} -> {simulated_date}")
+            else:
+                logger.info(f"📅 No date change detected, skipping rollover processing")
+                
+        except Exception as e:
+            logger.warning(f"❌ Could not process rollover for date transition: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Update or insert the simulated date (AFTER processing rollover)
+        run_query("""
+            INSERT INTO user_preferences (user_id, simulated_date, updated_at)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (user_id) 
+            DO UPDATE SET 
+                simulated_date = EXCLUDED.simulated_date,
+                updated_at = NOW()
+        """, (user_id, simulated_date))
+        
+        logger.info(f"User {user_id} set simulated date to {simulated_date}")
         
         return jsonify({
-            'daily_rollover': daily_rollover,
-            'success': True
+            'success': True,
+            'message': f'Date simulation set to {simulated_date}',
+            'simulated_date': simulated_date_str
         })
         
     except Exception as e:
+        logger.error(f"Error setting date simulation: {e}")
+        return jsonify({
+            'error': str(e),
+            'success': False
+        }), 500
+
+@preferences_bp.route('/preferences/date-simulation', methods=['DELETE'])
+@require_auth
+def clear_date_simulation():
+    """Clear the simulated date and return to real date"""
+    try:
+        user_id = get_current_user_id()
+        
+        # Process rollover before clearing simulated date
+        try:
+            from rollover_service import RolloverService
+            rollover_service = RolloverService()
+            
+            # Get current simulated date to process rollover
+            current_result = run_query("""
+                SELECT simulated_date 
+                FROM user_preferences 
+                WHERE user_id = %s AND simulated_date IS NOT NULL
+            """, (user_id,), fetch_one=True)
+            
+            if current_result and current_result['simulated_date']:
+                # Process rollover for the current simulated date before clearing
+                rollover_service.process_end_of_day_rollover(user_id, current_result['simulated_date'])
+                logger.info(f"Processed rollover before clearing simulated date: {current_result['simulated_date']}")
+                
+        except Exception as e:
+            logger.warning(f"Could not process rollover before clearing date: {e}")
+        
+        # Clear the simulated date
+        run_query("""
+            UPDATE user_preferences 
+            SET simulated_date = NULL, updated_at = NOW()
+            WHERE user_id = %s
+        """, (user_id,))
+        
+        logger.info(f"User {user_id} cleared simulated date")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Date simulation cleared, using real date'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error clearing date simulation: {e}")
         return jsonify({
             'error': str(e),
             'success': False

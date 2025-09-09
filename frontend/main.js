@@ -219,8 +219,21 @@ function renderMainUI(summary) {
         ` : ''}
       </div>
       
+      <!-- Compact Date Simulation Controls (Top Right) -->
+      <div class="compact-date-controls">
+        <div class="date-display-compact">
+          <span id="current-date-value" class="current-date-value-compact">Loading...</span>
+        </div>
+        <div class="date-controls-compact">
+          <button id="prev-day-btn" class="btn btn-tiny btn-secondary" title="Previous Day">←</button>
+          <button id="next-day-btn" class="btn btn-tiny btn-secondary" title="Next Day">→</button>
+          <button id="reset-date-btn" class="btn btn-tiny btn-primary" title="Reset to Today">Today</button>
+        </div>
+      </div>
+      
       <!-- Main Content Grid -->
       <div class="main-grid">
+
         <!-- Hero Section - Balance and Plant Status -->
         <div class="hero-section">
           <div class="hero-content">
@@ -700,12 +713,40 @@ async function loadSummaryWithFallbacks() {
   const summary = await resp.json();
     console.log('✅ API call successful, summary data:', summary);
     
+    // Load rollover budget data if available
+    try {
+      const rolloverResponse = await fetch(`${API_BASE_URL}/api/rollover/current-budget`, {
+        credentials: 'include'
+      });
+      
+      if (rolloverResponse.ok) {
+        const rolloverData = await rolloverResponse.json();
+        console.log('✅ Rollover budget loaded:', rolloverData);
+        
+        if (rolloverData.success && rolloverData.rollover_enabled) {
+          // Use effective budget (base + rollover) instead of regular balance
+          summary.balance = rolloverData.effective_budget;
+          summary.rollover_info = {
+            base_budget: rolloverData.base_daily_limit,
+            rollover_amount: rolloverData.rollover_amount,
+            effective_budget: rolloverData.effective_budget
+          };
+          console.log('🔄 Using rollover-aware budget:', summary.balance);
+        }
+      }
+    } catch (rolloverError) {
+      console.warn('⚠️ Could not load rollover data, using regular budget:', rolloverError);
+    }
+    
     // Load category budgets first
     await loadCategoryBudgets();
     
     // Now render the main UI with budget data
   renderMainUI(summary);
   renderAddExpenseForm();
+  
+  // Setup date simulation controls
+  setupDateSimulationControls();
     
   } catch (error) {
     console.error('❌ API call failed with error:', error.message);
@@ -783,4 +824,169 @@ function clearConsole() {
   console.clear();
   console.log('🧹 Console cleared');
   alert('Console cleared!');
+}
+
+// ==========================================
+// DATE SIMULATION FUNCTIONS
+// ==========================================
+
+function setupDateSimulationControls() {
+  console.log('🗓️ Setting up date simulation controls...');
+  
+  // Load current date
+  loadCurrentDate();
+  
+  // Add event listeners
+  const prevDayBtn = document.getElementById('prev-day-btn');
+  const nextDayBtn = document.getElementById('next-day-btn');
+  const resetDateBtn = document.getElementById('reset-date-btn');
+  
+  if (prevDayBtn) {
+    prevDayBtn.addEventListener('click', () => navigateDate(-1));
+  }
+  
+  if (nextDayBtn) {
+    nextDayBtn.addEventListener('click', () => navigateDate(1));
+  }
+  
+  if (resetDateBtn) {
+    resetDateBtn.addEventListener('click', resetToToday);
+  }
+  
+  console.log('✅ Date simulation controls setup complete');
+}
+
+async function loadCurrentDate() {
+  try {
+    console.log('📅 Loading current date...');
+    const response = await fetch(`${API_BASE_URL}/api/preferences/date-simulation`, {
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('📅 Date simulation data:', data);
+    
+    const dateValueElement = document.getElementById('current-date-value');
+    if (dateValueElement) {
+      if (data.is_simulated && data.simulated_date) {
+        dateValueElement.textContent = data.simulated_date;
+        dateValueElement.classList.add('simulated');
+      } else {
+        const today = new Date().toISOString().split('T')[0];
+        dateValueElement.textContent = today;
+        dateValueElement.classList.remove('simulated');
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Error loading current date:', error);
+    const dateValueElement = document.getElementById('current-date-value');
+    if (dateValueElement) {
+      const today = new Date().toISOString().split('T')[0];
+      dateValueElement.textContent = today;
+      dateValueElement.classList.remove('simulated');
+    }
+  }
+}
+
+async function navigateDate(direction) {
+  try {
+    const currentDateElement = document.getElementById('current-date-value');
+    const currentDate = currentDateElement.textContent;
+    
+    if (!currentDate || currentDate === 'Loading...') {
+      console.error('❌ No current date available');
+      return;
+    }
+    
+    const date = new Date(currentDate);
+    date.setDate(date.getDate() + direction);
+    const newDate = date.toISOString().split('T')[0];
+    
+    console.log(`📅 Navigating from ${currentDate} to ${newDate} (${direction > 0 ? 'next' : 'previous'} day)`);
+    
+    await setSimulatedDate(newDate);
+    
+  } catch (error) {
+    console.error('❌ Error navigating date:', error);
+  }
+}
+
+async function resetToToday() {
+  try {
+    console.log('📅 Resetting to today...');
+    
+    const response = await fetch(`${API_BASE_URL}/api/preferences/date-simulation`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('📅 Reset date response:', data);
+    
+    if (data.success) {
+      const today = new Date().toISOString().split('T')[0];
+      const dateValueElement = document.getElementById('current-date-value');
+      if (dateValueElement) {
+        dateValueElement.textContent = today;
+        dateValueElement.classList.remove('simulated');
+      }
+      
+      // Reload the page to refresh all data with the new date
+      window.location.reload();
+    } else {
+      throw new Error(data.error || 'Failed to reset date');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error resetting to today:', error);
+  }
+}
+
+async function setSimulatedDate(date) {
+  try {
+    console.log('📅 Setting simulated date to:', date);
+    
+    const response = await fetch(`${API_BASE_URL}/api/preferences/date-simulation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        simulated_date: date
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('📅 Set date response:', data);
+    
+    if (data.success) {
+      const dateValueElement = document.getElementById('current-date-value');
+      if (dateValueElement) {
+        dateValueElement.textContent = data.simulated_date;
+        dateValueElement.classList.add('simulated');
+      }
+      
+      // Reload the page to refresh all data with the new date
+      window.location.reload();
+    } else {
+      throw new Error(data.error || 'Failed to set simulated date');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error setting simulated date:', error);
+  }
 } 

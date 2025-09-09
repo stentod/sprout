@@ -65,6 +65,7 @@ let preferenceStatusMessage;
 let rolloverToggle;
 let rolloverStatusMessage;
 
+
 // State
 let originalLimit = 30.00;
 let isLoading = false;
@@ -115,6 +116,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     rolloverToggle = document.getElementById('rollover-toggle');
     rolloverStatusMessage = document.getElementById('rollover-status-message');
     
+    
     // Load current daily limit, categories, and preferences
     loadCurrentDailyLimit();
     loadCategories();
@@ -144,6 +146,7 @@ function setupEventListeners() {
     
     // Rollover toggle
     rolloverToggle.addEventListener('change', handleRolloverChange);
+    
 }
 
 async function loadCurrentDailyLimit() {
@@ -862,7 +865,7 @@ async function confirmDeleteCategory(categoryId, categoryName) {
 async function loadRolloverSettings() {
     try {
         console.log('Loading rollover settings...');
-        const response = await fetch(`${API_BASE}/preferences/rollover-settings`, {
+        const response = await fetch(`${API_BASE}/rollover/settings`, {
             credentials: 'include'
         });
         
@@ -890,7 +893,7 @@ async function handleRolloverChange(event) {
         const enabled = event.target.checked;
         console.log('Updating rollover settings:', { daily_rollover_enabled: enabled });
         
-        const response = await fetch(`${API_BASE}/preferences/rollover-settings`, {
+        const response = await fetch(`${API_BASE}/rollover/settings`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -935,5 +938,6 @@ function showRolloverStatusMessage(message, type) {
         rolloverStatusMessage.style.display = 'none';
     }, 5000);
 }
+
 
  

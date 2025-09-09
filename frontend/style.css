@@ -1710,6 +1710,101 @@ body {
   justify-content: flex-end;
 }
 
+/* ==========================================
+   COMPACT DATE SIMULATION CONTROLS
+   ========================================== */
+
+.compact-date-controls {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.date-display-compact {
+  display: flex;
+  align-items: center;
+}
+
+.current-date-value-compact {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  background: var(--color-bg-secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+}
+
+.current-date-value-compact.simulated {
+  background: var(--color-accent-warning);
+  color: #000;
+  border-color: var(--color-accent-warning);
+}
+
+.date-controls-compact {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.btn-tiny {
+  padding: 4px 8px;
+  font-size: 12px;
+  min-width: auto;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-tiny:hover {
+  background: var(--color-bg-card-hover);
+  border-color: var(--color-border-focus);
+}
+
+.btn-tiny.btn-primary {
+  background: var(--color-accent-primary);
+  color: white;
+  border-color: var(--color-accent-primary);
+}
+
+.btn-tiny.btn-primary:hover {
+  background: var(--color-accent-primary-hover);
+  border-color: var(--color-accent-primary-hover);
+}
+
+/* Responsive adjustments for compact date controls */
+@media (max-width: 768px) {
+  .compact-date-controls {
+    top: 10px;
+    right: 10px;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  
+  .current-date-value-compact {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+  
+  .btn-tiny {
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+}
+
 /* Mobile responsive for category budgets */
 @media (max-width: 768px) {
   .category-budget-item {
