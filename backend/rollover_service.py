@@ -181,6 +181,17 @@ class RolloverService:
                     updated_at = NOW()
             """, (user_id, enabled))
             
+            # If enabling rollover, clear any existing rollover data for today
+            # This ensures rollover only affects future days, not the current day
+            if enabled:
+                from datetime import date
+                today = date.today()
+                run_query("""
+                    DELETE FROM daily_rollovers 
+                    WHERE user_id = %s AND date = %s
+                """, (user_id, today))
+                self.logger.info(f"Cleared existing rollover data for user {user_id} on {today} when enabling rollover")
+            
             self.logger.info(f"Updated rollover settings for user {user_id}: enabled={enabled}")
             
         except Exception as e:
