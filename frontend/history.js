@@ -252,6 +252,9 @@ function renderHistory(days) {
   setupEventHandlers();
 }
 
+// Global flag to track if event listeners are already set up
+let eventListenersSetup = false;
+
 // Setup event handlers for filters and expense actions
 function setupEventHandlers() {
   const periodFilter = document.getElementById('period-filter');
@@ -280,21 +283,25 @@ function setupEventHandlers() {
     });
   }
 
-  // Add event delegation for edit and delete buttons
-  document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('edit-expense-btn')) {
-      const expenseId = e.target.dataset.expenseId;
-      const amount = e.target.dataset.amount;
-      const description = e.target.dataset.description;
-      const categoryId = e.target.dataset.categoryId === 'none' ? '' : e.target.dataset.categoryId;
-      const categoryType = e.target.dataset.categoryType;
-      console.log('Button clicked - categoryId:', categoryId, 'categoryType:', categoryType);
-      editExpense(expenseId, amount, description, categoryId);
-    } else if (e.target.classList.contains('delete-expense-btn')) {
-      const expenseId = e.target.dataset.expenseId;
-      deleteExpense(expenseId);
-    }
-  });
+  // Only add the global click listener once
+  if (!eventListenersSetup) {
+    // Add event delegation for edit and delete buttons
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('edit-expense-btn')) {
+        const expenseId = e.target.dataset.expenseId;
+        const amount = e.target.dataset.amount;
+        const description = e.target.dataset.description;
+        const categoryId = e.target.dataset.categoryId === 'none' ? '' : e.target.dataset.categoryId;
+        const categoryType = e.target.dataset.categoryType;
+        console.log('Button clicked - categoryId:', categoryId, 'categoryType:', categoryType);
+        editExpense(expenseId, amount, description, categoryId);
+      } else if (e.target.classList.contains('delete-expense-btn')) {
+        const expenseId = e.target.dataset.expenseId;
+        deleteExpense(expenseId);
+      }
+    });
+    eventListenersSetup = true;
+  }
 }
 
 // Load history with current filters
