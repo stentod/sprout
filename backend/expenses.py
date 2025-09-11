@@ -451,3 +451,154 @@ def delete_expense(expense_id):
     
     logger.info(f"Expense {expense_id} deleted successfully for user {user_id}")
     return jsonify({'success': True, 'message': 'Expense deleted successfully'})
+
+@expenses_bp.route('/analytics/daily-spending', methods=['GET'])
+@require_auth
+def get_daily_spending_analytics():
+    """Get daily spending analytics with clean, simple implementation"""
+    try:
+        user_id = get_current_user_id()
+        days = int(request.args.get('days', 30))
+        day_offset = int(request.args.get('dayOffset', 0))
+        
+        # Get user's daily budget limit
+        user_daily_limit = get_user_daily_limit(user_id)
+        
+        # Use the same date calculation logic as the main app
+        from datetime import datetime, timedelta, timezone
+        
+        # Get the current "today" using the same logic as get_day_bounds
+        if user_id:
+            try:
+                simulated_date_result = run_query("""
+                    SELECT simulated_date 
+                    FROM user_preferences 
+                    WHERE user_id = %s AND simulated_date IS NOT NULL
+                """, (user_id,), fetch_one=True)
+                
+                if simulated_date_result and simulated_date_result['simulated_date']:
+                    # Use simulated date as the base
+                    simulated_date = simulated_date_result['simulated_date']
+                    target_day = datetime.combine(simulated_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+                    target_day = target_day + timedelta(days=day_offset)
+                    today = target_day.date()
+                else:
+                    # Use real current date
+                    today = datetime.now(timezone.utc).date() + timedelta(days=day_offset)
+            except Exception as e:
+                logger.warning(f"Could not check simulated date for user {user_id}: {e}")
+                today = datetime.now(timezone.utc).date() + timedelta(days=day_offset)
+        else:
+            today = datetime.now(timezone.utc).date() + timedelta(days=day_offset)
+        
+        logger.info(f"Analytics date calculation: day_offset={day_offset}, today={today}")
+        
+        start_date = today - timedelta(days=days-1)
+        
+        # Get all expenses in the date range using the same approach as the main app
+        # We'll get expenses for each day individually to ensure proper timezone handling
+        all_expenses = []
+        
+        for i in range(days):
+            current_date = start_date + timedelta(days=i)
+            day_start, day_end = get_day_bounds(day_offset - (days-1-i), user_id)
+            
+            sql = '''
+                SELECT 
+                    amount,
+                    description,
+                    timestamp
+                FROM expenses 
+                WHERE user_id = %s 
+                    AND timestamp >= %s 
+                    AND timestamp < %s
+                ORDER BY timestamp ASC
+            '''
+            
+            day_expenses = run_query(sql, (user_id, day_start.isoformat(), day_end.isoformat()))
+            
+            # Add date information to each expense
+            for expense in day_expenses:
+                expense['expense_date'] = current_date
+                all_expenses.append(expense)
+        
+        logger.info(f"Analytics query: start_date={start_date}, today={today}, found {len(all_expenses)} expenses")
+        
+        # Group expenses by date
+        daily_totals = {}
+        for expense in all_expenses:
+            date_str = expense['expense_date'].strftime('%Y-%m-%d')
+            logger.info(f"Processing expense: date={date_str}, amount={expense['amount']}, timestamp={expense['timestamp']}")
+            if date_str not in daily_totals:
+                daily_totals[date_str] = {
+                    'amount': 0.0,
+                    'count': 0,
+                    'expenses': []
+                }
+            daily_totals[date_str]['amount'] += float(expense['amount'])
+            daily_totals[date_str]['count'] += 1
+            daily_totals[date_str]['expenses'].append({
+                'amount': float(expense['amount']),
+                'description': expense['description'],
+                'time': expense['timestamp'].strftime('%H:%M')
+            })
+        
+        # Create complete date range with data
+        chart_data = []
+        total_spent = 0.0
+        days_over_budget = 0
+        days_with_spending = 0
+        
+        for i in range(days):
+            current_date = start_date + timedelta(days=i)
+            date_str = current_date.strftime('%Y-%m-%d')
+            
+            if date_str in daily_totals:
+                amount = daily_totals[date_str]['amount']
+                count = daily_totals[date_str]['count']
+                expenses_list = daily_totals[date_str]['expenses']
+                days_with_spending += 1
+            else:
+                amount = 0.0
+                count = 0
+                expenses_list = []
+            
+            total_spent += amount
+            if amount > user_daily_limit:
+                days_over_budget += 1
+            
+            chart_data.append({
+                'date': date_str,
+                'amount': amount,
+                'count': count,
+                'budget_limit': user_daily_limit,
+                'expenses': expenses_list
+            })
+        
+        # Calculate summary
+        avg_daily = total_spent / days if days > 0 else 0.0
+        days_under_budget = days_with_spending - days_over_budget
+        days_no_spending = days - days_with_spending
+        
+        return jsonify({
+            'success': True,
+            'data': chart_data,
+            'summary': {
+                'total_days': days,
+                'total_spent': round(total_spent, 2),
+                'average_daily': round(avg_daily, 2),
+                'daily_budget_limit': user_daily_limit,
+                'days_over_budget': days_over_budget,
+                'days_under_budget': days_under_budget,
+                'days_no_spending': days_no_spending,
+                'days_with_spending': days_with_spending
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Analytics error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+

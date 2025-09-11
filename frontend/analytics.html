@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Analytics - Sprout Budget</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=4.5">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="analytics-container">
+    <!-- Header -->
+    <header class="analytics-header">
+      <div class="header-content">
+        <div class="header-left">
+          <a href="/" class="back-button">
+            <span class="back-icon">←</span>
+            Back to Dashboard
+          </a>
+        </div>
+        <h1>📊 Spending Analytics</h1>
+        <div class="header-right">
+          <a href="/history.html" class="back-button">History</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="analytics-main">
+      <!-- Controls -->
+      <section class="controls-section">
+        <div class="controls-container">
+          <div class="time-selector">
+            <label for="timeRange">Time Period:</label>
+            <select id="timeRange">
+              <option value="7">Last 7 days</option>
+              <option value="14">Last 14 days</option>
+              <option value="30" selected>Last 30 days</option>
+              <option value="90">Last 3 months</option>
+            </select>
+          </div>
+          <button id="refreshBtn" class="btn btn-primary">🔄 Refresh</button>
+        </div>
+      </section>
+
+      <!-- Summary Cards -->
+      <section class="summary-section">
+        <div class="summary-grid">
+          <div class="summary-card">
+            <div class="card-icon">💰</div>
+            <div class="card-content">
+              <div class="card-label">Total Spent</div>
+              <div class="card-value" id="totalSpent">$0.00</div>
+            </div>
+          </div>
+          <div class="summary-card">
+            <div class="card-icon">📈</div>
+            <div class="card-content">
+              <div class="card-label">Daily Average</div>
+              <div class="card-value" id="dailyAverage">$0.00</div>
+            </div>
+          </div>
+          <div class="summary-card">
+            <div class="card-icon">🎯</div>
+            <div class="card-content">
+              <div class="card-label">Budget Limit</div>
+              <div class="card-value" id="budgetLimit">$30.00</div>
+            </div>
+          </div>
+          <div class="summary-card">
+            <div class="card-icon">⚠️</div>
+            <div class="card-content">
+              <div class="card-label">Days Over Budget</div>
+              <div class="card-value" id="daysOverBudget">0</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Chart Section -->
+      <section class="chart-section">
+        <div class="chart-container">
+          <div class="chart-header">
+            <h2>Daily Spending Trends</h2>
+            <p>Track your daily spending patterns and budget adherence</p>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="spendingChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Loading Overlay -->
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading analytics...</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="analytics.js?v=2.0"></script>
+</body>
+</html>

@@ -154,6 +154,10 @@ def serve_history():
 def serve_settings():
     return send_from_directory(FRONTEND_DIR, 'settings.html')
 
+@app.route('/analytics.html')
+def serve_analytics():
+    return send_from_directory(FRONTEND_DIR, 'analytics.html')
+
 @app.route('/<path:filename>')
 def serve_static(filename):
     response = send_from_directory(FRONTEND_DIR, filename)
