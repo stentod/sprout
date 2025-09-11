@@ -118,8 +118,10 @@ def health():
 @app.route('/api/config')
 def get_config():
     """Get application configuration including debug mode"""
+    # Read DEBUG_MODE directly from environment to ensure it's current
+    current_debug_mode = os.environ.get("DEBUG_MODE", "False").lower() == "true"
     return jsonify({
-        'debug': DEBUG_MODE,
+        'debug': current_debug_mode,
         'flask_debug': DEBUG
     })
 
