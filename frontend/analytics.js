@@ -4,6 +4,7 @@ console.log('📊 Analytics page loading...');
 // Configuration
 const API_BASE_URL = getApiBaseUrl();
 let spendingChart = null;
+let categoryChart = null;
 
 // Get API base URL
 function getApiBaseUrl() {
@@ -125,6 +126,9 @@ async function loadAnalyticsData() {
     if (result.success) {
       updateSummaryCards(result.summary);
       createChart(result.data, result.summary);
+      
+      // Also load category breakdown data
+      await loadCategoryData();
     } else {
       throw new Error(result.error || 'Failed to load data');
     }
@@ -416,10 +420,171 @@ function showError(message) {
   }, 5000);
 }
 
+// Load category breakdown data
+async function loadCategoryData() {
+  try {
+    const timeRange = document.getElementById('timeRange').value;
+    const urlParams = new URLSearchParams(window.location.search);
+    const dayOffset = urlParams.get('dayOffset') || '0';
+    
+    const response = await fetch(`${API_BASE_URL}/api/analytics/category-breakdown?days=${timeRange}&dayOffset=${dayOffset}`, {
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    console.log('🥧 Category data received:', result);
+    
+    if (result.success) {
+      createCategoryChart(result.data, result.summary);
+    } else {
+      throw new Error(result.error || 'Failed to load category data');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error loading category data:', error);
+    showError('Failed to load category breakdown data.');
+  }
+}
+
+// Create category breakdown pie chart
+function createCategoryChart(data, summary) {
+  const ctx = document.getElementById('categoryChart');
+  if (!ctx) return;
+  
+  // Destroy existing chart
+  if (categoryChart) {
+    console.log('🗑️ Destroying existing category chart');
+    categoryChart.destroy();
+    categoryChart = null;
+  }
+  
+  if (!data || data.length === 0) {
+    // Show empty state
+    ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+    const legendEl = document.getElementById('categoryLegend');
+    if (legendEl) {
+      legendEl.innerHTML = '<p class="no-data">No spending data available for the selected period.</p>';
+    }
+    return;
+  }
+  
+  // Prepare chart data
+  const labels = data.map(item => item.category);
+  const amounts = data.map(item => item.amount);
+  const colors = data.map(item => item.color);
+  
+  // Chart configuration
+  const config = {
+    type: 'pie',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: amounts,
+        backgroundColor: colors,
+        borderColor: colors.map(color => color),
+        borderWidth: 2,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false // We'll create custom legend
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const item = data[context.dataIndex];
+              return `${item.category}: $${item.amount.toFixed(2)} (${item.percentage}%)`;
+            }
+          }
+        }
+      },
+      animation: {
+        animateRotate: true,
+        animateScale: true,
+        duration: 1000
+      }
+    }
+  };
+  
+  // Create chart
+  categoryChart = new Chart(ctx, config);
+  
+  // Create custom legend
+  createCategoryLegend(data, summary);
+  
+  console.log('🥧 Category chart created successfully');
+}
+
+// Create custom category legend
+function createCategoryLegend(data, summary) {
+  const legendEl = document.getElementById('categoryLegend');
+  if (!legendEl) return;
+  
+  if (!data || data.length === 0) {
+    legendEl.innerHTML = '<p class="no-data">No spending data available for the selected period.</p>';
+    return;
+  }
+  
+  let legendHTML = '<div class="legend-grid">';
+  
+  data.forEach(item => {
+    const percentage = item.percentage;
+    const amount = item.amount;
+    const count = item.count;
+    
+    legendHTML += `
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: ${item.color}"></div>
+        <div class="legend-details">
+          <div class="legend-category">${item.category}</div>
+          <div class="legend-stats">
+            <span class="legend-amount">$${amount.toFixed(2)}</span>
+            <span class="legend-percentage">(${percentage}%)</span>
+            <span class="legend-count">${count} transaction${count !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  
+  legendHTML += '</div>';
+  
+  // Add summary
+  legendHTML += `
+    <div class="legend-summary">
+      <div class="summary-item">
+        <span class="summary-label">Total Categories:</span>
+        <span class="summary-value">${summary.total_categories}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Total Spent:</span>
+        <span class="summary-value">$${summary.total_spent.toFixed(2)}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Period:</span>
+        <span class="summary-value">${summary.days_analyzed} days</span>
+      </div>
+    </div>
+  `;
+  
+  legendEl.innerHTML = legendHTML;
+}
+
 // Handle window resize
 window.addEventListener('resize', function() {
   if (spendingChart) {
     spendingChart.resize();
+  }
+  if (categoryChart) {
+    categoryChart.resize();
   }
 });
 

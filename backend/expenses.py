@@ -602,3 +602,112 @@ def get_daily_spending_analytics():
             'error': str(e)
         }), 500
 
+@expenses_bp.route('/analytics/category-breakdown', methods=['GET'])
+@require_auth
+def get_category_breakdown_analytics():
+    """Get category spending breakdown analytics"""
+    try:
+        user_id = get_current_user_id()
+        days = int(request.args.get('days', 30))
+        day_offset = int(request.args.get('dayOffset', 0))
+        
+        # Use the same date calculation logic as daily spending analytics
+        from datetime import datetime, timedelta, timezone
+        from utils import get_day_bounds
+        
+        # Get the current "today" using the same logic as get_day_bounds
+        base_date = datetime.now(timezone.utc).date()
+        today_for_range = base_date + timedelta(days=day_offset)
+        start_date_for_range = today_for_range - timedelta(days=days-1)
+        
+        # Get all expenses in the date range
+        all_expenses = []
+        
+        for i in range(days):
+            current_date_in_loop = start_date_for_range + timedelta(days=i)
+            relative_day_offset = (current_date_in_loop - base_date).days
+            
+            day_start, day_end = get_day_bounds(relative_day_offset, user_id)
+            
+            sql = '''
+                SELECT
+                    e.amount,
+                    e.description,
+                    e.timestamp,
+                    COALESCE(dc.name, cc.name) as category_name,
+                    COALESCE(dc.color, cc.color) as category_color
+                FROM expenses e
+                LEFT JOIN default_categories dc ON e.category_id = CONCAT('default_', dc.id::text)
+                LEFT JOIN custom_categories cc ON e.category_id = CONCAT('custom_', cc.id::text) AND cc.user_id = e.user_id
+                WHERE e.user_id = %s
+                    AND e.timestamp >= %s
+                    AND e.timestamp < %s
+                ORDER BY e.timestamp ASC
+            '''
+            
+            day_expenses = run_query(sql, (user_id, day_start.isoformat(), day_end.isoformat()))
+            
+            # Add date information to each expense
+            for expense in day_expenses:
+                expense['expense_date'] = current_date_in_loop
+                all_expenses.append(expense)
+        
+        # Group expenses by category
+        category_totals = {}
+        total_spent = 0.0
+        
+        for expense in all_expenses:
+            category_name = expense['category_name'] or 'Uncategorized'
+            amount = float(expense['amount'])
+            
+            if category_name not in category_totals:
+                category_totals[category_name] = {
+                    'amount': 0.0,
+                    'count': 0,
+                    'color': expense['category_color'] or '#6c757d',  # Default gray color
+                    'expenses': []
+                }
+            
+            category_totals[category_name]['amount'] += amount
+            category_totals[category_name]['count'] += 1
+            category_totals[category_name]['expenses'].append({
+                'amount': amount,
+                'description': expense['description'],
+                'date': expense['expense_date'].strftime('%Y-%m-%d'),
+                'time': expense['timestamp'].strftime('%H:%M')
+            })
+            total_spent += amount
+        
+        # Convert to chart data format
+        chart_data = []
+        for category_name, data in category_totals.items():
+            percentage = (data['amount'] / total_spent * 100) if total_spent > 0 else 0
+            chart_data.append({
+                'category': category_name,
+                'amount': round(data['amount'], 2),
+                'count': data['count'],
+                'percentage': round(percentage, 1),
+                'color': data['color'],
+                'expenses': data['expenses']
+            })
+        
+        # Sort by amount (highest first)
+        chart_data.sort(key=lambda x: x['amount'], reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'data': chart_data,
+            'summary': {
+                'total_categories': len(chart_data),
+                'total_spent': round(total_spent, 2),
+                'days_analyzed': days
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Category breakdown analytics error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
