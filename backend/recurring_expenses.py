@@ -260,7 +260,7 @@ def delete_recurring_expense(expense_id):
 def process_recurring_expenses_for_date(target_date):
     """Process recurring expenses for a specific date (used for date simulation)"""
     try:
-        logger.info(f"Processing recurring expenses for date: {target_date}")
+        logger.info(f"🔄 Processing recurring expenses for simulated date: {target_date}")
         
         # First check if the table exists
         check_table_sql = '''
@@ -275,7 +275,7 @@ def process_recurring_expenses_for_date(target_date):
             logger.info("Recurring expenses table does not exist yet, skipping processing")
             return 0
         
-        # Get all active recurring expenses
+        # Get all active recurring expenses with safety checks
         sql = '''
             SELECT 
                 re.id,
@@ -284,52 +284,74 @@ def process_recurring_expenses_for_date(target_date):
                 re.amount,
                 re.category_id,
                 re.frequency,
-                re.start_date
+                re.start_date,
+                re.created_at
             FROM recurring_expenses re
             WHERE re.is_active = TRUE
+            AND re.start_date <= %s
+            AND re.created_at >= %s
         '''
         
-        recurring_expenses = run_query(sql, (), fetch_all=True)
+        # Only process recurring expenses created in the last 30 days to prevent old test data
+        thirty_days_ago = target_date - timedelta(days=30)
+        recurring_expenses = run_query(sql, (target_date, thirty_days_ago), fetch_all=True)
+        
+        if not recurring_expenses:
+            logger.info(f"No recent active recurring expenses found for {target_date}")
+            return 0
+            
+        logger.info(f"Found {len(recurring_expenses)} recent active recurring expenses for {target_date}")
         
         processed_count = 0
+        skipped_count = 0
         
         for expense in recurring_expenses:
             if is_recurring_expense_due(expense, target_date):
-                # Check if this expense already exists for this date
+                # Check if this expense already exists for this date (prevent duplicates)
                 existing_expense_sql = '''
                     SELECT id FROM expenses 
-                    WHERE user_id = %s AND amount = %s AND description = %s 
+                    WHERE user_id = %s 
+                    AND amount = %s 
+                    AND description = %s 
                     AND DATE(timestamp) = %s
+                    AND category_id = %s
                 '''
                 existing = run_query(existing_expense_sql, (
                     expense['user_id'],
                     expense['amount'],
                     expense['description'],
-                    target_date
+                    target_date,
+                    expense['category_id']
                 ), fetch_one=True)
                 
-                if not existing:
-                    # Add the expense with the target date
-                    insert_sql = '''
-                        INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
-                        VALUES (%s, %s, %s, %s, %s)
-                    '''
-                    # Create timestamp with target date but current time
-                    from datetime import datetime, timezone
-                    current_time = datetime.now(timezone.utc).time()
-                    target_timestamp = datetime.combine(target_date, current_time)
-                    
-                    run_query(insert_sql, (
-                        expense['user_id'],
-                        expense['amount'],
-                        expense['description'],
-                        expense['category_id'],
-                        target_timestamp
-                    ))
-                    processed_count += 1
-                    logger.info(f"Added recurring expense: {expense['description']} for user {expense['user_id']} on {target_date}")
+                if existing:
+                    logger.info(f"⏭️ Skipping duplicate recurring expense: {expense['description']} for user {expense['user_id']} on {target_date}")
+                    skipped_count += 1
+                    continue
+                
+                # Add the expense with the target date
+                insert_sql = '''
+                    INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
+                    VALUES (%s, %s, %s, %s, %s)
+                '''
+                # Create timestamp with target date but current time
+                from datetime import datetime, timezone
+                current_time = datetime.now(timezone.utc).time()
+                target_timestamp = datetime.combine(target_date, current_time)
+                
+                run_query(insert_sql, (
+                    expense['user_id'],
+                    expense['amount'],
+                    expense['description'],
+                    expense['category_id'],
+                    target_timestamp
+                ))
+                processed_count += 1
+                logger.info(f"✅ Added recurring expense: {expense['description']} (${expense['amount']}) for user {expense['user_id']} on {target_date}")
+            else:
+                logger.debug(f"⏭️ Recurring expense not due on {target_date}: {expense['description']}")
         
-        logger.info(f"Processed {processed_count} recurring expenses for {target_date}")
+        logger.info(f"🎯 Recurring expenses processing complete for {target_date}: {processed_count} added, {skipped_count} skipped")
         return processed_count
         
     except Exception as e:
@@ -339,7 +361,7 @@ def process_recurring_expenses_for_date(target_date):
 def process_recurring_expenses():
     """Process recurring expenses and add them to the expenses table if due"""
     try:
-        logger.info("Processing recurring expenses...")
+        logger.info("🔄 Starting recurring expenses processing...")
         today = date.today()
         
         # First check if the table exists
@@ -355,7 +377,7 @@ def process_recurring_expenses():
             logger.info("Recurring expenses table does not exist yet, skipping processing")
             return 0
         
-        # Get all active recurring expenses
+        # Get all active recurring expenses with additional safety checks
         sql = '''
             SELECT 
                 re.id,
@@ -364,18 +386,52 @@ def process_recurring_expenses():
                 re.amount,
                 re.category_id,
                 re.frequency,
-                re.start_date
+                re.start_date,
+                re.created_at
             FROM recurring_expenses re
             WHERE re.is_active = TRUE
+            AND re.start_date <= %s
+            AND re.created_at >= %s
         '''
         
-        recurring_expenses = run_query(sql, (), fetch_all=True)
+        # Only process recurring expenses created in the last 30 days to prevent old test data
+        thirty_days_ago = today - timedelta(days=30)
+        recurring_expenses = run_query(sql, (today, thirty_days_ago), fetch_all=True)
+        
+        if not recurring_expenses:
+            logger.info("No recent active recurring expenses found")
+            return 0
+            
+        logger.info(f"Found {len(recurring_expenses)} recent active recurring expenses")
         
         processed_count = 0
+        skipped_count = 0
         
         for expense in recurring_expenses:
             if is_recurring_expense_due(expense, today):
-                # Add the expense (allow duplicates - user can manage them manually)
+                # Check if this expense already exists for today (prevent duplicates)
+                existing_expense_sql = '''
+                    SELECT id FROM expenses 
+                    WHERE user_id = %s 
+                    AND amount = %s 
+                    AND description = %s 
+                    AND DATE(timestamp) = %s
+                    AND category_id = %s
+                '''
+                existing = run_query(existing_expense_sql, (
+                    expense['user_id'],
+                    expense['amount'],
+                    expense['description'],
+                    today,
+                    expense['category_id']
+                ), fetch_one=True)
+                
+                if existing:
+                    logger.info(f"⏭️ Skipping duplicate recurring expense: {expense['description']} for user {expense['user_id']}")
+                    skipped_count += 1
+                    continue
+                
+                # Add the expense
                 insert_sql = '''
                     INSERT INTO expenses (user_id, amount, description, category_id, timestamp)
                     VALUES (%s, %s, %s, %s, %s)
@@ -388,9 +444,11 @@ def process_recurring_expenses():
                     datetime.now()
                 ))
                 processed_count += 1
-                logger.info(f"Added recurring expense: {expense['description']} for user {expense['user_id']}")
+                logger.info(f"✅ Added recurring expense: {expense['description']} (${expense['amount']}) for user {expense['user_id']}")
+            else:
+                logger.debug(f"⏭️ Recurring expense not due today: {expense['description']}")
         
-        logger.info(f"Processed {processed_count} recurring expenses")
+        logger.info(f"🎯 Recurring expenses processing complete: {processed_count} added, {skipped_count} skipped")
         return processed_count
         
     except Exception as e:

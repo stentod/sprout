@@ -38,10 +38,28 @@ except Exception as e:
 try:
     import time
     time.sleep(1)  # Give the database a moment to commit the table creation
-    from recurring_expenses import process_recurring_expenses
-    logger.info("Processing recurring expenses on startup...")
-    processed_count = process_recurring_expenses()
-    logger.info(f"✅ Processed {processed_count} recurring expenses on startup")
+    
+    # Safety check: Don't process if there are too many old recurring expenses
+    from utils import run_query
+    from datetime import datetime, timedelta
+    
+    safety_check_sql = '''
+        SELECT COUNT(*) as old_count
+        FROM recurring_expenses 
+        WHERE created_at < %s AND is_active = TRUE
+    '''
+    thirty_days_ago = datetime.now() - timedelta(days=30)
+    old_count_result = run_query(safety_check_sql, (thirty_days_ago,), fetch_one=True)
+    
+    if old_count_result and old_count_result['old_count'] > 5:
+        logger.warning(f"⚠️ Found {old_count_result['old_count']} old recurring expenses. Skipping processing to prevent phantom expenses.")
+        logger.info("💡 Run cleanup_phantom_expenses.py to analyze and clean up old data.")
+    else:
+        from recurring_expenses import process_recurring_expenses
+        logger.info("Processing recurring expenses on startup...")
+        processed_count = process_recurring_expenses()
+        logger.info(f"✅ Processed {processed_count} recurring expenses on startup")
+        
 except Exception as e:
     logger.warning(f"⚠️ Could not process recurring expenses: {e}. App will continue.")
 
