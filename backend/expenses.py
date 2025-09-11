@@ -711,3 +711,144 @@ def get_category_breakdown_analytics():
             'error': str(e)
         }), 500
 
+@expenses_bp.route('/analytics/weekly-heatmap', methods=['GET'])
+@require_auth
+def get_weekly_heatmap_analytics():
+    """Get weekly spending heatmap analytics"""
+    try:
+        user_id = get_current_user_id()
+        weeks = int(request.args.get('weeks', 12))  # Default to 12 weeks
+        day_offset = int(request.args.get('dayOffset', 0))
+        
+        # Use the same date calculation logic as other analytics
+        from datetime import datetime, timedelta, timezone
+        from utils import get_day_bounds
+        
+        # Get the current "today" using the same logic as get_day_bounds
+        base_date = datetime.now(timezone.utc).date()
+        today_for_range = base_date + timedelta(days=day_offset)
+        
+        # Calculate the start date (go back to the beginning of the week)
+        days_since_monday = today_for_range.weekday()  # Monday = 0, Sunday = 6
+        start_date_for_range = today_for_range - timedelta(days=days_since_monday + (weeks - 1) * 7)
+        
+        # Get all expenses in the date range
+        all_expenses = []
+        total_days = weeks * 7
+        
+        for i in range(total_days):
+            current_date_in_loop = start_date_for_range + timedelta(days=i)
+            relative_day_offset = (current_date_in_loop - base_date).days
+            
+            day_start, day_end = get_day_bounds(relative_day_offset, user_id)
+            
+            sql = '''
+                SELECT
+                    e.amount,
+                    e.description,
+                    e.timestamp
+                FROM expenses e
+                WHERE e.user_id = %s
+                    AND e.timestamp >= %s
+                    AND e.timestamp < %s
+                ORDER BY e.timestamp ASC
+            '''
+            
+            day_expenses = run_query(sql, (user_id, day_start.isoformat(), day_end.isoformat()))
+            
+            # Calculate total spending for this day
+            day_total = sum(float(expense['amount']) for expense in day_expenses)
+            
+            all_expenses.append({
+                'date': current_date_in_loop,
+                'amount': day_total,
+                'count': len(day_expenses),
+                'expenses': day_expenses
+            })
+        
+        # Calculate spending statistics for color intensity
+        amounts = [expense['amount'] for expense in all_expenses if expense['amount'] > 0]
+        max_spending = max(amounts) if amounts else 0
+        avg_spending = sum(amounts) / len(amounts) if amounts else 0
+        
+        # Create heatmap data structure
+        heatmap_data = []
+        current_week = []
+        
+        for i, expense in enumerate(all_expenses):
+            date = expense['date']
+            amount = expense['amount']
+            count = expense['count']
+            
+            # Calculate color intensity (0-1 scale)
+            if max_spending > 0:
+                intensity = min(amount / max_spending, 1.0)
+            else:
+                intensity = 0
+            
+            # Determine color level (0-4 scale for CSS classes)
+            if amount == 0:
+                color_level = 0
+            elif intensity <= 0.25:
+                color_level = 1
+            elif intensity <= 0.5:
+                color_level = 2
+            elif intensity <= 0.75:
+                color_level = 3
+            else:
+                color_level = 4
+            
+            day_data = {
+                'date': date.strftime('%Y-%m-%d'),
+                'day_name': date.strftime('%a'),  # Mon, Tue, etc.
+                'day_number': date.day,
+                'amount': round(amount, 2),
+                'count': count,
+                'intensity': round(intensity, 2),
+                'color_level': color_level,
+                'expenses': expense['expenses']
+            }
+            
+            current_week.append(day_data)
+            
+            # If we've completed a week (7 days), add it to heatmap_data
+            if len(current_week) == 7:
+                heatmap_data.append(current_week)
+                current_week = []
+        
+        # Add any remaining days as the last week
+        if current_week:
+            # Pad with empty days if needed
+            while len(current_week) < 7:
+                current_week.append({
+                    'date': None,
+                    'day_name': '',
+                    'day_number': '',
+                    'amount': 0,
+                    'count': 0,
+                    'intensity': 0,
+                    'color_level': 0,
+                    'expenses': []
+                })
+            heatmap_data.append(current_week)
+        
+        return jsonify({
+            'success': True,
+            'data': heatmap_data,
+            'summary': {
+                'total_weeks': len(heatmap_data),
+                'total_days': total_days,
+                'max_spending': round(max_spending, 2),
+                'avg_spending': round(avg_spending, 2),
+                'start_date': start_date_for_range.strftime('%Y-%m-%d'),
+                'end_date': today_for_range.strftime('%Y-%m-%d')
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Weekly heatmap analytics error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+

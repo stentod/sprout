@@ -127,8 +127,9 @@ async function loadAnalyticsData() {
       updateSummaryCards(result.summary);
       createChart(result.data, result.summary);
       
-      // Also load category breakdown data
+      // Also load category breakdown and heatmap data
       await loadCategoryData();
+      await loadHeatmapData();
     } else {
       throw new Error(result.error || 'Failed to load data');
     }
@@ -576,6 +577,184 @@ function createCategoryLegend(data, summary) {
   `;
   
   legendEl.innerHTML = legendHTML;
+}
+
+// Load heatmap data
+async function loadHeatmapData() {
+  try {
+    const timeRange = document.getElementById('timeRange').value;
+    const urlParams = new URLSearchParams(window.location.search);
+    const dayOffset = urlParams.get('dayOffset') || '0';
+    
+    // Convert days to weeks (minimum 4 weeks, maximum 16 weeks)
+    const days = parseInt(timeRange);
+    const weeks = Math.max(4, Math.min(16, Math.ceil(days / 7)));
+    
+    const response = await fetch(`${API_BASE_URL}/api/analytics/weekly-heatmap?weeks=${weeks}&dayOffset=${dayOffset}`, {
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    console.log('🔥 Heatmap data received:', result);
+    
+    if (result.success) {
+      createHeatmap(result.data, result.summary);
+    } else {
+      throw new Error(result.error || 'Failed to load heatmap data');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error loading heatmap data:', error);
+    showError('Failed to load weekly heatmap data.');
+  }
+}
+
+// Create weekly spending heatmap
+function createHeatmap(data, summary) {
+  const gridEl = document.getElementById('heatmapGrid');
+  const summaryEl = document.getElementById('heatmapSummary');
+  
+  if (!gridEl || !summaryEl) return;
+  
+  if (!data || data.length === 0) {
+    gridEl.innerHTML = '<p class="no-data">No spending data available for the selected period.</p>';
+    summaryEl.innerHTML = '';
+    return;
+  }
+  
+  // Create day headers (Mon, Tue, Wed, etc.)
+  const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  
+  let gridHTML = '<div class="heatmap-table">';
+  
+  // Add day headers
+  gridHTML += '<div class="heatmap-header">';
+  gridHTML += '<div class="week-label"></div>'; // Empty cell for week labels
+  dayHeaders.forEach(day => {
+    gridHTML += `<div class="day-header">${day}</div>`;
+  });
+  gridHTML += '</div>';
+  
+  // Add weeks
+  data.forEach((week, weekIndex) => {
+    gridHTML += '<div class="heatmap-week">';
+    gridHTML += `<div class="week-label">Week ${data.length - weekIndex}</div>`;
+    
+    week.forEach(day => {
+      if (day.date) {
+        const tooltip = `$${day.amount} (${day.count} transaction${day.count !== 1 ? 's' : ''})`;
+        gridHTML += `
+          <div class="heatmap-day level-${day.color_level}" 
+               data-date="${day.date}" 
+               data-amount="${day.amount}" 
+               data-count="${day.count}"
+               title="${tooltip}">
+            <span class="day-number">${day.day_number}</span>
+          </div>
+        `;
+      } else {
+        gridHTML += '<div class="heatmap-day empty"></div>';
+      }
+    });
+    
+    gridHTML += '</div>';
+  });
+  
+  gridHTML += '</div>';
+  
+  gridEl.innerHTML = gridHTML;
+  
+  // Create summary
+  const summaryHTML = `
+    <div class="heatmap-stats">
+      <div class="stat-item">
+        <span class="stat-label">Period:</span>
+        <span class="stat-value">${summary.total_weeks} weeks</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Max Daily:</span>
+        <span class="stat-value">$${summary.max_spending}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Avg Daily:</span>
+        <span class="stat-value">$${summary.avg_spending}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Date Range:</span>
+        <span class="stat-value">${summary.start_date} to ${summary.end_date}</span>
+      </div>
+    </div>
+  `;
+  
+  summaryEl.innerHTML = summaryHTML;
+  
+  // Add click handlers for day details
+  const dayElements = gridEl.querySelectorAll('.heatmap-day[data-date]');
+  dayElements.forEach(dayEl => {
+    dayEl.addEventListener('click', function() {
+      const date = this.dataset.date;
+      const amount = parseFloat(this.dataset.amount);
+      const count = parseInt(this.dataset.count);
+      
+      if (amount > 0) {
+        showDayDetails(date, amount, count);
+      }
+    });
+  });
+  
+  console.log('🔥 Heatmap created successfully');
+}
+
+// Show day details modal
+function showDayDetails(date, amount, count) {
+  const dateObj = new Date(date);
+  const formattedDate = dateObj.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  
+  const modal = document.createElement('div');
+  modal.className = 'day-details-modal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>${formattedDate}</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="day-summary">
+          <div class="summary-item">
+            <span class="summary-label">Total Spent:</span>
+            <span class="summary-value">$${amount.toFixed(2)}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Transactions:</span>
+            <span class="summary-value">${count}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Close modal handlers
+  const closeBtn = modal.querySelector('.modal-close');
+  closeBtn.addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+  
+  // Auto-close after 3 seconds
+  setTimeout(() => {
+    if (modal.parentElement) modal.remove();
+  }, 3000);
 }
 
 // Handle window resize
