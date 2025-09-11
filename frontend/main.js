@@ -225,6 +225,50 @@ function renderCompactCategoryBudgets() {
 
 
 
+// Update budget gauge with color coding
+function updateBudgetGauge(summary) {
+  // Calculate budget utilization percentage
+  const dailyLimit = summary.daily_limit || 30; // Default to $30 if not set
+  const spent = dailyLimit - summary.balance;
+  const utilization = Math.max((spent / dailyLimit) * 100, 0); // Allow over 100% for over-budget
+  
+  // Debug logging
+  console.log('🔍 Budget Gauge Debug:', {
+    dailyLimit: dailyLimit,
+    balance: summary.balance,
+    spent: spent,
+    utilization: utilization
+  });
+  
+  // Find all gauge progress circles
+  const progressCircles = document.querySelectorAll('.gauge-progress');
+  const percentageElements = document.querySelectorAll('.gauge-percentage');
+  
+  progressCircles.forEach(circle => {
+    // Calculate stroke-dasharray for the progress
+    const circumference = 2 * Math.PI * 45; // radius = 45
+    const progress = Math.min((utilization / 100) * circumference, circumference); // Cap at full circle
+    
+    circle.style.strokeDasharray = `${progress} ${circumference}`;
+    
+    // Set color based on utilization
+    if (utilization <= 50) {
+      circle.style.stroke = '#4CAF50'; // Green - safe
+    } else if (utilization <= 75) {
+      circle.style.stroke = '#FF9800'; // Orange - warning
+    } else if (utilization <= 90) {
+      circle.style.stroke = '#FF5722'; // Red-orange - caution
+    } else {
+      circle.style.stroke = '#F44336'; // Red - over budget
+    }
+  });
+  
+  // Update percentage text
+  percentageElements.forEach(element => {
+    element.textContent = `${Math.round(utilization)}%`;
+  });
+}
+
 // Render main UI
 function renderMainUI(summary) {
   const compactBudgetsHtml = renderCompactCategoryBudgets();
@@ -277,9 +321,26 @@ function renderMainUI(summary) {
 
         <!-- Stats Sidebar -->
         <div class="stats-sidebar">
-          <div class="projection-card">
-            <div class="projection-header">30-Day Projection</div>
-            <div class="projection-amount">${summary.projection_30 >= 0 ? '+' : ''}$${summary.projection_30.toFixed(2)}</div>
+          <!-- Budget Utilization Gauge -->
+          <div class="budget-gauge-card">
+            <div class="gauge-header">Daily Budget</div>
+            <div class="gauge-container">
+              <div class="gauge-circle">
+                <svg class="gauge-svg" viewBox="0 0 100 100">
+                  <circle class="gauge-background" cx="50" cy="50" r="45" />
+                  <circle class="gauge-progress" cx="50" cy="50" r="45" 
+                          stroke-dasharray="${summary.budget_utilization * 2.827}" 
+                          stroke-dashoffset="0" />
+                </svg>
+                <div class="gauge-text">
+                  <div class="gauge-percentage">${Math.round(summary.budget_utilization)}%</div>
+                  <div class="gauge-label">Used</div>
+                </div>
+              </div>
+            </div>
+            <div class="gauge-details">
+              <div class="gauge-amount">$${summary.balance.toFixed(2)} / $${summary.daily_limit.toFixed(2)}</div>
+            </div>
           </div>
           
           <!-- Navigation in Sidebar -->
@@ -577,9 +638,26 @@ function renderOfflineUI() {
 
         <!-- Stats Sidebar -->
         <div class="stats-sidebar">
-          <div class="projection-card">
-            <div class="projection-header">30-Day Projection</div>
-            <div class="projection-amount">+$900.00</div>
+          <!-- Budget Utilization Gauge -->
+          <div class="budget-gauge-card">
+            <div class="gauge-header">Daily Budget</div>
+            <div class="gauge-container">
+              <div class="gauge-circle">
+                <svg class="gauge-svg" viewBox="0 0 100 100">
+                  <circle class="gauge-background" cx="50" cy="50" r="45" />
+                  <circle class="gauge-progress" cx="50" cy="50" r="45" 
+                          stroke-dasharray="${summary.budget_utilization * 2.827}" 
+                          stroke-dashoffset="0" />
+                </svg>
+                <div class="gauge-text">
+                  <div class="gauge-percentage">${Math.round(summary.budget_utilization)}%</div>
+                  <div class="gauge-label">Used</div>
+                </div>
+              </div>
+            </div>
+            <div class="gauge-details">
+              <div class="gauge-amount">$${summary.balance.toFixed(2)} / $${summary.daily_limit.toFixed(2)}</div>
+            </div>
           </div>
           
           <!-- Navigation in Sidebar -->
@@ -642,9 +720,26 @@ function renderFallbackUI() {
 
         <!-- Stats Sidebar -->
         <div class="stats-sidebar">
-          <div class="projection-card">
-            <div class="projection-header">30-Day Projection</div>
-            <div class="projection-amount">+$900.00</div>
+          <!-- Budget Utilization Gauge -->
+          <div class="budget-gauge-card">
+            <div class="gauge-header">Daily Budget</div>
+            <div class="gauge-container">
+              <div class="gauge-circle">
+                <svg class="gauge-svg" viewBox="0 0 100 100">
+                  <circle class="gauge-background" cx="50" cy="50" r="45" />
+                  <circle class="gauge-progress" cx="50" cy="50" r="45" 
+                          stroke-dasharray="${summary.budget_utilization * 2.827}" 
+                          stroke-dashoffset="0" />
+                </svg>
+                <div class="gauge-text">
+                  <div class="gauge-percentage">${Math.round(summary.budget_utilization)}%</div>
+                  <div class="gauge-label">Used</div>
+                </div>
+              </div>
+            </div>
+            <div class="gauge-details">
+              <div class="gauge-amount">$${summary.balance.toFixed(2)} / $${summary.daily_limit.toFixed(2)}</div>
+            </div>
           </div>
           
           <!-- Navigation in Sidebar -->
@@ -740,6 +835,11 @@ async function loadSummaryWithFallbacks() {
     
   const summary = await resp.json();
     console.log('✅ API call successful, summary data:', summary);
+    console.log('🔍 Summary Debug:', {
+      balance: summary.balance,
+      daily_limit: summary.daily_limit,
+      avg_7day: summary.avg_7day
+    });
     
     // Load rollover budget data if available
     try {
@@ -750,16 +850,31 @@ async function loadSummaryWithFallbacks() {
       if (rolloverResponse.ok) {
         const rolloverData = await rolloverResponse.json();
         console.log('✅ Rollover budget loaded:', rolloverData);
+        console.log('🔍 Full rollover data:', JSON.stringify(rolloverData, null, 2));
         
         if (rolloverData.success && rolloverData.rollover_enabled) {
-          // Use effective budget (base + rollover) instead of regular balance
+          // The effective_budget represents the total available budget (base + rollover)
+          // But we need to calculate the total daily limit including rollover
+          const totalDailyLimit = rolloverData.base_daily_limit + rolloverData.rollover_amount;
+          
+          // Update the balance to reflect the remaining budget after spending
+          // The balance should be: total_daily_limit - amount_spent
           summary.balance = rolloverData.effective_budget;
+          summary.daily_limit = totalDailyLimit;
+          
           summary.rollover_info = {
             base_budget: rolloverData.base_daily_limit,
             rollover_amount: rolloverData.rollover_amount,
-            effective_budget: rolloverData.effective_budget
+            effective_budget: rolloverData.effective_budget,
+            total_daily_limit: totalDailyLimit
           };
-          console.log('🔄 Using rollover-aware budget:', summary.balance);
+          console.log('🔄 Using rollover-aware budget:', {
+            balance: summary.balance,
+            daily_limit: summary.daily_limit,
+            base_daily_limit: rolloverData.base_daily_limit,
+            rollover_amount: rolloverData.rollover_amount,
+            effective_budget: rolloverData.effective_budget
+          });
         }
       }
     } catch (rolloverError) {
@@ -771,6 +886,10 @@ async function loadSummaryWithFallbacks() {
     
     // Now render the main UI with budget data
   renderMainUI(summary);
+  
+  // Update budget gauge after UI is rendered
+  updateBudgetGauge(summary);
+  
   renderAddExpenseForm();
   
   // Setup date simulation controls (only in debug mode)

@@ -240,7 +240,6 @@ def get_summary():
         # Today's balance and averages
         today_balance = deltas[0] if deltas else user_daily_limit
         avg_daily_surplus = sum(deltas) / 7 if deltas else user_daily_limit  # Always divide by 7 days
-        projection_30 = avg_daily_surplus * 30  # 30-day projection based on average daily surplus
         
         # Plant state logic - prioritize today's spending over 7-day average
         if today_balance < 0:
@@ -264,7 +263,7 @@ def get_summary():
         return jsonify({
             'balance': round(today_balance, 2),
             'avg_7day': round(avg_daily_surplus, 2),
-            'projection_30': round(projection_30, 2),
+            'daily_limit': user_daily_limit,
             'plant_state': plant,
             'plant_emoji': plant_emoji
         })
@@ -276,7 +275,7 @@ def get_summary():
         return jsonify({
             'balance': 30.0,
             'avg_7day': 30.0,
-            'projection_30': 900.0,
+            'daily_limit': 30.0,
             'plant_state': 'healthy',
             'plant_emoji': '🌱'
         })
