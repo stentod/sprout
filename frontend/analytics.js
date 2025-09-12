@@ -613,7 +613,7 @@ async function loadHeatmapData() {
   }
 }
 
-// Create weekly spending heatmap
+// Create 30-day spending heatmap
 function createHeatmap(data, summary) {
   const gridEl = document.getElementById('heatmapGrid');
   const summaryEl = document.getElementById('heatmapSummary');
@@ -633,20 +633,36 @@ function createHeatmap(data, summary) {
   
   // Add day headers
   gridHTML += '<div class="heatmap-header">';
-  gridHTML += '<div class="week-label"></div>'; // Empty cell for week labels
+  gridHTML += '<div class="week-label"></div>'; // Empty cell for date labels
   dayHeaders.forEach(day => {
     gridHTML += `<div class="day-header">${day}</div>`;
   });
   gridHTML += '</div>';
   
-  // Add weeks
+  // Add weeks with actual dates
   data.forEach((week, weekIndex) => {
     gridHTML += '<div class="heatmap-week">';
-    gridHTML += `<div class="week-label">Week ${data.length - weekIndex}</div>`;
+    
+    // Show the date range for this week instead of "Week X"
+    const firstDay = week.find(day => day.date);
+    const lastDay = week.filter(day => day.date).pop();
+    
+    let weekLabel = '';
+    if (firstDay && lastDay) {
+      if (firstDay.month_name === lastDay.month_name) {
+        // Same month: "Jan 1-7"
+        weekLabel = `${firstDay.month_name} ${firstDay.day_number}-${lastDay.day_number}`;
+      } else {
+        // Different months: "Dec 30 - Jan 5"
+        weekLabel = `${firstDay.month_name} ${firstDay.day_number} - ${lastDay.month_name} ${lastDay.day_number}`;
+      }
+    }
+    
+    gridHTML += `<div class="week-label">${weekLabel}</div>`;
     
     week.forEach(day => {
       if (day.date) {
-        const tooltip = `$${day.amount} (${day.count} transaction${day.count !== 1 ? 's' : ''})`;
+        const tooltip = `${day.month_name} ${day.day_number}: $${day.amount} (${day.count} transaction${day.count !== 1 ? 's' : ''})`;
         gridHTML += `
           <div class="heatmap-day level-${day.color_level}" 
                data-date="${day.date}" 
@@ -673,7 +689,7 @@ function createHeatmap(data, summary) {
     <div class="heatmap-stats">
       <div class="stat-item">
         <span class="stat-label">Period:</span>
-        <span class="stat-value">${summary.total_weeks} weeks</span>
+        <span class="stat-value">${summary.total_days} days</span>
       </div>
       <div class="stat-item">
         <span class="stat-label">Max Daily:</span>

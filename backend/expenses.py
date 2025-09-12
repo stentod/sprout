@@ -713,10 +713,10 @@ def get_category_breakdown_analytics():
 @expenses_bp.route('/analytics/weekly-heatmap', methods=['GET'])
 @require_auth
 def get_weekly_heatmap_analytics():
-    """Get weekly spending heatmap analytics"""
+    """Get 30-day spending heatmap analytics"""
     try:
         user_id = get_current_user_id()
-        weeks = int(request.args.get('weeks', 12))  # Default to 12 weeks
+        days = int(request.args.get('days', 30))  # Default to 30 days
         day_offset = int(request.args.get('dayOffset', 0))
         
         # Use the same date calculation logic as other analytics
@@ -726,16 +726,12 @@ def get_weekly_heatmap_analytics():
         # Get the current "today" using the same logic as get_day_bounds
         base_date = datetime.now(timezone.utc).date()
         today_for_range = base_date + timedelta(days=day_offset)
-        
-        # Calculate the start date (go back to the beginning of the week)
-        days_since_monday = today_for_range.weekday()  # Monday = 0, Sunday = 6
-        start_date_for_range = today_for_range - timedelta(days=days_since_monday + (weeks - 1) * 7)
+        start_date_for_range = today_for_range - timedelta(days=days-1)
         
         # Get all expenses in the date range
         all_expenses = []
-        total_days = weeks * 7
         
-        for i in range(total_days):
+        for i in range(days):
             current_date_in_loop = start_date_for_range + timedelta(days=i)
             relative_day_offset = (current_date_in_loop - base_date).days
             
@@ -770,7 +766,7 @@ def get_weekly_heatmap_analytics():
         max_spending = max(amounts) if amounts else 0
         avg_spending = sum(amounts) / len(amounts) if amounts else 0
         
-        # Create heatmap data structure
+        # Create heatmap data structure - organize by weeks but show actual dates
         heatmap_data = []
         current_week = []
         
@@ -801,6 +797,7 @@ def get_weekly_heatmap_analytics():
                 'date': date.strftime('%Y-%m-%d'),
                 'day_name': date.strftime('%a'),  # Mon, Tue, etc.
                 'day_number': date.day,
+                'month_name': date.strftime('%b'),  # Jan, Feb, etc.
                 'amount': round(amount, 2),
                 'count': count,
                 'intensity': round(intensity, 2),
@@ -823,6 +820,7 @@ def get_weekly_heatmap_analytics():
                     'date': None,
                     'day_name': '',
                     'day_number': '',
+                    'month_name': '',
                     'amount': 0,
                     'count': 0,
                     'intensity': 0,
@@ -836,7 +834,7 @@ def get_weekly_heatmap_analytics():
             'data': heatmap_data,
             'summary': {
                 'total_weeks': len(heatmap_data),
-                'total_days': total_days,
+                'total_days': days,
                 'max_spending': round(max_spending, 2),
                 'avg_spending': round(avg_spending, 2),
                 'start_date': start_date_for_range.strftime('%Y-%m-%d'),
