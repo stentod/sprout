@@ -348,7 +348,6 @@ function renderMainUI(summary) {
             <a href="history.html${window.location.search}" class="btn btn-secondary btn-full">📊 View History</a>
             <a href="analytics.html" class="btn btn-secondary btn-full">📈 Analytics</a>
             <a href="budgets.html" class="btn btn-secondary btn-full">💰 Budgets</a>
-            <a href="recurring-expenses.html" class="btn btn-secondary btn-full">🔄 Recurring</a>
             <a href="settings.html" class="btn btn-secondary btn-full">⚙️ Settings</a>
     </div>
     </div>
@@ -665,7 +664,6 @@ function renderOfflineUI() {
             <a href="history.html${window.location.search}" class="btn btn-secondary btn-full">📊 View History</a>
             <a href="analytics.html" class="btn btn-secondary btn-full">📈 Analytics</a>
             <a href="budgets.html" class="btn btn-secondary btn-full">💰 Budgets</a>
-            <a href="recurring-expenses.html" class="btn btn-secondary btn-full">🔄 Recurring</a>
             <a href="settings.html" class="btn btn-secondary btn-full">⚙️ Settings</a>
           </div>
         </div>
@@ -746,7 +744,6 @@ function renderFallbackUI() {
           <div class="sidebar-nav">
             <a href="history.html" class="btn btn-secondary btn-full">📊 View History</a>
             <a href="budgets.html" class="btn btn-secondary btn-full">💰 Budgets</a>
-            <a href="recurring-expenses.html" class="btn btn-secondary btn-full">🔄 Recurring</a>
             <a href="settings.html" class="btn btn-secondary btn-full">⚙️ Settings</a>
           </div>
         </div>

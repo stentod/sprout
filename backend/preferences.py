@@ -356,16 +356,6 @@ def set_date_simulation():
             import traceback
             traceback.print_exc()
         
-        # Process recurring expenses for the new simulated date
-        try:
-            from recurring_expenses import process_recurring_expenses_for_date
-            logger.info(f"🔄 Processing recurring expenses for simulated date: {simulated_date}")
-            processed_count = process_recurring_expenses_for_date(simulated_date)
-            logger.info(f"✅ Processed {processed_count} recurring expenses for {simulated_date}")
-        except Exception as e:
-            logger.warning(f"❌ Could not process recurring expenses for date transition: {e}")
-            import traceback
-            traceback.print_exc()
         
         # Update or insert the simulated date (AFTER processing rollover)
         run_query("""

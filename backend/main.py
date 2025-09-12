@@ -14,54 +14,15 @@ from auth import auth_bp
 from expenses import expenses_bp
 from categories import categories_bp
 from preferences import preferences_bp
-from recurring_expenses import recurring_expenses_bp
 from rollover_api import rollover_bp
 
 # Initialize logging
 logger = setup_logging()
 
 
-# Auto-fix recurring expenses database on app startup
-try:
-    from auto_fix_recurring_expenses import fix_recurring_expenses_database
-    logger.info("Running automatic recurring expenses database fix...")
-    if fix_recurring_expenses_database():
-        logger.info("✅ Recurring expenses database fix completed successfully")
-    else:
-        logger.warning("⚠️ Recurring expenses database fix had issues, but app will continue")
-except Exception as e:
-    logger.warning(f"⚠️ Could not run recurring expenses database fix: {e}. App will continue.")
 
 # Rollover migration already completed - tables should exist
 
-# Process recurring expenses on app startup (with delay to ensure table is committed)
-try:
-    import time
-    time.sleep(1)  # Give the database a moment to commit the table creation
-    
-    # Safety check: Don't process if there are too many old recurring expenses
-    from utils import run_query
-    from datetime import datetime, timedelta
-    
-    safety_check_sql = '''
-        SELECT COUNT(*) as old_count
-        FROM recurring_expenses 
-        WHERE created_at < %s AND is_active = TRUE
-    '''
-    thirty_days_ago = datetime.now() - timedelta(days=30)
-    old_count_result = run_query(safety_check_sql, (thirty_days_ago,), fetch_one=True)
-    
-    if old_count_result and old_count_result['old_count'] > 5:
-        logger.warning(f"⚠️ Found {old_count_result['old_count']} old recurring expenses. Skipping processing to prevent phantom expenses.")
-        logger.info("💡 Run cleanup_phantom_expenses.py to analyze and clean up old data.")
-    else:
-        from recurring_expenses import process_recurring_expenses
-        logger.info("Processing recurring expenses on startup...")
-        processed_count = process_recurring_expenses()
-        logger.info(f"✅ Processed {processed_count} recurring expenses on startup")
-        
-except Exception as e:
-    logger.warning(f"⚠️ Could not process recurring expenses: {e}. App will continue.")
 
 # Production fix - ensure proper session handling
 app = Flask(__name__)
@@ -106,7 +67,6 @@ app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(expenses_bp, url_prefix='/api')
 app.register_blueprint(categories_bp, url_prefix='/api')
 app.register_blueprint(preferences_bp, url_prefix='/api')
-app.register_blueprint(recurring_expenses_bp, url_prefix='/api')
 app.register_blueprint(rollover_bp, url_prefix='/api')
 
 # Error handlers for database connection issues
