@@ -586,11 +586,10 @@ async function loadHeatmapData() {
     const urlParams = new URLSearchParams(window.location.search);
     const dayOffset = urlParams.get('dayOffset') || '0';
     
-    // Convert days to weeks (minimum 4 weeks, maximum 16 weeks)
+    // Use the timeRange directly as days (the backend expects days parameter)
     const days = parseInt(timeRange);
-    const weeks = Math.max(4, Math.min(16, Math.ceil(days / 7)));
     
-    const response = await fetch(`${API_BASE_URL}/api/analytics/weekly-heatmap?weeks=${weeks}&dayOffset=${dayOffset}`, {
+    const response = await fetch(`${API_BASE_URL}/api/analytics/weekly-heatmap?days=${days}&dayOffset=${dayOffset}`, {
       credentials: 'include'
     });
     
