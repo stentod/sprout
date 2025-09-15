@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   daily_spending_limit DECIMAL(10,2) DEFAULT 30.00,
   require_categories BOOLEAN DEFAULT TRUE,
   daily_rollover_enabled BOOLEAN DEFAULT FALSE,
+  simulated_date DATE DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
