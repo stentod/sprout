@@ -470,20 +470,32 @@ def get_daily_spending_analytics():
         # Get the current "today" using the same logic as get_day_bounds
         if user_id:
             try:
-                simulated_date_result = run_query("""
-                    SELECT simulated_date 
-                    FROM user_preferences 
-                    WHERE user_id = %s AND simulated_date IS NOT NULL
-                """, (user_id,), fetch_one=True)
+                # First check if the simulated_date column exists
+                column_check = run_query("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'user_preferences' 
+                    AND column_name = 'simulated_date'
+                """, fetch_one=True)
                 
-                if simulated_date_result and simulated_date_result['simulated_date']:
-                    # Use simulated date as the base
-                    simulated_date = simulated_date_result['simulated_date']
-                    target_day = datetime.combine(simulated_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-                    target_day = target_day + timedelta(days=day_offset)
-                    today = target_day.date()
+                if column_check:
+                    simulated_date_result = run_query("""
+                        SELECT simulated_date 
+                        FROM user_preferences 
+                        WHERE user_id = %s AND simulated_date IS NOT NULL
+                    """, (user_id,), fetch_one=True)
+                    
+                    if simulated_date_result and simulated_date_result['simulated_date']:
+                        # Use simulated date as the base
+                        simulated_date = simulated_date_result['simulated_date']
+                        target_day = datetime.combine(simulated_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+                        target_day = target_day + timedelta(days=day_offset)
+                        today = target_day.date()
+                    else:
+                        # Use real current date
+                        today = datetime.now(timezone.utc).date() + timedelta(days=day_offset)
                 else:
-                    # Use real current date
+                    # Column doesn't exist, use real current date
                     today = datetime.now(timezone.utc).date() + timedelta(days=day_offset)
             except Exception as e:
                 logger.warning(f"Could not check simulated date for user {user_id}: {e}")

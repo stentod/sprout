@@ -460,23 +460,32 @@ def handle_errors(f):
 
 def get_day_bounds(day_offset=0, user_id=None):
     """Get the start and end of the target day (using dayOffset)"""
-    # Check if user has a simulated date set
+    # Check if user has a simulated date set (only if column exists)
     if user_id:
         try:
-            simulated_date_result = run_query("""
-                SELECT simulated_date 
-                FROM user_preferences 
-                WHERE user_id = %s AND simulated_date IS NOT NULL
-            """, (user_id,), fetch_one=True)
+            # First check if the simulated_date column exists
+            column_check = run_query("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'user_preferences' 
+                AND column_name = 'simulated_date'
+            """, fetch_one=True)
             
-            if simulated_date_result and simulated_date_result['simulated_date']:
-                # Use simulated date as the base
-                simulated_date = simulated_date_result['simulated_date']
-                target_day = datetime.combine(simulated_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-                target_day = target_day + timedelta(days=day_offset)
-                start = target_day
-                end = target_day + timedelta(days=1)
-                return start, end
+            if column_check:
+                simulated_date_result = run_query("""
+                    SELECT simulated_date 
+                    FROM user_preferences 
+                    WHERE user_id = %s AND simulated_date IS NOT NULL
+                """, (user_id,), fetch_one=True)
+                
+                if simulated_date_result and simulated_date_result['simulated_date']:
+                    # Use simulated date as the base
+                    simulated_date = simulated_date_result['simulated_date']
+                    target_day = datetime.combine(simulated_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+                    target_day = target_day + timedelta(days=day_offset)
+                    start = target_day
+                    end = target_day + timedelta(days=1)
+                    return start, end
         except Exception as e:
             logger.warning(f"Could not check simulated date for user {user_id}: {e}")
     
