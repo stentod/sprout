@@ -453,6 +453,7 @@ def delete_expense(expense_id):
 
 @expenses_bp.route('/analytics/daily-spending', methods=['GET'])
 @require_auth
+@handle_errors
 def get_daily_spending_analytics():
     """Get daily spending analytics with clean, simple implementation"""
     try:
@@ -595,14 +596,16 @@ def get_daily_spending_analytics():
         })
         
     except Exception as e:
-        logger.error(f"Analytics error: {e}")
+        logger.error(f"Analytics error: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'Failed to load analytics data',
+            'details': str(e) if DEBUG else 'Please try again later'
         }), 500
 
 @expenses_bp.route('/analytics/category-breakdown', methods=['GET'])
 @require_auth
+@handle_errors
 def get_category_breakdown_analytics():
     """Get category spending breakdown analytics"""
     try:
@@ -704,14 +707,16 @@ def get_category_breakdown_analytics():
         })
         
     except Exception as e:
-        logger.error(f"Category breakdown analytics error: {e}")
+        logger.error(f"Category breakdown analytics error: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'Failed to load category breakdown data',
+            'details': str(e) if DEBUG else 'Please try again later'
         }), 500
 
 @expenses_bp.route('/analytics/weekly-heatmap', methods=['GET'])
 @require_auth
+@handle_errors
 def get_weekly_heatmap_analytics():
     """Get 30-day spending heatmap analytics"""
     try:
@@ -843,9 +848,39 @@ def get_weekly_heatmap_analytics():
         })
         
     except Exception as e:
-        logger.error(f"Weekly heatmap analytics error: {e}")
+        logger.error(f"Weekly heatmap analytics error: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'Failed to load heatmap data',
+            'details': str(e) if DEBUG else 'Please try again later'
+        }), 500
+
+@expenses_bp.route('/analytics/test', methods=['GET'])
+@require_auth
+@handle_errors
+def test_analytics():
+    """Test endpoint to verify analytics API is working"""
+    try:
+        user_id = get_current_user_id()
+        logger.info(f"Analytics test endpoint called for user {user_id}")
+        
+        # Test database connection
+        test_query = "SELECT COUNT(*) as count FROM expenses WHERE user_id = %s"
+        result = run_query(test_query, (user_id,), fetch_one=True)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Analytics API is working',
+            'user_id': user_id,
+            'expense_count': result['count'] if result else 0,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Analytics test error: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'Analytics test failed',
+            'details': str(e) if DEBUG else 'Please check server logs'
         }), 500
 

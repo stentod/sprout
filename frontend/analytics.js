@@ -16,18 +16,24 @@ function getApiBaseUrl() {
     return `http://localhost:${apiPort}`;
   }
   
+  // For production, use relative URLs (same domain)
   return '';
 }
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
   console.log('📊 Analytics page initialized');
+  console.log('🌐 Current URL:', window.location.href);
+  console.log('🔗 API Base URL:', API_BASE_URL);
   
   // Check authentication
   checkAuth();
   
   // Set up event listeners
   setupEventListeners();
+  
+  // Test analytics API first
+  testAnalyticsAPI();
   
   // Load initial data
   loadAnalyticsData();
@@ -38,6 +44,26 @@ document.addEventListener('DOMContentLoaded', function() {
     loadAnalyticsData();
   }, 30000);
 });
+
+// Test analytics API
+async function testAnalyticsAPI() {
+  try {
+    console.log('🧪 Testing analytics API...');
+    const response = await fetch(`${API_BASE_URL}/api/analytics/test`, {
+      credentials: 'include'
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ Analytics API test successful:', result);
+    } else {
+      const errorText = await response.text();
+      console.error('❌ Analytics API test failed:', response.status, errorText);
+    }
+  } catch (error) {
+    console.error('❌ Analytics API test error:', error);
+  }
+}
 
 // Check authentication
 async function checkAuth() {
@@ -123,6 +149,8 @@ async function loadAnalyticsData() {
     });
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ API Error Response:', errorText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
@@ -502,6 +530,8 @@ async function loadCategoryData() {
     });
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Category API Error Response:', errorText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
@@ -663,6 +693,8 @@ async function loadHeatmapData() {
     });
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Heatmap API Error Response:', errorText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
