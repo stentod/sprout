@@ -745,38 +745,65 @@ def get_weekly_heatmap_analytics():
         today_for_range = base_date + timedelta(days=day_offset)
         start_date_for_range = today_for_range - timedelta(days=days-1)
         
-        # Get all expenses in the date range
-        all_expenses = []
+        # Get all expenses in the date range using a single optimized query
+        # Calculate the overall date range for the query
+        overall_start, _ = get_day_bounds(day_offset - (days-1), user_id)
+        _, overall_end = get_day_bounds(day_offset + 1, user_id)
         
+        sql = '''
+            SELECT
+                e.amount,
+                e.description,
+                e.timestamp,
+                DATE(e.timestamp) as expense_date
+            FROM expenses e
+            WHERE e.user_id = %s
+                AND e.timestamp >= %s
+                AND e.timestamp < %s
+            ORDER BY e.timestamp ASC
+        '''
+        
+        all_expenses_raw = run_query(sql, (user_id, overall_start.isoformat(), overall_end.isoformat()))
+        
+        # Group expenses by date
+        daily_totals = {}
+        for expense in all_expenses_raw:
+            date_str = expense['expense_date'].strftime('%Y-%m-%d')
+            if date_str not in daily_totals:
+                daily_totals[date_str] = {
+                    'amount': 0.0,
+                    'count': 0,
+                    'expenses': []
+                }
+            daily_totals[date_str]['amount'] += float(expense['amount'])
+            daily_totals[date_str]['count'] += 1
+            daily_totals[date_str]['expenses'].append({
+                'amount': float(expense['amount']),
+                'description': expense['description'],
+                'timestamp': expense['timestamp']
+            })
+        
+        # Create complete date range with data
+        all_expenses = []
         for i in range(days):
             current_date_in_loop = start_date_for_range + timedelta(days=i)
-            relative_day_offset = (current_date_in_loop - base_date).days
+            date_str = current_date_in_loop.strftime('%Y-%m-%d')
             
-            day_start, day_end = get_day_bounds(relative_day_offset, user_id)
-            
-            sql = '''
-                SELECT
-                    e.amount,
-                    e.description,
-                    e.timestamp
-                FROM expenses e
-                WHERE e.user_id = %s
-                    AND e.timestamp >= %s
-                    AND e.timestamp < %s
-                ORDER BY e.timestamp ASC
-            '''
-            
-            day_expenses = run_query(sql, (user_id, day_start.isoformat(), day_end.isoformat()))
-            
-            # Calculate total spending for this day
-            day_total = sum(float(expense['amount']) for expense in day_expenses)
-            
-            all_expenses.append({
-                'date': current_date_in_loop,
-                'amount': day_total,
-                'count': len(day_expenses),
-                'expenses': day_expenses
-            })
+            if date_str in daily_totals:
+                day_data = daily_totals[date_str]
+                all_expenses.append({
+                    'date': current_date_in_loop,
+                    'amount': day_data['amount'],
+                    'count': day_data['count'],
+                    'expenses': day_data['expenses']
+                })
+            else:
+                all_expenses.append({
+                    'date': current_date_in_loop,
+                    'amount': 0.0,
+                    'count': 0,
+                    'expenses': []
+                })
         
         # Calculate spending statistics for color intensity
         amounts = [expense['amount'] for expense in all_expenses if expense['amount'] > 0]
