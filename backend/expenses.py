@@ -730,11 +730,25 @@ def get_category_breakdown_analytics():
 @require_auth
 @handle_errors
 def get_weekly_heatmap_analytics():
-    """Get 30-day spending heatmap analytics"""
+    """Get 30-day spending heatmap analytics - ultra-optimized version"""
     try:
         user_id = get_current_user_id()
         days = int(request.args.get('days', 30))  # Default to 30 days
         day_offset = int(request.args.get('dayOffset', 0))
+        
+        # Simple cache key for this specific request
+        cache_key = f"heatmap_{user_id}_{days}_{day_offset}"
+        
+        # Check if we have cached data (5 minute cache)
+        from datetime import datetime, timedelta, timezone
+        cache_timestamp_key = f"{cache_key}_timestamp"
+        
+        # For now, skip caching to ensure we get the performance improvement
+        # TODO: Add proper caching system later
+        
+        # Performance tracking
+        start_time = datetime.now()
+        logger.info(f"Heatmap request started for user {user_id}, days={days}, offset={day_offset}")
         
         # Use the same date calculation logic as other analytics
         from datetime import datetime, timedelta, timezone
@@ -745,61 +759,52 @@ def get_weekly_heatmap_analytics():
         today_for_range = base_date + timedelta(days=day_offset)
         start_date_for_range = today_for_range - timedelta(days=days-1)
         
-        # Get all expenses in the date range using a single optimized query
-        # Calculate the overall date range for the query
+        # Ultra-optimized single query with aggregation - no individual expense details needed for heatmap
         overall_start, _ = get_day_bounds(day_offset - (days-1), user_id)
         _, overall_end = get_day_bounds(day_offset + 1, user_id)
         
+        # Use database aggregation instead of fetching all individual expenses
         sql = '''
             SELECT
-                e.amount,
-                e.description,
-                e.timestamp,
-                DATE(e.timestamp) as expense_date
-            FROM expenses e
-            WHERE e.user_id = %s
-                AND e.timestamp >= %s
-                AND e.timestamp < %s
-            ORDER BY e.timestamp ASC
+                DATE(timestamp) as expense_date,
+                SUM(amount) as daily_total,
+                COUNT(*) as transaction_count
+            FROM expenses
+            WHERE user_id = %s
+                AND timestamp >= %s
+                AND timestamp < %s
+            GROUP BY DATE(timestamp)
+            ORDER BY expense_date ASC
         '''
         
-        all_expenses_raw = run_query(sql, (user_id, overall_start.isoformat(), overall_end.isoformat()))
+        daily_data = run_query(sql, (user_id, overall_start.isoformat(), overall_end.isoformat()))
         
-        # Group expenses by date
-        daily_totals = {}
-        for expense in all_expenses_raw:
-            date_str = expense['expense_date'].strftime('%Y-%m-%d')
-            if date_str not in daily_totals:
-                daily_totals[date_str] = {
-                    'amount': 0.0,
-                    'count': 0,
-                    'expenses': []
-                }
-            daily_totals[date_str]['amount'] += float(expense['amount'])
-            daily_totals[date_str]['count'] += 1
-            daily_totals[date_str]['expenses'].append({
-                'amount': float(expense['amount']),
-                'description': expense['description'],
-                'timestamp': expense['timestamp']
-            })
+        # Create lookup dictionary for fast access
+        daily_lookup = {}
+        for day in daily_data:
+            date_str = day['expense_date'].strftime('%Y-%m-%d')
+            daily_lookup[date_str] = {
+                'amount': float(day['daily_total']),
+                'count': day['transaction_count']
+            }
         
-        # Create complete date range with data
+        # Create complete date range with data (much faster)
         all_expenses = []
         for i in range(days):
-            current_date_in_loop = start_date_for_range + timedelta(days=i)
-            date_str = current_date_in_loop.strftime('%Y-%m-%d')
+            current_date = start_date_for_range + timedelta(days=i)
+            date_str = current_date.strftime('%Y-%m-%d')
             
-            if date_str in daily_totals:
-                day_data = daily_totals[date_str]
+            if date_str in daily_lookup:
+                day_data = daily_lookup[date_str]
                 all_expenses.append({
-                    'date': current_date_in_loop,
+                    'date': current_date,
                     'amount': day_data['amount'],
                     'count': day_data['count'],
-                    'expenses': day_data['expenses']
+                    'expenses': []  # Empty for heatmap - we don't need individual expenses
                 })
             else:
                 all_expenses.append({
-                    'date': current_date_in_loop,
+                    'date': current_date,
                     'amount': 0.0,
                     'count': 0,
                     'expenses': []
@@ -810,68 +815,69 @@ def get_weekly_heatmap_analytics():
         max_spending = max(amounts) if amounts else 0
         avg_spending = sum(amounts) / len(amounts) if amounts else 0
         
-        # Create heatmap data structure - organize by weeks but show actual dates
+        # Ultra-fast heatmap data creation with pre-calculated values
         heatmap_data = []
-        current_week = []
         
-        for i, expense in enumerate(all_expenses):
-            date = expense['date']
-            amount = expense['amount']
-            count = expense['count']
-            
-            # Calculate color intensity (0-1 scale)
-            if max_spending > 0:
-                intensity = min(amount / max_spending, 1.0)
-            else:
-                intensity = 0
-            
-            # Determine color level (0-4 scale for CSS classes)
-            if amount == 0:
-                color_level = 0
-            elif intensity <= 0.25:
-                color_level = 1
-            elif intensity <= 0.5:
-                color_level = 2
-            elif intensity <= 0.75:
-                color_level = 3
-            else:
-                color_level = 4
-            
-            day_data = {
-                'date': date.strftime('%Y-%m-%d'),
-                'day_name': date.strftime('%a'),  # Mon, Tue, etc.
-                'day_number': date.day,
-                'month_name': date.strftime('%b'),  # Jan, Feb, etc.
-                'amount': round(amount, 2),
-                'count': count,
-                'intensity': round(intensity, 2),
-                'color_level': color_level,
-                'expenses': expense['expenses']
-            }
-            
-            current_week.append(day_data)
-            
-            # If we've completed a week (7 days), add it to heatmap_data
-            if len(current_week) == 7:
-                heatmap_data.append(current_week)
-                current_week = []
+        # Pre-calculate intensity multiplier to avoid division in loop
+        intensity_multiplier = 1.0 / max_spending if max_spending > 0 else 0
         
-        # Add any remaining days as the last week
-        if current_week:
-            # Pad with empty days if needed
-            while len(current_week) < 7:
-                current_week.append({
-                    'date': None,
-                    'day_name': '',
-                    'day_number': '',
-                    'month_name': '',
-                    'amount': 0,
-                    'count': 0,
-                    'intensity': 0,
-                    'color_level': 0,
-                    'expenses': []
-                })
-            heatmap_data.append(current_week)
+        # Process all days at once
+        for i in range(0, len(all_expenses), 7):  # Process 7 days at a time
+            week_data = []
+            
+            for j in range(7):
+                if i + j < len(all_expenses):
+                    expense = all_expenses[i + j]
+                    date = expense['date']
+                    amount = expense['amount']
+                    count = expense['count']
+                    
+                    # Fast color level calculation
+                    if amount == 0:
+                        color_level = 0
+                        intensity = 0
+                    else:
+                        intensity = min(amount * intensity_multiplier, 1.0)
+                        if intensity <= 0.25:
+                            color_level = 1
+                        elif intensity <= 0.5:
+                            color_level = 2
+                        elif intensity <= 0.75:
+                            color_level = 3
+                        else:
+                            color_level = 4
+                    
+                    week_data.append({
+                        'date': date.strftime('%Y-%m-%d'),
+                        'day_name': date.strftime('%a'),
+                        'day_number': date.day,
+                        'month_name': date.strftime('%b'),
+                        'amount': round(amount, 2),
+                        'count': count,
+                        'intensity': round(intensity, 2),
+                        'color_level': color_level,
+                        'expenses': []  # Empty for performance
+                    })
+                else:
+                    # Pad with empty day
+                    week_data.append({
+                        'date': None,
+                        'day_name': '',
+                        'day_number': '',
+                        'month_name': '',
+                        'amount': 0,
+                        'count': 0,
+                        'intensity': 0,
+                        'color_level': 0,
+                        'expenses': []
+                    })
+            
+            heatmap_data.append(week_data)
+        
+        # Performance tracking
+        end_time = datetime.now()
+        processing_time = (end_time - start_time).total_seconds()
+        logger.info(f"Heatmap request completed in {processing_time:.2f} seconds for user {user_id}")
         
         return jsonify({
             'success': True,
@@ -882,7 +888,8 @@ def get_weekly_heatmap_analytics():
                 'max_spending': round(max_spending, 2),
                 'avg_spending': round(avg_spending, 2),
                 'start_date': start_date_for_range.strftime('%Y-%m-%d'),
-                'end_date': today_for_range.strftime('%Y-%m-%d')
+                'end_date': today_for_range.strftime('%Y-%m-%d'),
+                'processing_time_seconds': round(processing_time, 2)
             }
         })
         
