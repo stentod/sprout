@@ -100,6 +100,12 @@ async function loadAnalyticsData() {
   const loadingOverlay = document.getElementById('loadingOverlay');
   const timeRange = document.getElementById('timeRange').value;
   
+  // Add a safety timeout to force hide loading after 10 seconds
+  const safetyTimeout = setTimeout(() => {
+    console.warn('⚠️ Safety timeout: forcing loading overlay to hide');
+    showLoading(false);
+  }, 10000);
+  
   try {
     // Show loading
     showLoading(true);
@@ -127,9 +133,24 @@ async function loadAnalyticsData() {
       updateSummaryCards(result.summary);
       createChart(result.data, result.summary);
       
-      // Also load category breakdown and heatmap data
-      await loadCategoryData();
-      await loadHeatmapData();
+      // Load additional components one by one with individual error handling
+      console.log('📊 Loading category breakdown...');
+      try {
+        await loadCategoryData();
+        console.log('✅ Category breakdown loaded');
+      } catch (error) {
+        console.warn('⚠️ Category breakdown failed:', error);
+      }
+      
+      console.log('📊 Loading heatmap...');
+      try {
+        await loadHeatmapData();
+        console.log('✅ Heatmap loaded');
+      } catch (error) {
+        console.warn('⚠️ Heatmap failed:', error);
+      }
+      
+      console.log('✅ All analytics components loaded');
     } else {
       throw new Error(result.error || 'Failed to load data');
     }
@@ -137,8 +158,53 @@ async function loadAnalyticsData() {
   } catch (error) {
     console.error('❌ Error loading data:', error);
     showError('Failed to load analytics data. Please try again.');
+    
+    // Try to load basic data as fallback
+    try {
+      console.log('🔄 Attempting fallback data loading...');
+      await loadBasicAnalytics();
+    } catch (fallbackError) {
+      console.error('❌ Fallback loading also failed:', fallbackError);
+    }
   } finally {
+    clearTimeout(safetyTimeout);
     showLoading(false);
+  }
+}
+
+// Load basic analytics as fallback
+async function loadBasicAnalytics() {
+  try {
+    console.log('📊 Loading basic analytics fallback...');
+    
+    // Try to get just the summary data
+    const response = await fetch(`${API_BASE_URL}/api/summary`, {
+      credentials: 'include'
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success) {
+        // Show basic summary without charts
+        updateSummaryCards({
+          total_spent: result.total_spent || 0,
+          average_daily: result.average_daily || 0,
+          daily_budget_limit: result.daily_limit || 30,
+          days_over_budget: result.days_over_budget || 0
+        });
+        
+        // Show a simple message instead of charts
+        const chartContainer = document.getElementById('spendingChart');
+        if (chartContainer) {
+          chartContainer.innerHTML = '<div class="no-data">Basic analytics loaded. Charts unavailable.</div>';
+        }
+        
+        console.log('✅ Basic analytics loaded successfully');
+      }
+    }
+  } catch (error) {
+    console.error('❌ Basic analytics fallback failed:', error);
+    throw error;
   }
 }
 
@@ -393,6 +459,9 @@ function showLoading(show) {
   const loadingOverlay = document.getElementById('loadingOverlay');
   if (loadingOverlay) {
     loadingOverlay.style.display = show ? 'flex' : 'none';
+    console.log(`🔄 Loading overlay ${show ? 'shown' : 'hidden'}`);
+  } else {
+    console.error('❌ Loading overlay element not found!');
   }
 }
 
