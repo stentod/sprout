@@ -475,6 +475,12 @@ def get_daily_spending_analytics():
                 logger.info(f"Daily spending cache hit for user {user_id}")
                 return jsonify(cached_data)
         
+        # Validate inputs
+        if days <= 0 or days > 365:
+            return jsonify({'error': 'Invalid days parameter'}), 400
+        if abs(day_offset) > 365:
+            return jsonify({'error': 'Invalid dayOffset parameter'}), 400
+        
         # Get user's daily budget limit
         user_daily_limit = get_user_daily_limit(user_id)
         
@@ -521,16 +527,29 @@ def get_daily_spending_analytics():
         
         start_date = today - timedelta(days=days-1)
         
-        # Use the same date calculation as the history endpoint for consistency
-        # This ensures analytics and history show the same data
-        period_start, _ = get_day_bounds(day_offset - (days - 1), user_id)
-        _, period_end = get_day_bounds(day_offset, user_id)
+        # Create robust date range calculation without get_day_bounds dependency
+        # Calculate the date range manually to avoid timezone issues
+        base_date = datetime.now(timezone.utc).date()
+        target_date = base_date + timedelta(days=day_offset)
+        period_start = target_date - timedelta(days=days - 1)
+        period_end = target_date + timedelta(days=1)  # Include the end day
         
         logger.info(f"Fetching expenses from {period_start} to {period_end} for {days} days")
         
-        # Use the same function as history endpoint to ensure data consistency
+        # Use direct query to avoid get_expenses_between complexity
         try:
-            all_expenses = get_expenses_between(period_start, period_end, user_id)
+            sql = '''
+                SELECT 
+                    amount,
+                    description,
+                    timestamp
+                FROM expenses 
+                WHERE user_id = %s 
+                    AND timestamp >= %s 
+                    AND timestamp < %s
+                ORDER BY timestamp ASC
+            '''
+            all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
             logger.info(f"Successfully fetched {len(all_expenses)} expenses for daily spending analytics")
         except Exception as e:
             logger.error(f"Error fetching expenses for daily spending analytics: {e}")
@@ -665,16 +684,33 @@ def get_category_breakdown_analytics():
         today_for_range = base_date + timedelta(days=day_offset)
         start_date_for_range = today_for_range - timedelta(days=days-1)
         
-        # Use the same date calculation as the history endpoint for consistency
-        # This ensures analytics and history show the same data
-        period_start, _ = get_day_bounds(day_offset - (days - 1), user_id)
-        _, period_end = get_day_bounds(day_offset, user_id)
+        # Create robust date range calculation without get_day_bounds dependency
+        # Calculate the date range manually to avoid timezone issues
+        base_date = datetime.now(timezone.utc).date()
+        target_date = base_date + timedelta(days=day_offset)
+        period_start = target_date - timedelta(days=days - 1)
+        period_end = target_date + timedelta(days=1)  # Include the end day
         
         logger.info(f"Category analytics: fetching expenses from {period_start} to {period_end} for {days} days")
         
-        # Use the same function as history endpoint to ensure data consistency
+        # Use direct query with category information
         try:
-            all_expenses = get_expenses_between(period_start, period_end, user_id)
+            sql = '''
+                SELECT
+                    e.amount,
+                    e.description,
+                    e.timestamp,
+                    COALESCE(dc.name, cc.name) as category_name,
+                    COALESCE(dc.color, cc.color) as category_color
+                FROM expenses e
+                LEFT JOIN default_categories dc ON e.category_id = CONCAT('default_', dc.id::text)
+                LEFT JOIN custom_categories cc ON e.category_id = CONCAT('custom_', cc.id::text) AND cc.user_id = e.user_id
+                WHERE e.user_id = %s
+                    AND e.timestamp >= %s
+                    AND e.timestamp < %s
+                ORDER BY e.timestamp ASC
+            '''
+            all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
             logger.info(f"Successfully fetched {len(all_expenses)} expenses for category breakdown analytics")
         except Exception as e:
             logger.error(f"Error fetching expenses for category breakdown analytics: {e}")
@@ -695,14 +731,9 @@ def get_category_breakdown_analytics():
         total_spent = 0.0
         
         for expense in all_expenses:
-            # Handle the new data structure from get_expenses_between
-            if expense.get('category') and expense['category'].get('name'):
-                category_name = expense['category']['name']
-                category_color = expense['category'].get('color', '#6c757d')
-            else:
-                category_name = 'Uncategorized'
-                category_color = '#6c757d'
-            
+            # Handle the direct query data structure
+            category_name = expense.get('category_name') or 'Uncategorized'
+            category_color = expense.get('category_color') or '#6c757d'
             amount = float(expense['amount'])
             
             if category_name not in category_totals:
@@ -923,6 +954,56 @@ def get_weekly_heatmap_analytics():
             'success': False,
             'error': 'Failed to load heatmap data',
             'details': str(e) if DEBUG else 'Please try again later'
+        }), 500
+
+@expenses_bp.route('/analytics/test-simple', methods=['GET'])
+@require_auth
+@handle_errors
+def test_analytics_simple():
+    """Simple test endpoint to verify basic analytics functionality"""
+    try:
+        user_id = get_current_user_id()
+        logger.info(f"Simple analytics test for user {user_id}")
+        
+        # Test basic database connection
+        test_query = "SELECT COUNT(*) as count FROM expenses WHERE user_id = %s"
+        result = run_query(test_query, (user_id,), fetch_one=True)
+        
+        # Test date calculation
+        from datetime import datetime, timedelta, timezone
+        base_date = datetime.now(timezone.utc).date()
+        test_start = base_date - timedelta(days=7)
+        test_end = base_date + timedelta(days=1)
+        
+        # Test basic expense query
+        expense_query = """
+            SELECT COUNT(*) as count 
+            FROM expenses 
+            WHERE user_id = %s 
+            AND timestamp >= %s 
+            AND timestamp < %s
+        """
+        expense_result = run_query(expense_query, (user_id, test_start.isoformat(), test_end.isoformat()), fetch_one=True)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Simple analytics test passed',
+            'user_id': user_id,
+            'total_expenses': result['count'] if result else 0,
+            'recent_expenses': expense_result['count'] if expense_result else 0,
+            'date_range': {
+                'start': test_start.isoformat(),
+                'end': test_end.isoformat()
+            },
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Simple analytics test error: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'user_id': user_id if 'user_id' in locals() else None
         }), 500
 
 @expenses_bp.route('/analytics/test', methods=['GET'])
