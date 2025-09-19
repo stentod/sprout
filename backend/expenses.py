@@ -521,28 +521,16 @@ def get_daily_spending_analytics():
         
         start_date = today - timedelta(days=days-1)
         
-        # Optimized: Get all expenses in the date range with a single query
-        # Use a simpler approach to avoid get_day_bounds complexity
-        period_start = start_date
-        period_end = today + timedelta(days=1)  # Include the end day
+        # Use the same date calculation as the history endpoint for consistency
+        # This ensures analytics and history show the same data
+        period_start, _ = get_day_bounds(day_offset - (days - 1), user_id)
+        _, period_end = get_day_bounds(day_offset, user_id)
         
         logger.info(f"Fetching expenses from {period_start} to {period_end} for {days} days")
         
-        # Single query for all expenses in the period
-        sql = '''
-            SELECT 
-                amount,
-                description,
-                timestamp
-            FROM expenses 
-            WHERE user_id = %s 
-                AND timestamp >= %s 
-                AND timestamp < %s
-            ORDER BY timestamp ASC
-        '''
-        
+        # Use the same function as history endpoint to ensure data consistency
         try:
-            all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
+            all_expenses = get_expenses_between(period_start, period_end, user_id)
             logger.info(f"Successfully fetched {len(all_expenses)} expenses for daily spending analytics")
         except Exception as e:
             logger.error(f"Error fetching expenses for daily spending analytics: {e}")
@@ -677,32 +665,16 @@ def get_category_breakdown_analytics():
         today_for_range = base_date + timedelta(days=day_offset)
         start_date_for_range = today_for_range - timedelta(days=days-1)
         
-        # Optimized: Get all expenses in the date range with a single query
-        # Use a simpler approach to avoid get_day_bounds complexity
-        period_start = start_date_for_range
-        period_end = today_for_range + timedelta(days=1)  # Include the end day
+        # Use the same date calculation as the history endpoint for consistency
+        # This ensures analytics and history show the same data
+        period_start, _ = get_day_bounds(day_offset - (days - 1), user_id)
+        _, period_end = get_day_bounds(day_offset, user_id)
         
         logger.info(f"Category analytics: fetching expenses from {period_start} to {period_end} for {days} days")
         
-        # Single query for all expenses in the period with category information
-        sql = '''
-            SELECT
-                e.amount,
-                e.description,
-                e.timestamp,
-                COALESCE(dc.name, cc.name) as category_name,
-                COALESCE(dc.color, cc.color) as category_color
-            FROM expenses e
-            LEFT JOIN default_categories dc ON e.category_id = CONCAT('default_', dc.id::text)
-            LEFT JOIN custom_categories cc ON e.category_id = CONCAT('custom_', cc.id::text) AND cc.user_id = e.user_id
-            WHERE e.user_id = %s
-                AND e.timestamp >= %s
-                AND e.timestamp < %s
-            ORDER BY e.timestamp ASC
-        '''
-        
+        # Use the same function as history endpoint to ensure data consistency
         try:
-            all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
+            all_expenses = get_expenses_between(period_start, period_end, user_id)
             logger.info(f"Successfully fetched {len(all_expenses)} expenses for category breakdown analytics")
         except Exception as e:
             logger.error(f"Error fetching expenses for category breakdown analytics: {e}")
@@ -723,14 +695,21 @@ def get_category_breakdown_analytics():
         total_spent = 0.0
         
         for expense in all_expenses:
-            category_name = expense['category_name'] or 'Uncategorized'
+            # Handle the new data structure from get_expenses_between
+            if expense.get('category') and expense['category'].get('name'):
+                category_name = expense['category']['name']
+                category_color = expense['category'].get('color', '#6c757d')
+            else:
+                category_name = 'Uncategorized'
+                category_color = '#6c757d'
+            
             amount = float(expense['amount'])
             
             if category_name not in category_totals:
                 category_totals[category_name] = {
                     'amount': 0.0,
                     'count': 0,
-                    'color': expense['category_color'] or '#6c757d',  # Default gray color
+                    'color': category_color,
                     'expenses': []
                 }
             
