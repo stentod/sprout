@@ -468,11 +468,12 @@ def get_daily_spending_analytics():
             get_daily_spending_analytics._cache = {}
         
         cache = get_daily_spending_analytics._cache
-        # Temporarily disable caching to debug
-        # if cache_key in cache:
-        #     cache_time, cached_data = cache[cache_key]
-        #     if (datetime.now() - cache_time).total_seconds() < 60:  # 1 minute cache
-        #         return jsonify(cached_data)
+        # Re-enable caching to reduce server load
+        if cache_key in cache:
+            cache_time, cached_data = cache[cache_key]
+            if (datetime.now() - cache_time).total_seconds() < 60:  # 1 minute cache
+                logger.info(f"Daily spending cache hit for user {user_id}")
+                return jsonify(cached_data)
         
         # Get user's daily budget limit
         user_daily_limit = get_user_daily_limit(user_id)
@@ -520,32 +521,32 @@ def get_daily_spending_analytics():
         
         start_date = today - timedelta(days=days-1)
         
-        # Get all expenses in the date range using the same approach as the main app
-        # We'll get expenses for each day individually to ensure proper timezone handling
-        all_expenses = []
+        # Optimized: Get all expenses in the date range with a single query
+        # Calculate the overall start and end bounds for the entire period
+        period_start, _ = get_day_bounds(day_offset - (days-1), user_id)
+        _, period_end = get_day_bounds(day_offset, user_id)
         
-        for i in range(days):
-            current_date = start_date + timedelta(days=i)
-            day_start, day_end = get_day_bounds(day_offset - (days-1-i), user_id)
-            
-            sql = '''
-                SELECT 
-                    amount,
-                    description,
-                    timestamp
-                FROM expenses 
-                WHERE user_id = %s 
-                    AND timestamp >= %s 
-                    AND timestamp < %s
-                ORDER BY timestamp ASC
-            '''
-            
-            day_expenses = run_query(sql, (user_id, day_start.isoformat(), day_end.isoformat()))
-            
-            # Add date information to each expense
-            for expense in day_expenses:
-                expense['expense_date'] = current_date
-                all_expenses.append(expense)
+        logger.info(f"Fetching expenses from {period_start} to {period_end} for {days} days")
+        
+        # Single query for all expenses in the period
+        sql = '''
+            SELECT 
+                amount,
+                description,
+                timestamp
+            FROM expenses 
+            WHERE user_id = %s 
+                AND timestamp >= %s 
+                AND timestamp < %s
+            ORDER BY timestamp ASC
+        '''
+        
+        all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
+        
+        # Add date information to each expense based on timestamp
+        for expense in all_expenses:
+            expense_timestamp = datetime.fromisoformat(expense['timestamp'].replace('Z', '+00:00'))
+            expense['expense_date'] = expense_timestamp.date()
         
         logger.info(f"Analytics query: start_date={start_date}, today={today}, found {len(all_expenses)} expenses")
         
@@ -650,11 +651,12 @@ def get_category_breakdown_analytics():
             get_category_breakdown_analytics._cache = {}
         
         cache = get_category_breakdown_analytics._cache
-        # Temporarily disable caching to debug
-        # if cache_key in cache:
-        #     cache_time, cached_data = cache[cache_key]
-        #     if (datetime.now() - cache_time).total_seconds() < 60:  # 1 minute cache
-        #         return jsonify(cached_data)
+        # Re-enable caching to reduce server load
+        if cache_key in cache:
+            cache_time, cached_data = cache[cache_key]
+            if (datetime.now() - cache_time).total_seconds() < 60:  # 1 minute cache
+                logger.info(f"Category breakdown cache hit for user {user_id}")
+                return jsonify(cached_data)
         
         # Use the same date calculation logic as daily spending analytics
         from datetime import datetime, timedelta, timezone
@@ -665,37 +667,36 @@ def get_category_breakdown_analytics():
         today_for_range = base_date + timedelta(days=day_offset)
         start_date_for_range = today_for_range - timedelta(days=days-1)
         
-        # Get all expenses in the date range
-        all_expenses = []
+        # Optimized: Get all expenses in the date range with a single query
+        # Calculate the overall start and end bounds for the entire period
+        period_start, _ = get_day_bounds(day_offset - (days-1), user_id)
+        _, period_end = get_day_bounds(day_offset, user_id)
         
-        for i in range(days):
-            current_date_in_loop = start_date_for_range + timedelta(days=i)
-            relative_day_offset = (current_date_in_loop - base_date).days
-            
-            day_start, day_end = get_day_bounds(relative_day_offset, user_id)
-            
-            sql = '''
-                SELECT
-                    e.amount,
-                    e.description,
-                    e.timestamp,
-                    COALESCE(dc.name, cc.name) as category_name,
-                    COALESCE(dc.color, cc.color) as category_color
-                FROM expenses e
-                LEFT JOIN default_categories dc ON e.category_id = CONCAT('default_', dc.id::text)
-                LEFT JOIN custom_categories cc ON e.category_id = CONCAT('custom_', cc.id::text) AND cc.user_id = e.user_id
-                WHERE e.user_id = %s
-                    AND e.timestamp >= %s
-                    AND e.timestamp < %s
-                ORDER BY e.timestamp ASC
-            '''
-            
-            day_expenses = run_query(sql, (user_id, day_start.isoformat(), day_end.isoformat()))
-            
-            # Add date information to each expense
-            for expense in day_expenses:
-                expense['expense_date'] = current_date_in_loop
-                all_expenses.append(expense)
+        logger.info(f"Category analytics: fetching expenses from {period_start} to {period_end} for {days} days")
+        
+        # Single query for all expenses in the period with category information
+        sql = '''
+            SELECT
+                e.amount,
+                e.description,
+                e.timestamp,
+                COALESCE(dc.name, cc.name) as category_name,
+                COALESCE(dc.color, cc.color) as category_color
+            FROM expenses e
+            LEFT JOIN default_categories dc ON e.category_id = CONCAT('default_', dc.id::text)
+            LEFT JOIN custom_categories cc ON e.category_id = CONCAT('custom_', cc.id::text) AND cc.user_id = e.user_id
+            WHERE e.user_id = %s
+                AND e.timestamp >= %s
+                AND e.timestamp < %s
+            ORDER BY e.timestamp ASC
+        '''
+        
+        all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
+        
+        # Add date information to each expense based on timestamp
+        for expense in all_expenses:
+            expense_timestamp = datetime.fromisoformat(expense['timestamp'].replace('Z', '+00:00'))
+            expense['expense_date'] = expense_timestamp.date()
         
         # Group expenses by category
         category_totals = {}
@@ -781,12 +782,12 @@ def get_weekly_heatmap_analytics():
             get_weekly_heatmap_analytics._cache = {}
         
         cache = get_weekly_heatmap_analytics._cache
-        # Temporarily disable caching to debug
-        # if cache_key in cache:
-        #     cache_time, cached_data = cache[cache_key]
-        #     if (datetime.now() - cache_time).total_seconds() < 120:  # 2 minute cache
-        #         logger.info(f"Heatmap cache hit for user {user_id}")
-        #         return jsonify(cached_data)
+        # Re-enable caching to reduce server load
+        if cache_key in cache:
+            cache_time, cached_data = cache[cache_key]
+            if (datetime.now() - cache_time).total_seconds() < 120:  # 2 minute cache
+                logger.info(f"Heatmap cache hit for user {user_id}")
+                return jsonify(cached_data)
         
         # Performance tracking
         start_time = datetime.now()

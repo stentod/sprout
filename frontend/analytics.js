@@ -130,31 +130,41 @@ function setupEventListeners() {
   
 }
 
-// Load analytics data
+// Load analytics data with sequential loading to prevent server overload
 async function loadAnalyticsData() {
   const loadingOverlay = document.getElementById('loadingOverlay');
   const timeRange = document.getElementById('timeRange').value;
   
-  // Add a safety timeout to force hide loading after 10 seconds
+  // Add a safety timeout to force hide loading after 15 seconds
   const safetyTimeout = setTimeout(() => {
     console.warn('⚠️ Safety timeout: forcing loading overlay to hide');
     showLoading(false);
-  }, 10000);
+  }, 15000);
   
   try {
     // Show loading
     showLoading(true);
     
-    console.log(`📊 Loading data for ${timeRange} days`);
+    console.log(`📊 Loading data for ${timeRange} days (sequential loading to prevent server overload)`);
     
     // Get current day offset from URL parameters (for date simulation)
     const urlParams = new URLSearchParams(window.location.search);
     const dayOffset = urlParams.get('dayOffset') || '0';
     
+    // Keep full data range but load sequentially to prevent server overload
+    const isProduction = window.location.hostname !== 'localhost';
     
-    // Fetch data with day offset parameter
+    if (isProduction) {
+      console.log('🌐 Production mode: using optimized sequential loading for 30 days');
+    }
+    
+    // Load data sequentially with delays to prevent server overload
+    console.log('🔄 Loading daily spending data...');
     const response = await fetch(`${API_BASE_URL}/api/analytics/daily-spending?days=${timeRange}&dayOffset=${dayOffset}`, {
-      credentials: 'include'
+      credentials: 'include',
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
     });
     
     if (!response.ok) {
@@ -170,9 +180,11 @@ async function loadAnalyticsData() {
       updateSummaryCards(result.summary);
       createChart(result.data, result.summary);
       
-      // Load additional components one by one with individual error handling
+      // Load additional components sequentially with delays to prevent server overload
       console.log('📊 Loading category breakdown...');
       try {
+        // Add delay to prevent server overload (reduced for better UX)
+        await new Promise(resolve => setTimeout(resolve, 500));
         await loadCategoryData();
         console.log('✅ Category breakdown loaded');
       } catch (error) {
@@ -181,6 +193,8 @@ async function loadAnalyticsData() {
       
       console.log('📊 Loading heatmap...');
       try {
+        // Add delay to prevent server overload (reduced for better UX)
+        await new Promise(resolve => setTimeout(resolve, 500));
         await loadHeatmapData();
         console.log('✅ Heatmap loaded');
       } catch (error) {
@@ -534,8 +548,12 @@ async function loadCategoryData() {
     const urlParams = new URLSearchParams(window.location.search);
     const dayOffset = urlParams.get('dayOffset') || '0';
     
+    console.log('🔄 Fetching category breakdown data...');
     const response = await fetch(`${API_BASE_URL}/api/analytics/category-breakdown?days=${timeRange}&dayOffset=${dayOffset}`, {
-      credentials: 'include'
+      credentials: 'include',
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
     });
     
     if (!response.ok) {
@@ -697,8 +715,12 @@ async function loadHeatmapData() {
     // Use the timeRange directly as days (the backend expects days parameter)
     const days = parseInt(timeRange);
     
+    console.log('🔄 Fetching heatmap data...');
     const response = await fetch(`${API_BASE_URL}/api/analytics/weekly-heatmap?days=${days}&dayOffset=${dayOffset}`, {
-      credentials: 'include'
+      credentials: 'include',
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
     });
     
     if (!response.ok) {
