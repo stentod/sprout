@@ -46,12 +46,6 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Load initial data
   loadAnalyticsData();
-  
-  // Set up periodic refresh every 30 seconds to catch any changes
-  setInterval(function() {
-    console.log('⏰ Periodic refresh of analytics data');
-    loadAnalyticsData();
-  }, 30000);
 });
 
 // Test analytics API
@@ -269,29 +263,10 @@ function updateSummaryCards(summary) {
     totalSpentEl.textContent = `$${summary.total_spent.toFixed(2)}`;
   }
   
-  // Daily average
-  const dailyAverageEl = document.getElementById('dailyAverage');
-  if (dailyAverageEl) {
-    dailyAverageEl.textContent = `$${summary.average_daily.toFixed(2)}`;
-  }
-  
   // Budget limit
   const budgetLimitEl = document.getElementById('budgetLimit');
   if (budgetLimitEl) {
     budgetLimitEl.textContent = `$${summary.daily_budget_limit.toFixed(2)}`;
-  }
-  
-  // Days over budget
-  const daysOverBudgetEl = document.getElementById('daysOverBudget');
-  if (daysOverBudgetEl) {
-    daysOverBudgetEl.textContent = summary.days_over_budget;
-    
-    // Color coding
-    if (summary.days_over_budget > 0) {
-      daysOverBudgetEl.style.color = '#FF6B6B';
-    } else {
-      daysOverBudgetEl.style.color = '#4CAF50';
-    }
   }
 }
 
