@@ -527,17 +527,30 @@ def get_daily_spending_analytics():
         
         start_date = today - timedelta(days=days-1)
         
-        # Create robust date range calculation without get_day_bounds dependency
-        # Calculate the date range manually to avoid timezone issues
-        base_date = datetime.now(timezone.utc).date()
-        target_date = base_date + timedelta(days=day_offset)
-        period_start = target_date - timedelta(days=days - 1)
-        period_end = target_date + timedelta(days=1)  # Include the end day
-        
-        logger.info(f"Fetching expenses from {period_start} to {period_end} for {days} days")
-        
-        # Use direct query to avoid get_expenses_between complexity
+        # Use the EXACT same date calculation as the history endpoint for consistency
+        # This ensures analytics and history show identical data
         try:
+            start_date, _ = get_day_bounds(day_offset - (days - 1), user_id)
+            _, end_date = get_day_bounds(day_offset, user_id)
+            logger.info(f"Using get_day_bounds: start={start_date}, end={end_date}")
+        except Exception as e:
+            logger.warning(f"get_day_bounds failed, using fallback: {e}")
+            # Fallback to simple calculation if get_day_bounds fails
+            base_date = datetime.now(timezone.utc).date()
+            target_date = base_date + timedelta(days=day_offset)
+            start_date = target_date - timedelta(days=days - 1)
+            end_date = target_date + timedelta(days=1)
+            logger.info(f"Using fallback calculation: start={start_date}, end={end_date}")
+        
+        logger.info(f"Fetching expenses from {start_date} to {end_date} for {days} days")
+        
+        # Use the same function as history endpoint to ensure data consistency
+        try:
+            all_expenses = get_expenses_between(start_date, end_date, user_id)
+            logger.info(f"Successfully fetched {len(all_expenses)} expenses for daily spending analytics")
+        except Exception as e:
+            logger.error(f"get_expenses_between failed, using direct query: {e}")
+            # Fallback to direct query if get_expenses_between fails
             sql = '''
                 SELECT 
                     amount,
@@ -549,11 +562,8 @@ def get_daily_spending_analytics():
                     AND timestamp < %s
                 ORDER BY timestamp ASC
             '''
-            all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
-            logger.info(f"Successfully fetched {len(all_expenses)} expenses for daily spending analytics")
-        except Exception as e:
-            logger.error(f"Error fetching expenses for daily spending analytics: {e}")
-            raise
+            all_expenses = run_query(sql, (user_id, start_date.isoformat(), end_date.isoformat()))
+            logger.info(f"Successfully fetched {len(all_expenses)} expenses using direct query")
         
         # Add date information to each expense based on timestamp
         for expense in all_expenses:
@@ -565,7 +575,13 @@ def get_daily_spending_analytics():
                 # Fallback: use the start_date
                 expense['expense_date'] = start_date
         
-        logger.info(f"Analytics query: start_date={start_date}, today={today}, found {len(all_expenses)} expenses")
+        logger.info(f"Analytics query: start_date={start_date}, end_date={end_date}, found {len(all_expenses)} expenses")
+        
+        # Log some sample expenses for debugging
+        if all_expenses:
+            logger.info(f"Sample expenses: {all_expenses[:3]}")
+        else:
+            logger.info("No expenses found in date range")
         
         # Group expenses by date
         daily_totals = {}
@@ -684,17 +700,30 @@ def get_category_breakdown_analytics():
         today_for_range = base_date + timedelta(days=day_offset)
         start_date_for_range = today_for_range - timedelta(days=days-1)
         
-        # Create robust date range calculation without get_day_bounds dependency
-        # Calculate the date range manually to avoid timezone issues
-        base_date = datetime.now(timezone.utc).date()
-        target_date = base_date + timedelta(days=day_offset)
-        period_start = target_date - timedelta(days=days - 1)
-        period_end = target_date + timedelta(days=1)  # Include the end day
-        
-        logger.info(f"Category analytics: fetching expenses from {period_start} to {period_end} for {days} days")
-        
-        # Use direct query with category information
+        # Use the EXACT same date calculation as the history endpoint for consistency
+        # This ensures analytics and history show identical data
         try:
+            start_date, _ = get_day_bounds(day_offset - (days - 1), user_id)
+            _, end_date = get_day_bounds(day_offset, user_id)
+            logger.info(f"Category analytics using get_day_bounds: start={start_date}, end={end_date}")
+        except Exception as e:
+            logger.warning(f"get_day_bounds failed for category analytics, using fallback: {e}")
+            # Fallback to simple calculation if get_day_bounds fails
+            base_date = datetime.now(timezone.utc).date()
+            target_date = base_date + timedelta(days=day_offset)
+            start_date = target_date - timedelta(days=days - 1)
+            end_date = target_date + timedelta(days=1)
+            logger.info(f"Category analytics using fallback: start={start_date}, end={end_date}")
+        
+        logger.info(f"Category analytics: fetching expenses from {start_date} to {end_date} for {days} days")
+        
+        # Use the same function as history endpoint to ensure data consistency
+        try:
+            all_expenses = get_expenses_between(start_date, end_date, user_id)
+            logger.info(f"Successfully fetched {len(all_expenses)} expenses for category breakdown analytics")
+        except Exception as e:
+            logger.error(f"get_expenses_between failed for category analytics, using direct query: {e}")
+            # Fallback to direct query if get_expenses_between fails
             sql = '''
                 SELECT
                     e.amount,
@@ -710,11 +739,8 @@ def get_category_breakdown_analytics():
                     AND e.timestamp < %s
                 ORDER BY e.timestamp ASC
             '''
-            all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
-            logger.info(f"Successfully fetched {len(all_expenses)} expenses for category breakdown analytics")
-        except Exception as e:
-            logger.error(f"Error fetching expenses for category breakdown analytics: {e}")
-            raise
+            all_expenses = run_query(sql, (user_id, start_date.isoformat(), end_date.isoformat()))
+            logger.info(f"Successfully fetched {len(all_expenses)} expenses for category breakdown using direct query")
         
         # Add date information to each expense based on timestamp
         for expense in all_expenses:
@@ -731,9 +757,20 @@ def get_category_breakdown_analytics():
         total_spent = 0.0
         
         for expense in all_expenses:
-            # Handle the direct query data structure
-            category_name = expense.get('category_name') or 'Uncategorized'
-            category_color = expense.get('category_color') or '#6c757d'
+            # Handle both data structures: get_expenses_between and direct query
+            if expense.get('category') and expense['category'].get('name'):
+                # Data from get_expenses_between
+                category_name = expense['category']['name']
+                category_color = expense['category'].get('color', '#6c757d')
+            elif expense.get('category_name'):
+                # Data from direct query
+                category_name = expense['category_name']
+                category_color = expense.get('category_color', '#6c757d')
+            else:
+                # No category information
+                category_name = 'Uncategorized'
+                category_color = '#6c757d'
+            
             amount = float(expense['amount'])
             
             if category_name not in category_totals:
@@ -954,6 +991,68 @@ def get_weekly_heatmap_analytics():
             'success': False,
             'error': 'Failed to load heatmap data',
             'details': str(e) if DEBUG else 'Please try again later'
+        }), 500
+
+@expenses_bp.route('/analytics/compare-history', methods=['GET'])
+@require_auth
+@handle_errors
+def compare_analytics_history():
+    """Compare analytics and history data to debug differences"""
+    try:
+        user_id = get_current_user_id()
+        days = int(request.args.get('days', 30))
+        day_offset = int(request.args.get('dayOffset', 0))
+        
+        logger.info(f"Comparing analytics vs history for user {user_id}, days={days}, offset={day_offset}")
+        
+        # Get history data
+        try:
+            start_date, _ = get_day_bounds(day_offset - (days - 1), user_id)
+            _, end_date = get_day_bounds(day_offset, user_id)
+            history_expenses = get_expenses_between(start_date, end_date, user_id)
+        except Exception as e:
+            logger.error(f"History data fetch failed: {e}")
+            history_expenses = []
+        
+        # Get analytics data (same logic as daily spending analytics)
+        try:
+            analytics_start, _ = get_day_bounds(day_offset - (days - 1), user_id)
+            _, analytics_end = get_day_bounds(day_offset, user_id)
+            analytics_expenses = get_expenses_between(analytics_start, analytics_end, user_id)
+        except Exception as e:
+            logger.error(f"Analytics data fetch failed: {e}")
+            analytics_expenses = []
+        
+        # Compare the data
+        comparison = {
+            'date_range': {
+                'start': start_date.isoformat() if 'start_date' in locals() else None,
+                'end': end_date.isoformat() if 'end_date' in locals() else None
+            },
+            'history': {
+                'expense_count': len(history_expenses),
+                'total_amount': sum(float(e['amount']) for e in history_expenses),
+                'sample_expenses': history_expenses[:3] if history_expenses else []
+            },
+            'analytics': {
+                'expense_count': len(analytics_expenses),
+                'total_amount': sum(float(e['amount']) for e in analytics_expenses),
+                'sample_expenses': analytics_expenses[:3] if analytics_expenses else []
+            },
+            'match': len(history_expenses) == len(analytics_expenses)
+        }
+        
+        return jsonify({
+            'success': True,
+            'comparison': comparison,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Compare analytics history error: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
 
 @expenses_bp.route('/analytics/test-simple', methods=['GET'])
