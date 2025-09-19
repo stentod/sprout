@@ -462,15 +462,17 @@ def get_daily_spending_analytics():
         day_offset = int(request.args.get('dayOffset', 0))
         
         # Simple cache for daily spending
+        from datetime import datetime
         cache_key = f"daily_{user_id}_{days}_{day_offset}"
         if not hasattr(get_daily_spending_analytics, '_cache'):
             get_daily_spending_analytics._cache = {}
         
         cache = get_daily_spending_analytics._cache
-        if cache_key in cache:
-            cache_time, cached_data = cache[cache_key]
-            if (datetime.now() - cache_time).total_seconds() < 60:  # 1 minute cache
-                return jsonify(cached_data)
+        # Temporarily disable caching to debug
+        # if cache_key in cache:
+        #     cache_time, cached_data = cache[cache_key]
+        #     if (datetime.now() - cache_time).total_seconds() < 60:  # 1 minute cache
+        #         return jsonify(cached_data)
         
         # Get user's daily budget limit
         user_daily_limit = get_user_daily_limit(user_id)
@@ -642,15 +644,17 @@ def get_category_breakdown_analytics():
         day_offset = int(request.args.get('dayOffset', 0))
         
         # Simple cache for category breakdown
+        from datetime import datetime
         cache_key = f"category_{user_id}_{days}_{day_offset}"
         if not hasattr(get_category_breakdown_analytics, '_cache'):
             get_category_breakdown_analytics._cache = {}
         
         cache = get_category_breakdown_analytics._cache
-        if cache_key in cache:
-            cache_time, cached_data = cache[cache_key]
-            if (datetime.now() - cache_time).total_seconds() < 60:  # 1 minute cache
-                return jsonify(cached_data)
+        # Temporarily disable caching to debug
+        # if cache_key in cache:
+        #     cache_time, cached_data = cache[cache_key]
+        #     if (datetime.now() - cache_time).total_seconds() < 60:  # 1 minute cache
+        #         return jsonify(cached_data)
         
         # Use the same date calculation logic as daily spending analytics
         from datetime import datetime, timedelta, timezone
@@ -777,11 +781,12 @@ def get_weekly_heatmap_analytics():
             get_weekly_heatmap_analytics._cache = {}
         
         cache = get_weekly_heatmap_analytics._cache
-        if cache_key in cache:
-            cache_time, cached_data = cache[cache_key]
-            if (datetime.now() - cache_time).total_seconds() < 120:  # 2 minute cache
-                logger.info(f"Heatmap cache hit for user {user_id}")
-                return jsonify(cached_data)
+        # Temporarily disable caching to debug
+        # if cache_key in cache:
+        #     cache_time, cached_data = cache[cache_key]
+        #     if (datetime.now() - cache_time).total_seconds() < 120:  # 2 minute cache
+        #         logger.info(f"Heatmap cache hit for user {user_id}")
+        #         return jsonify(cached_data)
         
         # Performance tracking
         start_time = datetime.now()
