@@ -522,9 +522,9 @@ def get_daily_spending_analytics():
         start_date = today - timedelta(days=days-1)
         
         # Optimized: Get all expenses in the date range with a single query
-        # Calculate the overall start and end bounds for the entire period
-        period_start, _ = get_day_bounds(day_offset - (days-1), user_id)
-        _, period_end = get_day_bounds(day_offset, user_id)
+        # Use a simpler approach to avoid get_day_bounds complexity
+        period_start = start_date
+        period_end = today + timedelta(days=1)  # Include the end day
         
         logger.info(f"Fetching expenses from {period_start} to {period_end} for {days} days")
         
@@ -541,12 +541,22 @@ def get_daily_spending_analytics():
             ORDER BY timestamp ASC
         '''
         
-        all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
+        try:
+            all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
+            logger.info(f"Successfully fetched {len(all_expenses)} expenses for daily spending analytics")
+        except Exception as e:
+            logger.error(f"Error fetching expenses for daily spending analytics: {e}")
+            raise
         
         # Add date information to each expense based on timestamp
         for expense in all_expenses:
-            expense_timestamp = datetime.fromisoformat(expense['timestamp'].replace('Z', '+00:00'))
-            expense['expense_date'] = expense_timestamp.date()
+            try:
+                expense_timestamp = datetime.fromisoformat(expense['timestamp'].replace('Z', '+00:00'))
+                expense['expense_date'] = expense_timestamp.date()
+            except Exception as e:
+                logger.warning(f"Could not parse timestamp {expense['timestamp']}: {e}")
+                # Fallback: use the start_date
+                expense['expense_date'] = start_date
         
         logger.info(f"Analytics query: start_date={start_date}, today={today}, found {len(all_expenses)} expenses")
         
@@ -668,9 +678,9 @@ def get_category_breakdown_analytics():
         start_date_for_range = today_for_range - timedelta(days=days-1)
         
         # Optimized: Get all expenses in the date range with a single query
-        # Calculate the overall start and end bounds for the entire period
-        period_start, _ = get_day_bounds(day_offset - (days-1), user_id)
-        _, period_end = get_day_bounds(day_offset, user_id)
+        # Use a simpler approach to avoid get_day_bounds complexity
+        period_start = start_date_for_range
+        period_end = today_for_range + timedelta(days=1)  # Include the end day
         
         logger.info(f"Category analytics: fetching expenses from {period_start} to {period_end} for {days} days")
         
@@ -691,12 +701,22 @@ def get_category_breakdown_analytics():
             ORDER BY e.timestamp ASC
         '''
         
-        all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
+        try:
+            all_expenses = run_query(sql, (user_id, period_start.isoformat(), period_end.isoformat()))
+            logger.info(f"Successfully fetched {len(all_expenses)} expenses for category breakdown analytics")
+        except Exception as e:
+            logger.error(f"Error fetching expenses for category breakdown analytics: {e}")
+            raise
         
         # Add date information to each expense based on timestamp
         for expense in all_expenses:
-            expense_timestamp = datetime.fromisoformat(expense['timestamp'].replace('Z', '+00:00'))
-            expense['expense_date'] = expense_timestamp.date()
+            try:
+                expense_timestamp = datetime.fromisoformat(expense['timestamp'].replace('Z', '+00:00'))
+                expense['expense_date'] = expense_timestamp.date()
+            except Exception as e:
+                logger.warning(f"Could not parse timestamp {expense['timestamp']}: {e}")
+                # Fallback: use the start_date_for_range
+                expense['expense_date'] = start_date_for_range
         
         # Group expenses by category
         category_totals = {}
