@@ -25,6 +25,15 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log('📊 Analytics page initialized');
   console.log('🌐 Current URL:', window.location.href);
   console.log('🔗 API Base URL:', API_BASE_URL);
+  console.log('🌍 Environment:', window.location.hostname === 'localhost' ? 'Development' : 'Production');
+  console.log('📊 Chart.js Available:', typeof Chart !== 'undefined' ? 'Yes' : 'No');
+  
+  // Check if Chart.js is loaded
+  if (typeof Chart === 'undefined') {
+    console.error('❌ Chart.js is not loaded! This will cause charts to fail.');
+    showError('Chart.js library failed to load. Please refresh the page.');
+    return;
+  }
   
   // Check authentication
   checkAuth();

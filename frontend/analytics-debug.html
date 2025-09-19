@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Analytics Debug - Production</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=4.5">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .debug-info {
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      font-family: monospace;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .error { color: #ff6b6b; }
+    .success { color: #4caf50; }
+    .warning { color: #ffa726; }
+    .info { color: #2196f3; }
+    .test-section {
+      background: #1a1a1a;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+      border: 1px solid #333;
+    }
+    .test-button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    .test-button:hover { background: #45a049; }
+    .test-button.danger { background: #f44336; }
+    .test-button.danger:hover { background: #da190b; }
+  </style>
+</head>
+<body>
+  <div class="analytics-container">
+    <!-- Header -->
+    <header class="analytics-header">
+      <div class="header-content">
+        <div class="header-left">
+          <a href="/" class="back-button">
+            <span class="back-icon">←</span>
+            Back to Dashboard
+          </a>
+        </div>
+        <h1>🔧 Analytics Debug - Production</h1>
+        <div class="header-right">
+          <a href="/analytics.html" class="back-button">Real Analytics</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Debug Info -->
+    <div class="test-section">
+      <h2>Environment Information</h2>
+      <div id="envInfo" class="debug-info"></div>
+    </div>
+
+    <!-- API Tests -->
+    <div class="test-section">
+      <h2>API Connectivity Tests</h2>
+      <button class="test-button" onclick="testAllEndpoints()">Test All Endpoints</button>
+      <button class="test-button" onclick="testAuth()">Test Authentication</button>
+      <button class="test-button" onclick="testChartJS()">Test Chart.js</button>
+      <button class="test-button danger" onclick="clearResults()">Clear Results</button>
+      <div id="apiResults" class="debug-info"></div>
+    </div>
+
+    <!-- Chart Test -->
+    <div class="test-section">
+      <h2>Chart Rendering Test</h2>
+      <canvas id="testChart" width="400" height="200" style="background: white; margin: 10px 0; border-radius: 4px;"></canvas>
+      <div id="chartResults" class="debug-info"></div>
+    </div>
+
+    <!-- Real Analytics Test -->
+    <div class="test-section">
+      <h2>Real Analytics Data Test</h2>
+      <button class="test-button" onclick="testRealAnalytics()">Load Real Analytics Data</button>
+      <div id="realAnalyticsResults" class="debug-info"></div>
+    </div>
+  </div>
+
+  <script>
+    // Get API base URL
+    function getApiBaseUrl() {
+      const isDevelopment = window.location.hostname === 'localhost' && window.location.port !== '';
+      const isLivereload = window.location.port === '8080' || window.location.port === '3000';
+      
+      if (isDevelopment && isLivereload) {
+        const apiPort = window.ENV_API_PORT || '5001';
+        return `http://localhost:${apiPort}`;
+      }
+      
+      return '';
+    }
+
+    const API_BASE_URL = getApiBaseUrl();
+
+    // Display environment info
+    function displayEnvInfo() {
+      const envInfo = document.getElementById('envInfo');
+      envInfo.innerHTML = `
+Current URL: ${window.location.href}
+API Base URL: ${API_BASE_URL}
+Hostname: ${window.location.hostname}
+Port: ${window.location.port}
+Protocol: ${window.location.protocol}
+User Agent: ${navigator.userAgent}
+Chart.js Available: ${typeof Chart !== 'undefined' ? '✅ Yes' : '❌ No'}
+Chart.js Version: ${typeof Chart !== 'undefined' ? Chart.version : 'N/A'}
+Timestamp: ${new Date().toISOString()}
+      `;
+    }
+
+    // Test all endpoints
+    async function testAllEndpoints() {
+      const results = document.getElementById('apiResults');
+      results.innerHTML = '<span class="info">Testing all analytics endpoints...</span>\n';
+      
+      const tests = [
+        { name: 'Analytics Test', url: '/api/analytics/test' },
+        { name: 'Daily Spending', url: '/api/analytics/daily-spending?days=30&dayOffset=0' },
+        { name: 'Category Breakdown', url: '/api/analytics/category-breakdown?days=30&dayOffset=0' },
+        { name: 'Heatmap', url: '/api/analytics/weekly-heatmap?days=30&dayOffset=0' },
+        { name: 'Summary', url: '/api/summary' }
+      ];
+      
+      let html = '';
+      
+      for (const test of tests) {
+        try {
+          html += `<span class="info">Testing ${test.name}...</span>\n`;
+          results.innerHTML = html;
+          
+          const response = await fetch(`${API_BASE_URL}${test.url}`, {
+            credentials: 'include'
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            html += `<span class="success">✅ ${test.name}: OK (${response.status})</span>\n`;
+            html += `Response: ${JSON.stringify(data, null, 2).substring(0, 300)}...\n\n`;
+          } else {
+            const errorText = await response.text();
+            html += `<span class="error">❌ ${test.name}: ${response.status} ${response.statusText}</span>\n`;
+            html += `Error: ${errorText}\n\n`;
+          }
+        } catch (error) {
+          html += `<span class="error">❌ ${test.name}: ${error.message}</span>\n\n`;
+        }
+        
+        results.innerHTML = html;
+      }
+    }
+
+    // Test authentication
+    async function testAuth() {
+      const results = document.getElementById('apiResults');
+      results.innerHTML = '<span class="info">Testing authentication...</span>\n';
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          results.innerHTML = `<span class="success">✅ Authentication: OK</span>\n${JSON.stringify(data, null, 2)}`;
+        } else {
+          const errorText = await response.text();
+          results.innerHTML = `<span class="error">❌ Authentication failed: ${response.status} ${response.statusText}</span>\n${errorText}`;
+        }
+      } catch (error) {
+        results.innerHTML = `<span class="error">❌ Authentication error: ${error.message}</span>`;
+      }
+    }
+
+    // Test Chart.js
+    function testChartJS() {
+      const results = document.getElementById('chartResults');
+      
+      if (typeof Chart === 'undefined') {
+        results.innerHTML = '<span class="error">❌ Chart.js is not loaded</span>';
+        return;
+      }
+      
+      try {
+        const ctx = document.getElementById('testChart').getContext('2d');
+        const testChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+            datasets: [{
+              label: 'Test Data',
+              data: [12, 19, 3, 5, 2],
+              borderColor: 'rgb(75, 192, 192)',
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              tension: 0.1
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              title: {
+                display: true,
+                text: 'Chart.js Test Chart'
+              }
+            }
+          }
+        });
+        
+        results.innerHTML = '<span class="success">✅ Chart.js is working correctly</span>\nChart created successfully!';
+      } catch (error) {
+        results.innerHTML = `<span class="error">❌ Chart.js error: ${error.message}</span>\n${error.stack}`;
+      }
+    }
+
+    // Test real analytics data
+    async function testRealAnalytics() {
+      const results = document.getElementById('realAnalyticsResults');
+      results.innerHTML = '<span class="info">Loading real analytics data...</span>\n';
+      
+      try {
+        // Test daily spending
+        const dailyResponse = await fetch(`${API_BASE_URL}/api/analytics/daily-spending?days=30&dayOffset=0`, {
+          credentials: 'include'
+        });
+        
+        if (!dailyResponse.ok) {
+          throw new Error(`Daily spending API failed: ${dailyResponse.status}`);
+        }
+        
+        const dailyData = await dailyResponse.json();
+        results.innerHTML = `<span class="success">✅ Daily spending data loaded</span>\n`;
+        results.innerHTML += `Data points: ${dailyData.data ? dailyData.data.length : 0}\n`;
+        results.innerHTML += `Summary: ${JSON.stringify(dailyData.summary, null, 2)}\n\n`;
+        
+        // Test category breakdown
+        const categoryResponse = await fetch(`${API_BASE_URL}/api/analytics/category-breakdown?days=30&dayOffset=0`, {
+          credentials: 'include'
+        });
+        
+        if (!categoryResponse.ok) {
+          throw new Error(`Category breakdown API failed: ${categoryResponse.status}`);
+        }
+        
+        const categoryData = await categoryResponse.json();
+        results.innerHTML += `<span class="success">✅ Category breakdown data loaded</span>\n`;
+        results.innerHTML += `Categories: ${categoryData.data ? categoryData.data.length : 0}\n\n`;
+        
+        // Test heatmap
+        const heatmapResponse = await fetch(`${API_BASE_URL}/api/analytics/weekly-heatmap?days=30&dayOffset=0`, {
+          credentials: 'include'
+        });
+        
+        if (!heatmapResponse.ok) {
+          throw new Error(`Heatmap API failed: ${heatmapResponse.status}`);
+        }
+        
+        const heatmapData = await heatmapResponse.json();
+        results.innerHTML += `<span class="success">✅ Heatmap data loaded</span>\n`;
+        results.innerHTML += `Weeks: ${heatmapData.data ? heatmapData.data.length : 0}\n`;
+        results.innerHTML += `Processing time: ${heatmapData.summary ? heatmapData.summary.processing_time_seconds : 'N/A'}s\n`;
+        
+      } catch (error) {
+        results.innerHTML = `<span class="error">❌ Real analytics test failed: ${error.message}</span>`;
+      }
+    }
+
+    // Clear results
+    function clearResults() {
+      document.getElementById('apiResults').innerHTML = '';
+      document.getElementById('chartResults').innerHTML = '';
+      document.getElementById('realAnalyticsResults').innerHTML = '';
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+      displayEnvInfo();
+      console.log('🔧 Analytics debug page loaded');
+      console.log('🌐 Current URL:', window.location.href);
+      console.log('🔗 API Base URL:', API_BASE_URL);
+    });
+  </script>
+</body>
+</html>
