@@ -127,7 +127,7 @@ function renderBudgets() {
           <h1>📊 Budget Overview</h1>
           <div class="header-actions">
             <span class="daily-limit-display">Daily Limit: $${daily_limit.toFixed(2)}</span>
-            <button onclick="logout()" class="btn btn-small">Logout</button>
+            <a href="/" class="btn btn-secondary">🏠 Back to Home</a>
           </div>
         </div>
       </div>
@@ -192,12 +192,6 @@ function renderBudgets() {
         </div>
       </div>
 
-      <!-- Navigation -->
-      <div class="page-navigation">
-        <a href="/" class="btn btn-secondary btn-full">🏠 Back to Home</a>
-        <a href="history.html" class="btn btn-secondary btn-full">📊 View History</a>
-        <a href="settings.html" class="btn btn-secondary btn-full">⚙️ Settings</a>
-      </div>
 
       <!-- Refresh Button -->
       <div class="refresh-section">

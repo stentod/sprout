@@ -149,8 +149,6 @@ function renderHistory(days) {
         <h1>📊 Expense History - Last ${periodText}${titleSuffix}</h1>
         <div class="history-nav">
           <a href="index.html${window.location.search}" class="btn btn-primary">🏠 Back to Today</a>
-          <a href="analytics.html" class="btn btn-secondary">📈 Analytics</a>
-          <a href="settings.html" class="btn btn-secondary">⚙️ Settings</a>
         </div>
       </div>
       
