@@ -806,6 +806,7 @@ function createHeatmap(data, summary) {
                data-date="${day.date}" 
                data-amount="${day.amount}" 
                data-count="${day.count}"
+               data-month="${day.month_name}"
                title="${tooltip}">
             <span class="day-number">${day.day_number}</span>
           </div>
