@@ -529,15 +529,11 @@ def get_daily_spending_analytics():
         
         logger.info(f"Analytics date calculation: day_offset={day_offset}, today={today}")
         
+        # Use the properly calculated today date
         start_date = today - timedelta(days=days-1)
+        end_date = today + timedelta(days=1)  # Include the end day
         
-        # Ultra-simple date calculation - no complex functions that can fail
-        base_date = datetime.now(timezone.utc).date()
-        target_date = base_date + timedelta(days=day_offset)
-        start_date = target_date - timedelta(days=days - 1)
-        end_date = target_date + timedelta(days=1)  # Include the end day
-        
-        logger.info(f"Ultra-simple date calculation: start={start_date}, end={end_date} for {days} days")
+        logger.info(f"Date calculation: start={start_date}, end={end_date} for {days} days")
         
         # Ultra-simple direct query - no helper functions that can fail
         sql = '''
@@ -564,6 +560,10 @@ def get_daily_spending_analytics():
             try:
                 # Handle direct query data structure (datetime object)
                 expense_timestamp = expense['timestamp']
+                # Ensure we're using the same timezone as our date calculation
+                if expense_timestamp.tzinfo is None:
+                    # If no timezone info, assume UTC
+                    expense_timestamp = expense_timestamp.replace(tzinfo=timezone.utc)
                 expense['expense_date'] = expense_timestamp.date()
             except Exception as e:
                 logger.warning(f"Could not parse timestamp {expense['timestamp']}: {e}")
