@@ -3559,44 +3559,60 @@ body {
   
   /* Better chart containers on mobile - much smaller */
   .chart-container {
-    height: 250px;
+    height: 300px;
     margin-bottom: var(--spacing-md);
     padding: var(--spacing-sm);
     background: var(--color-bg-card);
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
   }
   
-  /* Chart canvas sizing */
+  /* Chart canvas sizing - ensure full chart is visible */
   .chart-container canvas {
-    max-height: 220px !important;
+    height: 280px !important;
     width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
   }
   
   /* Daily Spending Trends specific mobile fixes */
   .daily-spending-chart {
-    height: 200px !important;
-    padding: var(--spacing-xs);
-    margin-bottom: var(--spacing-sm);
+    height: 280px !important;
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    overflow: visible;
   }
   
   .daily-spending-chart canvas {
-    max-height: 180px !important;
+    height: 260px !important;
     width: 100% !important;
-  }
-  
-  /* Chart.js responsive options for mobile */
-  .chart-container {
-    position: relative;
-    width: 100%;
-    max-width: 100%;
-  }
-  
-  /* Force Chart.js to be responsive on mobile */
-  .chart-container canvas {
-    display: block !important;
     max-width: 100% !important;
-    height: auto !important;
+  }
+  
+  /* Category chart mobile fixes */
+  .category-chart {
+    height: 280px !important;
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    overflow: visible;
+  }
+  
+  .category-chart canvas {
+    height: 260px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Heatmap mobile fixes */
+  .heatmap-chart {
+    height: 300px !important;
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    overflow: visible;
   }
   
   /* Improve summary cards on mobile */
@@ -3834,37 +3850,54 @@ body {
     font-size: var(--font-size-lg);
   }
   
-  /* Even smaller charts */
+  /* Even smaller charts - but ensure full visibility */
   .chart-container {
-    height: 200px;
+    height: 250px;
     padding: var(--spacing-xs);
     margin-bottom: var(--spacing-sm);
+    overflow: visible;
   }
   
   .chart-container canvas {
-    max-height: 170px !important;
+    height: 230px !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
   
   /* Daily Spending Trends - extra small mobile */
   .daily-spending-chart {
-    height: 160px !important;
-    padding: 4px;
-    margin-bottom: var(--spacing-xs);
+    height: 240px !important;
+    padding: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+    overflow: visible;
   }
   
   .daily-spending-chart canvas {
-    max-height: 140px !important;
+    height: 220px !important;
     width: 100% !important;
+    max-width: 100% !important;
   }
   
-  /* Force smaller chart elements on very small screens */
-  .chart-container {
-    overflow: hidden;
+  /* Category chart - extra small mobile */
+  .category-chart {
+    height: 240px !important;
+    padding: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+    overflow: visible;
   }
   
-  .chart-container canvas {
-    transform: scale(0.9);
-    transform-origin: top left;
+  .category-chart canvas {
+    height: 220px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Heatmap - extra small mobile */
+  .heatmap-chart {
+    height: 250px !important;
+    padding: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+    overflow: visible;
   }
   
   /* Compact summary cards */
@@ -3929,12 +3962,35 @@ body {
   }
   
   .chart-container {
-    height: 180px;
+    height: 220px;
     margin-bottom: var(--spacing-sm);
+    overflow: visible;
   }
   
   .chart-container canvas {
-    max-height: 150px !important;
+    height: 200px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .daily-spending-chart {
+    height: 200px !important;
+  }
+  
+  .daily-spending-chart canvas {
+    height: 180px !important;
+  }
+  
+  .category-chart {
+    height: 200px !important;
+  }
+  
+  .category-chart canvas {
+    height: 180px !important;
+  }
+  
+  .heatmap-chart {
+    height: 220px !important;
   }
   
   .summary-grid {

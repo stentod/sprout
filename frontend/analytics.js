@@ -577,6 +577,12 @@ function createCategoryChart(data, summary) {
   const ctx = document.getElementById('categoryChart');
   if (!ctx) return;
   
+  // Add mobile-specific CSS class to chart container
+  const chartContainer = ctx.parentElement;
+  if (chartContainer) {
+    chartContainer.classList.add('category-chart');
+  }
+  
   // Destroy existing chart
   if (categoryChart) {
     console.log('🗑️ Destroying existing category chart');
@@ -745,6 +751,12 @@ function createHeatmap(data, summary) {
   const summaryEl = document.getElementById('heatmapSummary');
   
   if (!gridEl || !summaryEl) return;
+  
+  // Add mobile-specific CSS class to heatmap container
+  const heatmapContainer = gridEl.closest('.heatmap-container') || gridEl.parentElement;
+  if (heatmapContainer) {
+    heatmapContainer.classList.add('heatmap-chart');
+  }
   
   if (!data || data.length === 0) {
     gridEl.innerHTML = '<p class="no-data">No spending data available for the selected period.</p>';
