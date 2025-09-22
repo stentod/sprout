@@ -3560,8 +3560,8 @@ body {
   /* Better chart containers on mobile - much smaller */
   .chart-container {
     height: 300px;
-    margin-bottom: var(--spacing-lg);
-    padding: var(--spacing-md);
+    margin: var(--spacing-lg) 0;
+    padding: var(--spacing-lg);
     background: var(--color-bg-card);
     border-radius: var(--radius-lg);
     border: 1px solid var(--color-border);
@@ -3583,8 +3583,8 @@ body {
   /* Daily Spending Trends specific mobile fixes */
   .daily-spending-chart {
     height: 280px !important;
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    margin: var(--spacing-xl) 0;
     overflow: visible;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
@@ -3599,8 +3599,8 @@ body {
   /* Category chart mobile fixes */
   .category-chart {
     height: 280px !important;
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    margin: var(--spacing-xl) 0;
     overflow: visible;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
@@ -3615,8 +3615,8 @@ body {
   /* Heatmap mobile fixes - cleaner design */
   .heatmap-chart {
     height: 320px !important;
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    margin: var(--spacing-xl) 0;
     overflow: visible;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
@@ -3918,8 +3918,8 @@ body {
   /* Even smaller charts - but ensure full visibility */
   .chart-container {
     height: 250px;
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    margin: var(--spacing-lg) 0;
     overflow: visible;
     border-radius: var(--radius-md);
   }
@@ -3933,8 +3933,8 @@ body {
   /* Daily Spending Trends - extra small mobile */
   .daily-spending-chart {
     height: 240px !important;
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    margin: var(--spacing-lg) 0;
     overflow: visible;
     border-radius: var(--radius-md);
   }
@@ -3948,8 +3948,8 @@ body {
   /* Category chart - extra small mobile */
   .category-chart {
     height: 240px !important;
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    margin: var(--spacing-lg) 0;
     overflow: visible;
     border-radius: var(--radius-md);
   }
@@ -3963,8 +3963,8 @@ body {
   /* Heatmap - extra small mobile - cleaner */
   .heatmap-chart {
     height: 280px !important;
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    margin: var(--spacing-lg) 0;
     overflow: visible;
     border-radius: var(--radius-md);
   }
@@ -4048,7 +4048,8 @@ body {
   
   .chart-container {
     height: 220px;
-    margin-bottom: var(--spacing-sm);
+    margin: var(--spacing-md) 0;
+    padding: var(--spacing-md);
     overflow: visible;
   }
   
@@ -4060,6 +4061,8 @@ body {
   
   .daily-spending-chart {
     height: 200px !important;
+    margin: var(--spacing-md) 0;
+    padding: var(--spacing-md);
   }
   
   .daily-spending-chart canvas {
@@ -4068,6 +4071,8 @@ body {
   
   .category-chart {
     height: 200px !important;
+    margin: var(--spacing-md) 0;
+    padding: var(--spacing-md);
   }
   
   .category-chart canvas {
@@ -4076,6 +4081,8 @@ body {
   
   .heatmap-chart {
     height: 220px !important;
+    margin: var(--spacing-md) 0;
+    padding: var(--spacing-md);
   }
   
   .summary-grid {
