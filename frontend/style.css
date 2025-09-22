@@ -3541,15 +3541,15 @@ body {
 @media (max-width: 768px) {
   /* Analytics page container */
   .analytics-container {
-    padding: var(--spacing-sm);
+    padding: var(--spacing-md);
     max-width: 100vw;
     overflow-x: hidden;
   }
   
   /* Analytics header */
   .analytics-header {
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
   }
   
   .analytics-header h1 {
@@ -3560,15 +3560,16 @@ body {
   /* Better chart containers on mobile - much smaller */
   .chart-container {
     height: 300px;
-    margin-bottom: var(--spacing-md);
-    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-md);
     background: var(--color-bg-card);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     border: 1px solid var(--color-border);
     position: relative;
     width: 100%;
     max-width: 100%;
     overflow: visible;
+    box-shadow: var(--shadow-sm);
   }
   
   /* Chart canvas sizing - ensure full chart is visible */
@@ -3582,9 +3583,11 @@ body {
   /* Daily Spending Trends specific mobile fixes */
   .daily-spending-chart {
     height: 280px !important;
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
     overflow: visible;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
   }
   
   .daily-spending-chart canvas {
@@ -3596,9 +3599,11 @@ body {
   /* Category chart mobile fixes */
   .category-chart {
     height: 280px !important;
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
     overflow: visible;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
   }
   
   .category-chart canvas {
@@ -3607,24 +3612,30 @@ body {
     max-width: 100% !important;
   }
   
-  /* Heatmap mobile fixes */
+  /* Heatmap mobile fixes - cleaner design */
   .heatmap-chart {
-    height: 300px !important;
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    height: 320px !important;
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
     overflow: visible;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
   }
   
   /* Improve summary cards on mobile */
   .summary-grid {
     grid-template-columns: 1fr;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
   }
   
   .summary-card {
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-xs);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
   }
   
   .summary-card .card-icon {
@@ -3639,34 +3650,88 @@ body {
     font-size: var(--font-size-lg);
   }
   
-  /* Better heatmap on mobile - much more compact */
+  /* Better heatmap on mobile - cleaner design */
   .heatmap-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    margin-bottom: var(--spacing-md);
-    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-md);
     background: var(--color-bg-card);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
   }
   
   .heatmap-grid {
-    min-width: 500px; /* Reduced from 600px */
-    gap: 2px;
+    min-width: 450px; /* More compact */
+    gap: 3px;
+    padding: var(--spacing-sm);
   }
   
   .heatmap-week {
-    gap: 2px;
+    gap: 3px;
   }
   
   .heatmap-day {
-    width: 20px;
-    height: 20px;
-    font-size: 10px;
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+  }
+  
+  .heatmap-day:hover {
+    transform: scale(1.1);
+    z-index: 10;
+    position: relative;
   }
   
   .heatmap-day .day-number {
-    font-size: 8px;
+    font-size: 9px;
+    font-weight: var(--font-weight-medium);
+  }
+  
+  /* Heatmap color levels - more distinct */
+  .heatmap-day.level-0 {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-muted);
+  }
+  
+  .heatmap-day.level-1 {
+    background: rgba(76, 175, 80, 0.3);
+    color: var(--color-text-primary);
+  }
+  
+  .heatmap-day.level-2 {
+    background: rgba(76, 175, 80, 0.5);
+    color: var(--color-text-primary);
+  }
+  
+  .heatmap-day.level-3 {
+    background: rgba(76, 175, 80, 0.7);
+    color: var(--color-text-primary);
+  }
+  
+  .heatmap-day.level-4 {
+    background: rgba(76, 175, 80, 0.9);
+    color: var(--color-text-primary);
+  }
+  
+  /* Heatmap title and labels */
+  .heatmap-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    text-align: center;
+    margin-bottom: var(--spacing-md);
+    color: var(--color-text-primary);
+  }
+  
+  .heatmap-week-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    text-align: center;
+    margin-bottom: var(--spacing-xs);
   }
   
   /* Improve analytics navigation */
@@ -3853,9 +3918,10 @@ body {
   /* Even smaller charts - but ensure full visibility */
   .chart-container {
     height: 250px;
-    padding: var(--spacing-xs);
-    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
     overflow: visible;
+    border-radius: var(--radius-md);
   }
   
   .chart-container canvas {
@@ -3867,9 +3933,10 @@ body {
   /* Daily Spending Trends - extra small mobile */
   .daily-spending-chart {
     height: 240px !important;
-    padding: var(--spacing-xs);
-    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
     overflow: visible;
+    border-radius: var(--radius-md);
   }
   
   .daily-spending-chart canvas {
@@ -3881,9 +3948,10 @@ body {
   /* Category chart - extra small mobile */
   .category-chart {
     height: 240px !important;
-    padding: var(--spacing-xs);
-    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
     overflow: visible;
+    border-radius: var(--radius-md);
   }
   
   .category-chart canvas {
@@ -3892,12 +3960,29 @@ body {
     max-width: 100% !important;
   }
   
-  /* Heatmap - extra small mobile */
+  /* Heatmap - extra small mobile - cleaner */
   .heatmap-chart {
-    height: 250px !important;
-    padding: var(--spacing-xs);
-    margin-bottom: var(--spacing-sm);
+    height: 280px !important;
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
     overflow: visible;
+    border-radius: var(--radius-md);
+  }
+  
+  .heatmap-grid {
+    min-width: 400px;
+    gap: 2px;
+    padding: var(--spacing-xs);
+  }
+  
+  .heatmap-day {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+  
+  .heatmap-day .day-number {
+    font-size: 8px;
   }
   
   /* Compact summary cards */
