@@ -188,38 +188,47 @@ def get_budgets():
         monthly_budget = daily_limit * 30  # Using 30 days for consistency
         yearly_budget = daily_limit * 365
         
-        # Get spending data for different periods
+        # Get spending data for different periods using proper date calculation
+        from utils import get_day_bounds
+        from datetime import timedelta
+        
+        # Get current day bounds (accounts for simulated dates and timezones)
+        today_start, today_end = get_day_bounds(0, user_id)
+        
         # Weekly spending (last 7 days)
+        week_start, _ = get_day_bounds(-6, user_id)  # 7 days ago
         weekly_sql = '''
             SELECT COALESCE(SUM(amount), 0) as spent
             FROM expenses 
             WHERE user_id = %s 
-            AND timestamp >= CURRENT_DATE - INTERVAL '7 days'
-            AND timestamp < CURRENT_DATE + INTERVAL '1 day'
+            AND timestamp >= %s
+            AND timestamp < %s
         '''
-        weekly_result = run_query(weekly_sql, (user_id,), fetch_one=True)
+        weekly_result = run_query(weekly_sql, (user_id, week_start.isoformat(), today_end.isoformat()), fetch_one=True)
         weekly_spent = float(weekly_result['spent']) if weekly_result else 0.0
         
         # Monthly spending (last 30 days)
+        month_start, _ = get_day_bounds(-29, user_id)  # 30 days ago
         monthly_sql = '''
             SELECT COALESCE(SUM(amount), 0) as spent
             FROM expenses 
             WHERE user_id = %s 
-            AND timestamp >= CURRENT_DATE - INTERVAL '30 days'
-            AND timestamp < CURRENT_DATE + INTERVAL '1 day'
+            AND timestamp >= %s
+            AND timestamp < %s
         '''
-        monthly_result = run_query(monthly_sql, (user_id,), fetch_one=True)
+        monthly_result = run_query(monthly_sql, (user_id, month_start.isoformat(), today_end.isoformat()), fetch_one=True)
         monthly_spent = float(monthly_result['spent']) if monthly_result else 0.0
         
         # Yearly spending (last 365 days)
+        year_start, _ = get_day_bounds(-364, user_id)  # 365 days ago
         yearly_sql = '''
             SELECT COALESCE(SUM(amount), 0) as spent
             FROM expenses 
             WHERE user_id = %s 
-            AND timestamp >= CURRENT_DATE - INTERVAL '365 days'
-            AND timestamp < CURRENT_DATE + INTERVAL '1 day'
+            AND timestamp >= %s
+            AND timestamp < %s
         '''
-        yearly_result = run_query(yearly_sql, (user_id,), fetch_one=True)
+        yearly_result = run_query(yearly_sql, (user_id, year_start.isoformat(), today_end.isoformat()), fetch_one=True)
         yearly_spent = float(yearly_result['spent']) if yearly_result else 0.0
         
         return jsonify({
