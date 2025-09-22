@@ -3652,14 +3652,19 @@ body {
   
   /* Better heatmap on mobile - much cleaner design */
   .heatmap-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
     margin-bottom: var(--spacing-lg);
     padding: var(--spacing-lg);
     background: var(--color-bg-card);
     border-radius: var(--radius-lg);
     border: 1px solid var(--color-border);
     box-shadow: var(--shadow-sm);
+  }
+  
+  .heatmap-container .heatmap-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-md);
   }
   
   .heatmap-grid {
@@ -3669,6 +3674,9 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
   }
   
   .heatmap-week {
@@ -3676,6 +3684,8 @@ body {
     display: flex;
     align-items: center;
     margin-bottom: 2px;
+    padding: 2px 0;
+    background: transparent;
   }
   
   .heatmap-day {
@@ -3787,6 +3797,10 @@ body {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm);
+    border: 1px solid var(--color-border);
   }
   
   .heatmap-header {
@@ -4098,10 +4112,15 @@ body {
     min-width: 350px;
     gap: 3px;
     padding: var(--spacing-sm);
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
   }
   
   .heatmap-week {
     gap: 3px;
+    padding: 1px 0;
+    background: transparent;
   }
   
   .heatmap-day {
