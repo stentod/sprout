@@ -3344,4 +3344,361 @@ body {
     width: 100%;
     max-width: 200px;
   }
+}
+
+/* =====================================
+   ENHANCED MOBILE RESPONSIVENESS
+   ===================================== */
+
+/* Mobile-first improvements for better touch experience */
+@media (max-width: 768px) {
+  /* Improve touch targets - minimum 44px for accessibility */
+  .btn {
+    min-height: 44px;
+    padding: 12px 16px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  /* Better form inputs for mobile */
+  .form-input,
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  select {
+    min-height: 44px;
+    font-size: 16px; /* Prevent zoom on iOS */
+    padding: 12px 16px;
+  }
+  
+  /* Improve modal experience on mobile */
+  .modal-content {
+    width: 95vw;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: 5vh auto;
+    border-radius: 12px;
+  }
+  
+  /* Better spacing for mobile */
+  .form-section {
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+  }
+  
+  /* Improve grid layouts for mobile */
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+  
+  /* Better card layouts */
+  .main-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+  
+  /* Improve navigation */
+  .status-bar {
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+  }
+  
+  /* Better text sizing for mobile */
+  .balance-display {
+    font-size: var(--font-size-4xl);
+    line-height: 1.2;
+  }
+  
+  /* Improve expense list on mobile */
+  .expense-item {
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .expense-actions {
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+  
+  .expense-actions .btn {
+    width: 100%;
+    min-width: auto;
+  }
+}
+
+/* Extra small mobile devices */
+@media (max-width: 480px) {
+  /* Even more compact for small screens */
+  body {
+    padding: var(--spacing-sm);
+  }
+  
+  .container {
+    padding: 0;
+  }
+  
+  /* Smaller text for very small screens */
+  .balance-display {
+    font-size: var(--font-size-3xl);
+  }
+  
+  .plant-emoji {
+    font-size: 2.5rem;
+  }
+  
+  /* Compact form sections */
+  .form-section {
+    padding: var(--spacing-md);
+  }
+  
+  /* Better button sizing */
+  .btn {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+  
+  /* Improve modal on very small screens */
+  .modal-content {
+    width: 98vw;
+    max-width: 98vw;
+    margin: 1vh auto;
+    padding: var(--spacing-md);
+  }
+  
+  /* Better table responsiveness */
+  .expense-table {
+    font-size: var(--font-size-sm);
+  }
+  
+  .expense-table th,
+  .expense-table td {
+    padding: 8px 4px;
+  }
+}
+
+/* Landscape mobile orientation */
+@media (max-width: 768px) and (orientation: landscape) {
+  /* Optimize for landscape mobile */
+  .modal-content {
+    max-height: 95vh;
+    margin: 2.5vh auto;
+  }
+  
+  .form-section {
+    padding: var(--spacing-md);
+  }
+  
+  /* Better use of horizontal space */
+  .form-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+  }
+}
+
+/* Touch device improvements */
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover effects on touch devices */
+  .btn:hover {
+    transform: none;
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .btn-primary:hover {
+    background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-primary-hover));
+    transform: none;
+  }
+  
+  .btn-secondary:hover {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border);
+    transform: none;
+  }
+  
+  /* Add active states for touch feedback */
+  .btn:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+  
+  .form-input:active {
+    border-color: var(--color-border-focus);
+  }
+}
+
+/* High DPI mobile displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Ensure crisp rendering on retina displays */
+  .logo-container img {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Analytics page mobile improvements */
+@media (max-width: 768px) {
+  /* Better chart containers on mobile */
+  .chart-container {
+    height: 300px;
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  /* Improve summary cards on mobile */
+  .summary-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+  
+  .summary-card {
+    padding: var(--spacing-md);
+  }
+  
+  /* Better heatmap on mobile */
+  .heatmap-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .heatmap-grid {
+    min-width: 600px; /* Ensure horizontal scroll on small screens */
+  }
+  
+  /* Improve analytics navigation */
+  .analytics-nav {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  
+  .analytics-nav .btn {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+/* Budget page mobile improvements */
+@media (max-width: 768px) {
+  /* Better budget cards on mobile */
+  .budget-card {
+    padding: var(--spacing-md);
+  }
+  
+  .budget-card h3 {
+    font-size: var(--font-size-lg);
+  }
+  
+  .budget-amount {
+    font-size: var(--font-size-xl);
+  }
+  
+  /* Improve progress bars on mobile */
+  .progress-bar {
+    height: 12px;
+  }
+  
+  /* Better budget grid */
+  .budget-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+}
+
+/* Settings page mobile improvements */
+@media (max-width: 768px) {
+  /* Better settings sections on mobile */
+  .settings-section {
+    padding: var(--spacing-md);
+  }
+  
+  .settings-section h2 {
+    font-size: var(--font-size-lg);
+  }
+  
+  /* Improve form layouts in settings */
+  .settings-form .form-group {
+    margin-bottom: var(--spacing-md);
+  }
+  
+  /* Better category management on mobile */
+  .category-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+  
+  .category-actions {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  
+  .category-actions .btn {
+    flex: 1;
+    margin: 0 var(--spacing-xs);
+  }
+}
+
+/* History page mobile improvements */
+@media (max-width: 768px) {
+  /* Better expense table on mobile */
+  .expense-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  .expense-table thead,
+  .expense-table tbody,
+  .expense-table th,
+  .expense-table td,
+  .expense-table tr {
+    display: block;
+  }
+  
+  .expense-table thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+  
+  .expense-table tr {
+    border: 1px solid var(--color-border);
+    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+  }
+  
+  .expense-table td {
+    border: none;
+    position: relative;
+    padding-left: 50%;
+    padding-top: var(--spacing-xs);
+    padding-bottom: var(--spacing-xs);
+  }
+  
+  .expense-table td:before {
+    content: attr(data-label) ": ";
+    position: absolute;
+    left: 6px;
+    width: 45%;
+    padding-right: 10px;
+    white-space: nowrap;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-secondary);
+  }
+  
+  /* Better filters on mobile */
+  .history-filters {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  
+  .filter-group {
+    width: 100%;
+  }
+  
+  .filter-group select,
+  .filter-group input {
+    width: 100%;
+  }
 } 
