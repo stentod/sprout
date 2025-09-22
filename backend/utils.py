@@ -14,6 +14,9 @@ from functools import wraps
 # Load environment variables
 load_dotenv()
 
+# Cache for simulated_date column check to avoid repeated database queries
+_simulated_date_column_exists = None
+
 # ==========================================
 # LOGGING CONFIGURATION
 # ==========================================
@@ -459,19 +462,23 @@ def handle_errors(f):
 # ==========================================
 
 def get_day_bounds(day_offset=0, user_id=None):
-    """Get the start and end of the target day (using dayOffset)"""
+    """Get the start and end of the target day (using dayOffset) - OPTIMIZED"""
+    global _simulated_date_column_exists
+
     # Check if user has a simulated date set (only if column exists)
     if user_id:
         try:
-            # First check if the simulated_date column exists
-            column_check = run_query("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'user_preferences' 
-                AND column_name = 'simulated_date'
-            """, fetch_one=True)
-            
-            if column_check:
+            # Cache the column existence check to avoid repeated queries
+            if _simulated_date_column_exists is None:
+                column_check = run_query("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'user_preferences' 
+                    AND column_name = 'simulated_date'
+                """, fetch_one=True)
+                _simulated_date_column_exists = column_check is not None
+
+            if _simulated_date_column_exists:
                 simulated_date_result = run_query("""
                     SELECT simulated_date 
                     FROM user_preferences 

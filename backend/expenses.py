@@ -127,12 +127,16 @@ def add_expense():
         })
     
     # Use UTC timestamp to ensure consistent date handling across timezones
-    # Check if user has a simulated date set
-    simulated_date_result = run_query("""
-        SELECT simulated_date 
-        FROM user_preferences 
-        WHERE user_id = %s AND simulated_date IS NOT NULL
-    """, (user_id,), fetch_one=True)
+    # Check if user has a simulated date set (only if column exists)
+    from utils import _simulated_date_column_exists
+    simulated_date_result = None
+    
+    if _simulated_date_column_exists:
+        simulated_date_result = run_query("""
+            SELECT simulated_date 
+            FROM user_preferences 
+            WHERE user_id = %s AND simulated_date IS NOT NULL
+        """, (user_id,), fetch_one=True)
     
     if simulated_date_result and simulated_date_result['simulated_date']:
         # Use simulated date for the timestamp
