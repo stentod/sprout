@@ -310,17 +310,18 @@ function createChart(data, summary) {
   const budgetLimit = summary.daily_budget_limit;
   const budgetLineData = new Array(data.length).fill(budgetLimit);
   
-  // Detect mobile device
+  // Detect mobile device and orientation
   const isMobile = window.innerWidth <= 768;
   const isSmallMobile = window.innerWidth <= 480;
+  const isLandscape = window.innerHeight < window.innerWidth && isMobile;
   
   // Mobile-specific chart configurations
-  const pointRadius = isSmallMobile ? 3 : (isMobile ? 4 : 6);
-  const pointHoverRadius = isSmallMobile ? 4 : (isMobile ? 6 : 8);
-  const borderWidth = isMobile ? 2 : 3;
-  const titleFontSize = isSmallMobile ? 12 : (isMobile ? 14 : 18);
-  const legendFontSize = isSmallMobile ? 10 : (isMobile ? 12 : 14);
-  const axisFontSize = isSmallMobile ? 10 : (isMobile ? 12 : 14);
+  const pointRadius = isLandscape ? 2 : (isSmallMobile ? 3 : (isMobile ? 4 : 6));
+  const pointHoverRadius = isLandscape ? 3 : (isSmallMobile ? 4 : (isMobile ? 6 : 8));
+  const borderWidth = isLandscape ? 1 : (isMobile ? 2 : 3);
+  const titleFontSize = isLandscape ? 10 : (isSmallMobile ? 12 : (isMobile ? 14 : 18));
+  const legendFontSize = isLandscape ? 8 : (isSmallMobile ? 10 : (isMobile ? 12 : 14));
+  const axisFontSize = isLandscape ? 8 : (isSmallMobile ? 10 : (isMobile ? 12 : 14));
   
   // Chart configuration
   const config = {
@@ -373,7 +374,7 @@ function createChart(data, summary) {
           position: 'top',
           labels: {
             usePointStyle: true,
-            padding: isMobile ? 10 : 20,
+            padding: isLandscape ? 5 : (isMobile ? 10 : 20),
             font: {
               size: legendFontSize
             },

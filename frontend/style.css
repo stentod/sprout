@@ -4218,57 +4218,136 @@ body {
   }
 }
 
-/* Landscape mobile - Analytics page */
+/* Landscape mobile - Analytics page - much more compact */
 @media (max-width: 768px) and (orientation: landscape) {
   .analytics-container {
     padding: var(--spacing-xs);
   }
   
+  .analytics-header {
+    padding: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .analytics-header h1 {
+    font-size: var(--font-size-lg);
+    margin-bottom: 0;
+  }
+  
+  /* Much smaller charts for landscape */
   .chart-container {
-    height: 220px;
-    margin: var(--spacing-md) 0;
-    padding: var(--spacing-md);
+    height: 160px;
+    margin: var(--spacing-sm) 0;
+    padding: var(--spacing-sm);
     overflow: visible;
   }
   
   .chart-container canvas {
-    height: 200px !important;
+    height: 140px !important;
     width: 100% !important;
     max-width: 100% !important;
   }
   
   .daily-spending-chart {
-    height: 200px !important;
-    margin: var(--spacing-md) 0;
-    padding: var(--spacing-md);
+    height: 150px !important;
+    margin: var(--spacing-sm) 0;
+    padding: var(--spacing-sm);
   }
   
   .daily-spending-chart canvas {
-    height: 180px !important;
+    height: 130px !important;
   }
   
   .category-chart {
-    height: 200px !important;
-    margin: var(--spacing-md) 0;
-    padding: var(--spacing-md);
+    height: 150px !important;
+    margin: var(--spacing-sm) 0;
+    padding: var(--spacing-sm);
   }
   
   .category-chart canvas {
-    height: 180px !important;
+    height: 130px !important;
   }
   
   .heatmap-chart {
-    height: 220px !important;
-    margin: var(--spacing-md) 0;
-    padding: var(--spacing-md);
+    height: 180px !important;
+    margin: var(--spacing-sm) 0;
+    padding: var(--spacing-sm);
   }
   
+  .heatmap-grid {
+    min-width: 300px;
+    gap: 2px;
+    padding: var(--spacing-xs);
+  }
+  
+  .heatmap-day {
+    width: 18px;
+    height: 18px;
+    font-size: 8px;
+  }
+  
+  .heatmap-day .day-number {
+    font-size: 6px;
+  }
+  
+  .heatmap-week {
+    gap: 2px;
+    margin-bottom: 1px;
+  }
+  
+  /* Summary cards - horizontal layout */
   .summary-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
   }
   
-  .heatmap-container {
+  .summary-card {
+    padding: var(--spacing-xs);
+    margin-bottom: 0;
+  }
+  
+  .summary-card .card-icon {
+    font-size: 1.2rem;
+  }
+  
+  .summary-card .card-label {
+    font-size: 10px;
+  }
+  
+  .summary-card .card-value {
+    font-size: var(--font-size-sm);
+  }
+  
+  /* Heatmap summary - more compact */
+  .heatmap-stats {
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+  }
+  
+  .stat-item {
+    min-width: 45px;
+  }
+  
+  .stat-label {
+    font-size: 9px;
+  }
+  
+  .stat-value {
+    font-size: 10px;
+  }
+  
+  /* Navigation - horizontal layout */
+  .analytics-nav {
+    flex-direction: row;
+    gap: var(--spacing-xs);
     margin-bottom: var(--spacing-sm);
+  }
+  
+  .analytics-nav .btn {
+    flex: 1;
+    padding: var(--spacing-xs);
+    font-size: var(--font-size-xs);
   }
 } 
