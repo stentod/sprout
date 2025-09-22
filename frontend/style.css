@@ -3573,6 +3573,32 @@ body {
     width: 100% !important;
   }
   
+  /* Daily Spending Trends specific mobile fixes */
+  .daily-spending-chart {
+    height: 200px !important;
+    padding: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .daily-spending-chart canvas {
+    max-height: 180px !important;
+    width: 100% !important;
+  }
+  
+  /* Chart.js responsive options for mobile */
+  .chart-container {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  /* Force Chart.js to be responsive on mobile */
+  .chart-container canvas {
+    display: block !important;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+  
   /* Improve summary cards on mobile */
   .summary-grid {
     grid-template-columns: 1fr;
@@ -3817,6 +3843,28 @@ body {
   
   .chart-container canvas {
     max-height: 170px !important;
+  }
+  
+  /* Daily Spending Trends - extra small mobile */
+  .daily-spending-chart {
+    height: 160px !important;
+    padding: 4px;
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .daily-spending-chart canvas {
+    max-height: 140px !important;
+    width: 100% !important;
+  }
+  
+  /* Force smaller chart elements on very small screens */
+  .chart-container {
+    overflow: hidden;
+  }
+  
+  .chart-container canvas {
+    transform: scale(0.9);
+    transform-origin: top left;
   }
   
   /* Compact summary cards */

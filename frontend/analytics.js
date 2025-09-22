@@ -280,6 +280,12 @@ function createChart(data, summary) {
     return;
   }
   
+  // Add mobile-specific CSS class to chart container
+  const chartContainer = ctx.parentElement;
+  if (chartContainer) {
+    chartContainer.classList.add('daily-spending-chart');
+  }
+  
   // Destroy existing chart
   if (spendingChart) {
     console.log('🗑️ Destroying existing chart');
@@ -304,6 +310,18 @@ function createChart(data, summary) {
   const budgetLimit = summary.daily_budget_limit;
   const budgetLineData = new Array(data.length).fill(budgetLimit);
   
+  // Detect mobile device
+  const isMobile = window.innerWidth <= 768;
+  const isSmallMobile = window.innerWidth <= 480;
+  
+  // Mobile-specific chart configurations
+  const pointRadius = isSmallMobile ? 3 : (isMobile ? 4 : 6);
+  const pointHoverRadius = isSmallMobile ? 4 : (isMobile ? 6 : 8);
+  const borderWidth = isMobile ? 2 : 3;
+  const titleFontSize = isSmallMobile ? 12 : (isMobile ? 14 : 18);
+  const legendFontSize = isSmallMobile ? 10 : (isMobile ? 12 : 14);
+  const axisFontSize = isSmallMobile ? 10 : (isMobile ? 12 : 14);
+  
   // Chart configuration
   const config = {
     type: 'line',
@@ -315,21 +333,21 @@ function createChart(data, summary) {
           data: spendingData,
           borderColor: '#4CAF50',
           backgroundColor: 'rgba(76, 175, 80, 0.1)',
-          borderWidth: 3,
+          borderWidth: borderWidth,
           fill: true,
           tension: 0.4,
           pointBackgroundColor: '#4CAF50',
           pointBorderColor: '#ffffff',
-          pointBorderWidth: 2,
-          pointRadius: 6,
-          pointHoverRadius: 8
+          pointBorderWidth: 1,
+          pointRadius: pointRadius,
+          pointHoverRadius: pointHoverRadius
         },
         {
           label: 'Budget Limit',
           data: budgetLineData,
           borderColor: '#FF6B6B',
           backgroundColor: 'transparent',
-          borderWidth: 2,
+          borderWidth: isMobile ? 1 : 2,
           borderDash: [5, 5],
           fill: false,
           pointRadius: 0,
@@ -345,7 +363,7 @@ function createChart(data, summary) {
           display: true,
           text: `Daily Spending Trends (${summary.total_days} days)`,
           font: {
-            size: 18,
+            size: titleFontSize,
             weight: 'bold'
           },
           color: '#ffffff'
@@ -355,9 +373,9 @@ function createChart(data, summary) {
           position: 'top',
           labels: {
             usePointStyle: true,
-            padding: 20,
+            padding: isMobile ? 10 : 20,
             font: {
-              size: 14
+              size: legendFontSize
             },
             color: '#ffffff'
           }
@@ -405,7 +423,7 @@ function createChart(data, summary) {
             display: true,
             text: 'Date',
             font: {
-              size: 14,
+              size: axisFontSize,
               weight: 'bold'
             },
             color: '#ffffff'
@@ -424,7 +442,7 @@ function createChart(data, summary) {
             display: true,
             text: 'Amount ($)',
             font: {
-              size: 14,
+              size: axisFontSize,
               weight: 'bold'
             },
             color: '#ffffff'
