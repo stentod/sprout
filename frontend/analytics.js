@@ -373,7 +373,9 @@ function createChart(data, summary) {
           callbacks: {
             title: function(context) {
               const dataIndex = context[0].dataIndex;
-              const date = new Date(data[dataIndex].date);
+              // Parse the date string correctly to avoid timezone issues (same as chart labels)
+              const [year, month, day] = data[dataIndex].date.split('-');
+              const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
               return date.toLocaleDateString('en-US', { 
                 weekday: 'long',
                 year: 'numeric',
