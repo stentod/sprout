@@ -769,9 +769,9 @@ function createHeatmap(data, summary) {
   
   let gridHTML = '<div class="heatmap-table">';
   
-  // Add day headers
+  // Add cleaner day headers
   gridHTML += '<div class="heatmap-header">';
-  gridHTML += '<div class="week-label"></div>'; // Empty cell for date labels
+  gridHTML += '<div class="week-label-header">Week</div>'; // Cleaner header
   dayHeaders.forEach(day => {
     gridHTML += `<div class="day-header">${day}</div>`;
   });

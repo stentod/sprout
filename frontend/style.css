@@ -3650,12 +3650,12 @@ body {
     font-size: var(--font-size-lg);
   }
   
-  /* Better heatmap on mobile - cleaner design */
+  /* Better heatmap on mobile - much cleaner design */
   .heatmap-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     margin-bottom: var(--spacing-lg);
-    padding: var(--spacing-md);
+    padding: var(--spacing-lg);
     background: var(--color-bg-card);
     border-radius: var(--radius-lg);
     border: 1px solid var(--color-border);
@@ -3663,75 +3663,155 @@ body {
   }
   
   .heatmap-grid {
-    min-width: 450px; /* More compact */
-    gap: 3px;
-    padding: var(--spacing-sm);
+    min-width: 400px; /* More compact for mobile */
+    gap: 4px;
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
   
   .heatmap-week {
-    gap: 3px;
+    gap: 4px;
+    display: flex;
+    align-items: center;
+    margin-bottom: 2px;
   }
   
   .heatmap-day {
-    width: 22px;
-    height: 22px;
-    font-size: 11px;
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
     border-radius: var(--radius-sm);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     transition: all 0.2s ease;
-  }
-  
-  .heatmap-day:hover {
-    transform: scale(1.1);
-    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     position: relative;
   }
   
-  .heatmap-day .day-number {
-    font-size: 9px;
-    font-weight: var(--font-weight-medium);
+  .heatmap-day:hover {
+    transform: scale(1.15);
+    z-index: 10;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   }
   
-  /* Heatmap color levels - more distinct */
+  .heatmap-day .day-number {
+    font-size: 8px;
+    font-weight: var(--font-weight-semibold);
+    line-height: 1;
+  }
+  
+  /* Heatmap color levels - cleaner and more distinct */
   .heatmap-day.level-0 {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
     color: var(--color-text-muted);
+    border-color: rgba(255, 255, 255, 0.1);
   }
   
   .heatmap-day.level-1 {
-    background: rgba(76, 175, 80, 0.3);
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.4), rgba(76, 175, 80, 0.3));
     color: var(--color-text-primary);
+    border-color: rgba(76, 175, 80, 0.3);
   }
   
   .heatmap-day.level-2 {
-    background: rgba(76, 175, 80, 0.5);
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.6), rgba(76, 175, 80, 0.5));
     color: var(--color-text-primary);
+    border-color: rgba(76, 175, 80, 0.4);
   }
   
   .heatmap-day.level-3 {
-    background: rgba(76, 175, 80, 0.7);
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.8), rgba(76, 175, 80, 0.7));
     color: var(--color-text-primary);
+    border-color: rgba(76, 175, 80, 0.5);
   }
   
   .heatmap-day.level-4 {
-    background: rgba(76, 175, 80, 0.9);
-    color: var(--color-text-primary);
+    background: linear-gradient(135deg, rgba(76, 175, 80, 1), rgba(76, 175, 80, 0.9));
+    color: white;
+    border-color: rgba(76, 175, 80, 0.6);
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
   }
   
-  /* Heatmap title and labels */
+  /* Heatmap title and labels - cleaner typography */
   .heatmap-title {
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
     text-align: center;
-    margin-bottom: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
     color: var(--color-text-primary);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--color-border);
   }
   
   .heatmap-week-label {
     font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
     text-align: center;
-    margin-bottom: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+    font-weight: var(--font-weight-medium);
+    min-width: 30px;
+  }
+  
+  /* Heatmap legend - cleaner design */
+  .heatmap-legend {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-border);
+  }
+  
+  .heatmap-legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
+  
+  .heatmap-legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  /* Heatmap table structure - cleaner design */
+  .heatmap-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  
+  .heatmap-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+    padding-bottom: var(--spacing-xs);
+    border-bottom: 1px solid var(--color-border);
+  }
+  
+  .week-label-header {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-secondary);
+    min-width: 50px;
+    text-align: center;
+  }
+  
+  .day-header {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-secondary);
+    text-align: center;
+    width: 24px;
+    margin: 0 2px;
   }
   
   /* Improve analytics navigation */
@@ -3970,19 +4050,35 @@ body {
   }
   
   .heatmap-grid {
-    min-width: 400px;
-    gap: 2px;
-    padding: var(--spacing-xs);
+    min-width: 350px;
+    gap: 3px;
+    padding: var(--spacing-sm);
+  }
+  
+  .heatmap-week {
+    gap: 3px;
   }
   
   .heatmap-day {
-    width: 20px;
-    height: 20px;
-    font-size: 10px;
+    width: 22px;
+    height: 22px;
+    font-size: 9px;
+    border-radius: 3px;
   }
   
   .heatmap-day .day-number {
-    font-size: 8px;
+    font-size: 7px;
+    font-weight: var(--font-weight-semibold);
+  }
+  
+  .heatmap-title {
+    font-size: var(--font-size-base);
+    margin-bottom: var(--spacing-md);
+  }
+  
+  .heatmap-week-label {
+    font-size: 10px;
+    min-width: 25px;
   }
   
   /* Compact summary cards */
