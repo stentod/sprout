@@ -24,11 +24,36 @@ function getApiBaseUrl() {
 function forceRemoveStickyHeader() {
   const header = document.querySelector('.analytics-header');
   if (header) {
+    // Remove all possible sticky/fixed positioning
     header.style.position = 'static';
     header.style.top = 'auto';
+    header.style.bottom = 'auto';
+    header.style.left = 'auto';
+    header.style.right = 'auto';
     header.style.zIndex = 'auto';
     header.style.transform = 'none';
+    header.style.marginTop = '0';
+    header.style.marginBottom = '0';
+    
+    // Also remove from any child elements
+    const headerElements = header.querySelectorAll('*');
+    headerElements.forEach(el => {
+      el.style.position = 'static';
+      el.style.top = 'auto';
+      el.style.zIndex = 'auto';
+    });
+    
     console.log('🔧 Forced sticky header to static positioning');
+  }
+}
+
+// Continuous monitoring for mobile landscape
+function monitorMobileLandscape() {
+  if (isMobileLandscape()) {
+    forceRemoveStickyHeader();
+    // Run again after a short delay to catch any dynamic changes
+    setTimeout(forceRemoveStickyHeader, 100);
+    setTimeout(forceRemoveStickyHeader, 500);
   }
 }
 
@@ -53,25 +78,25 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   // Force remove sticky header if mobile landscape
-  if (isMobileLandscape()) {
-    forceRemoveStickyHeader();
-  }
+  monitorMobileLandscape();
   
   // Listen for orientation changes
   window.addEventListener('orientationchange', function() {
-    setTimeout(() => {
-      if (isMobileLandscape()) {
-        forceRemoveStickyHeader();
-      }
-    }, 100);
+    setTimeout(monitorMobileLandscape, 100);
+    setTimeout(monitorMobileLandscape, 500);
   });
   
   // Listen for resize events
   window.addEventListener('resize', function() {
-    if (isMobileLandscape()) {
-      forceRemoveStickyHeader();
-    }
+    monitorMobileLandscape();
   });
+  
+  // Continuous monitoring every 2 seconds when in mobile landscape
+  setInterval(function() {
+    if (isMobileLandscape()) {
+      monitorMobileLandscape();
+    }
+  }, 2000);
   
   // Check authentication
   checkAuth();

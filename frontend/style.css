@@ -2639,6 +2639,56 @@ body {
   z-index: 100;
 }
 
+/* Override sticky positioning for mobile devices */
+@media (max-width: 768px) {
+  .analytics-header {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+  }
+}
+
+/* Completely different approach for mobile landscape - minimal header */
+@media (max-width: 768px) and (orientation: landscape) {
+  .analytics-header {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    transform: none !important;
+    border-bottom: none !important;
+    background: transparent !important;
+    padding: 2px !important;
+    margin: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: 20px !important;
+    overflow: hidden !important;
+  }
+  
+  .analytics-header .header-content {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: 20px !important;
+    overflow: hidden !important;
+  }
+  
+  .analytics-header h1 {
+    font-size: 8px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+  }
+  
+  .analytics-header .btn {
+    font-size: 6px !important;
+    padding: 1px 2px !important;
+    margin: 0 !important;
+  }
+}
+
 .analytics-header .header-content {
   max-width: 1200px;
   margin: 0 auto;
