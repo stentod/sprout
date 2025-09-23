@@ -2759,6 +2759,10 @@ body {
     z-index: -9999 !important;
     opacity: 0 !important;
     pointer-events: none !important;
+    transform: scale(0) !important;
+    overflow: hidden !important;
+    border: none !important;
+    background: transparent !important;
   }
   
   .analytics-header * {
@@ -2773,6 +2777,37 @@ body {
   /* DEBUG: Green border for this media query */
   .analytics-container {
     border-top: 5px solid green !important;
+  }
+  
+  /* Add floating navigation buttons */
+  .analytics-container::before {
+    content: "← Back";
+    position: fixed;
+    top: 5px;
+    left: 5px;
+    background: var(--color-accent-primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    z-index: 1000;
+    text-decoration: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+  
+  .analytics-container::after {
+    content: "History";
+    position: fixed;
+    top: 5px;
+    right: 5px;
+    background: var(--color-accent-primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    z-index: 1000;
+    text-decoration: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
   }
 }
 
