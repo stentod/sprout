@@ -4240,6 +4240,9 @@ body {
     position: static !important;
     top: auto !important;
     z-index: auto !important;
+    transform: none !important;
+    border-bottom: none !important;
+    background: var(--color-bg-secondary) !important;
   }
   
   .analytics-header .header-content {
@@ -4247,6 +4250,9 @@ body {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
   }
   
   .analytics-header h1 {
@@ -4257,6 +4263,16 @@ body {
   .analytics-header .btn {
     padding: 2px 6px;
     font-size: 10px;
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+  }
+  
+  /* Ensure all header elements are static */
+  .analytics-header * {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
   }
   
   /* Much smaller charts for landscape */
