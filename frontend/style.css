@@ -4237,6 +4237,9 @@ body {
   .analytics-header {
     padding: 2px 4px;
     margin-bottom: var(--spacing-xs);
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
   }
   
   .analytics-header .header-content {
