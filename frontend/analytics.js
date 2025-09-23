@@ -20,40 +20,104 @@ function getApiBaseUrl() {
   return '';
 }
 
-// Force remove sticky positioning for mobile landscape
+// RADICAL APPROACH: Completely hide header in mobile landscape
 function forceRemoveStickyHeader() {
   const header = document.querySelector('.analytics-header');
   if (header) {
-    // Remove all possible sticky/fixed positioning
-    header.style.position = 'static';
-    header.style.top = 'auto';
-    header.style.bottom = 'auto';
-    header.style.left = 'auto';
-    header.style.right = 'auto';
-    header.style.zIndex = 'auto';
-    header.style.transform = 'none';
-    header.style.marginTop = '0';
-    header.style.marginBottom = '0';
+    // Completely hide the header
+    header.style.display = 'none';
+    header.style.visibility = 'hidden';
+    header.style.height = '0';
+    header.style.width = '0';
+    header.style.padding = '0';
+    header.style.margin = '0';
+    header.style.position = 'absolute';
+    header.style.top = '-9999px';
+    header.style.left = '-9999px';
+    header.style.zIndex = '-9999';
     
-    // Also remove from any child elements
+    // Also hide all child elements
     const headerElements = header.querySelectorAll('*');
     headerElements.forEach(el => {
-      el.style.position = 'static';
-      el.style.top = 'auto';
-      el.style.zIndex = 'auto';
+      el.style.display = 'none';
+      el.style.visibility = 'hidden';
     });
     
-    console.log('🔧 Forced sticky header to static positioning');
+    console.log('🔧 Completely hidden sticky header');
   }
+}
+
+// Create floating navigation buttons
+function createFloatingNav() {
+  // Remove existing floating nav if any
+  const existingNav = document.querySelector('.floating-nav');
+  if (existingNav) {
+    existingNav.remove();
+  }
+  
+  // Create floating navigation
+  const floatingNav = document.createElement('div');
+  floatingNav.className = 'floating-nav';
+  floatingNav.style.cssText = `
+    position: fixed;
+    top: 5px;
+    left: 5px;
+    right: 5px;
+    z-index: 1000;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+  `;
+  
+  // Back button
+  const backBtn = document.createElement('a');
+  backBtn.href = '/';
+  backBtn.textContent = '← Back';
+  backBtn.style.cssText = `
+    background: var(--color-accent-primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    text-decoration: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    pointer-events: auto;
+  `;
+  
+  // History button
+  const historyBtn = document.createElement('a');
+  historyBtn.href = '/history.html';
+  historyBtn.textContent = 'History';
+  historyBtn.style.cssText = `
+    background: var(--color-accent-primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    text-decoration: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    pointer-events: auto;
+  `;
+  
+  floatingNav.appendChild(backBtn);
+  floatingNav.appendChild(historyBtn);
+  document.body.appendChild(floatingNav);
 }
 
 // Continuous monitoring for mobile landscape
 function monitorMobileLandscape() {
   if (isMobileLandscape()) {
     forceRemoveStickyHeader();
+    createFloatingNav();
     // Run again after a short delay to catch any dynamic changes
     setTimeout(forceRemoveStickyHeader, 100);
     setTimeout(forceRemoveStickyHeader, 500);
+  } else {
+    // Remove floating nav if not in landscape
+    const existingNav = document.querySelector('.floating-nav');
+    if (existingNav) {
+      existingNav.remove();
+    }
   }
 }
 

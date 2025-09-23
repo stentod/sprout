@@ -2648,44 +2648,50 @@ body {
   }
 }
 
-/* Completely different approach for mobile landscape - minimal header */
+/* RADICAL APPROACH: Completely hide header in mobile landscape */
 @media (max-width: 768px) and (orientation: landscape) {
   .analytics-header {
-    position: static !important;
-    top: auto !important;
-    z-index: auto !important;
-    transform: none !important;
-    border-bottom: none !important;
-    background: transparent !important;
-    padding: 2px !important;
-    margin: 0 !important;
-    height: auto !important;
-    min-height: auto !important;
-    max-height: 20px !important;
-    overflow: hidden !important;
-  }
-  
-  .analytics-header .header-content {
-    position: static !important;
-    top: auto !important;
-    z-index: auto !important;
-    height: auto !important;
-    min-height: auto !important;
-    max-height: 20px !important;
-    overflow: hidden !important;
-  }
-  
-  .analytics-header h1 {
-    font-size: 8px !important;
-    margin: 0 !important;
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
     padding: 0 !important;
-    line-height: 1 !important;
+    margin: 0 !important;
+    position: absolute !important;
+    top: -9999px !important;
+    left: -9999px !important;
+    z-index: -9999 !important;
   }
   
-  .analytics-header .btn {
-    font-size: 6px !important;
-    padding: 1px 2px !important;
-    margin: 0 !important;
+  /* Add floating navigation button */
+  .analytics-container::before {
+    content: "← Back";
+    position: fixed;
+    top: 5px;
+    left: 5px;
+    background: var(--color-accent-primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    z-index: 1000;
+    text-decoration: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+  
+  .analytics-container::after {
+    content: "History";
+    position: fixed;
+    top: 5px;
+    right: 5px;
+    background: var(--color-accent-primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    z-index: 1000;
+    text-decoration: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
   }
 }
 
