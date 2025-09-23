@@ -4350,4 +4350,18 @@ body {
     padding: var(--spacing-xs);
     font-size: var(--font-size-xs);
   }
+  
+  /* Fix sticky header in landscape - make it scroll normally */
+  .analytics-header {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+  }
+  
+  /* Also fix any other sticky elements in landscape */
+  .back-to-today {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+  }
 } 
