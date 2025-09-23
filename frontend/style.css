@@ -3246,6 +3246,13 @@ body {
 
 /* Responsive Design for Analytics */
 @media (max-width: 768px) {
+  /* Remove sticky positioning for all mobile orientations */
+  .analytics-header {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+  }
+  
   .analytics-header .header-content {
     flex-direction: column;
     text-align: center;
@@ -3308,6 +3315,9 @@ body {
 @media (max-width: 480px) {
   .analytics-header {
     padding: var(--spacing-md);
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
   }
   
   .analytics-main {
