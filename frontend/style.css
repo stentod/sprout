@@ -2712,6 +2712,70 @@ body {
   }
 }
 
+/* ADDITIONAL MOBILE LANDSCAPE QUERIES - Try different breakpoints */
+@media (max-width: 1024px) and (orientation: landscape) and (max-height: 600px) {
+  .analytics-header {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: absolute !important;
+    top: -9999px !important;
+    left: -9999px !important;
+    z-index: -9999 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  .analytics-header * {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  /* DEBUG: Blue border for this media query */
+  .analytics-container {
+    border-top: 5px solid blue !important;
+  }
+}
+
+/* Try even broader mobile landscape detection */
+@media (orientation: landscape) and (max-height: 500px) {
+  .analytics-header {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: absolute !important;
+    top: -9999px !important;
+    left: -9999px !important;
+    z-index: -9999 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  .analytics-header * {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  /* DEBUG: Green border for this media query */
+  .analytics-container {
+    border-top: 5px solid green !important;
+  }
+}
+
 .analytics-header .header-content {
   max-width: 1200px;
   margin: 0 auto;
