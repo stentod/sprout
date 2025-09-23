@@ -20,30 +20,31 @@ function getApiBaseUrl() {
   return '';
 }
 
-// RADICAL APPROACH: Completely hide header in mobile landscape
+// ULTIMATE APPROACH: Remove header from DOM entirely in mobile landscape
 function forceRemoveStickyHeader() {
   const header = document.querySelector('.analytics-header');
   if (header) {
-    // Completely hide the header
-    header.style.display = 'none';
-    header.style.visibility = 'hidden';
-    header.style.height = '0';
-    header.style.width = '0';
-    header.style.padding = '0';
-    header.style.margin = '0';
-    header.style.position = 'absolute';
-    header.style.top = '-9999px';
-    header.style.left = '-9999px';
-    header.style.zIndex = '-9999';
+    // Store the header for potential restoration
+    if (!window.originalHeader) {
+      window.originalHeader = header.cloneNode(true);
+    }
     
-    // Also hide all child elements
-    const headerElements = header.querySelectorAll('*');
-    headerElements.forEach(el => {
-      el.style.display = 'none';
-      el.style.visibility = 'hidden';
-    });
+    // Completely remove from DOM
+    header.remove();
     
-    console.log('🔧 Completely hidden sticky header');
+    console.log('🔧 Completely removed sticky header from DOM');
+  }
+}
+
+// Restore header when not in landscape
+function restoreHeader() {
+  const container = document.querySelector('.analytics-container');
+  const main = document.querySelector('.analytics-main');
+  
+  if (window.originalHeader && container && main) {
+    // Insert the original header back before main content
+    container.insertBefore(window.originalHeader.cloneNode(true), main);
+    console.log('🔧 Restored header to DOM');
   }
 }
 
@@ -118,6 +119,8 @@ function monitorMobileLandscape() {
     if (existingNav) {
       existingNav.remove();
     }
+    // Restore header if not in landscape
+    restoreHeader();
   }
 }
 
@@ -141,7 +144,13 @@ document.addEventListener('DOMContentLoaded', function() {
     return;
   }
   
-  // Force remove sticky header if mobile landscape
+  // Force remove sticky header if mobile landscape - IMMEDIATE
+  if (isMobileLandscape()) {
+    forceRemoveStickyHeader();
+    createFloatingNav();
+  }
+  
+  // Also run the monitoring function
   monitorMobileLandscape();
   
   // Listen for orientation changes
