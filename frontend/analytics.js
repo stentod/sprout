@@ -23,6 +23,13 @@ function getApiBaseUrl() {
 // ULTIMATE APPROACH: Remove header from DOM entirely in mobile landscape
 function forceRemoveStickyHeader() {
   const header = document.querySelector('.analytics-header');
+  const container = document.querySelector('.analytics-container');
+  
+  console.log('🔍 Elements found:', {
+    header: !!header,
+    container: !!container
+  });
+  
   if (header) {
     // Store the header for potential restoration
     if (!window.originalHeader) {
@@ -34,6 +41,26 @@ function forceRemoveStickyHeader() {
     
     console.log('🔧 Completely removed sticky header from DOM');
   }
+  
+  // Also try to remove any sticky positioning from the container
+  if (container) {
+    container.style.position = 'static';
+    container.style.top = 'auto';
+    container.style.zIndex = 'auto';
+    console.log('🔧 Made analytics container static');
+  }
+  
+  // Try to find and remove any other sticky elements
+  const allElements = document.querySelectorAll('*');
+  allElements.forEach(el => {
+    const computedStyle = window.getComputedStyle(el);
+    if (computedStyle.position === 'sticky' || computedStyle.position === 'fixed') {
+      console.log('🔍 Found sticky/fixed element:', el.className, el.tagName);
+      el.style.position = 'static';
+      el.style.top = 'auto';
+      el.style.zIndex = 'auto';
+    }
+  });
 }
 
 // Restore header when not in landscape
@@ -126,7 +153,13 @@ function monitorMobileLandscape() {
 
 // Check if mobile landscape
 function isMobileLandscape() {
-  return window.innerWidth <= 768 && window.innerHeight < window.innerWidth;
+  const isLandscape = window.innerWidth <= 768 && window.innerHeight < window.innerWidth;
+  console.log('🔍 Landscape check:', {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    isLandscape: isLandscape
+  });
+  return isLandscape;
 }
 
 // Initialize page
@@ -152,6 +185,19 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Also run the monitoring function
   monitorMobileLandscape();
+  
+  // AGGRESSIVE: Run every 100ms for the first 5 seconds
+  let aggressiveCount = 0;
+  const aggressiveInterval = setInterval(() => {
+    if (isMobileLandscape()) {
+      forceRemoveStickyHeader();
+      createFloatingNav();
+    }
+    aggressiveCount++;
+    if (aggressiveCount >= 50) { // 5 seconds
+      clearInterval(aggressiveInterval);
+    }
+  }, 100);
   
   // Listen for orientation changes
   window.addEventListener('orientationchange', function() {
