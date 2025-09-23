@@ -4295,28 +4295,43 @@ body {
     margin-bottom: 1px;
   }
   
-  /* Summary cards - horizontal layout */
-  .summary-grid {
-    grid-template-columns: 1fr 1fr 1fr 1fr;
-    gap: var(--spacing-xs);
-    margin-bottom: var(--spacing-sm);
+  /* Summary section - minimal space in landscape */
+  .summary-section {
+    margin-bottom: var(--spacing-xs);
   }
   
-  .summary-card {
-    padding: var(--spacing-xs);
+  /* Summary cards - very compact horizontal layout */
+  .summary-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-xs);
     margin-bottom: 0;
   }
   
+  .summary-card {
+    padding: 4px;
+    margin-bottom: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+  }
+  
   .summary-card .card-icon {
-    font-size: 1.2rem;
+    font-size: 1rem;
+    width: 20px;
+    height: 20px;
+  }
+  
+  .summary-card .card-content {
+    flex: 1;
   }
   
   .summary-card .card-label {
-    font-size: 10px;
+    font-size: 8px;
+    margin-bottom: 1px;
   }
   
   .summary-card .card-value {
-    font-size: var(--font-size-sm);
+    font-size: 10px;
   }
   
   /* Heatmap summary - more compact */
