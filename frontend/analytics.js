@@ -20,6 +20,23 @@ function getApiBaseUrl() {
   return '';
 }
 
+// Force remove sticky positioning for mobile landscape
+function forceRemoveStickyHeader() {
+  const header = document.querySelector('.analytics-header');
+  if (header) {
+    header.style.position = 'static';
+    header.style.top = 'auto';
+    header.style.zIndex = 'auto';
+    header.style.transform = 'none';
+    console.log('🔧 Forced sticky header to static positioning');
+  }
+}
+
+// Check if mobile landscape
+function isMobileLandscape() {
+  return window.innerWidth <= 768 && window.innerHeight < window.innerWidth;
+}
+
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
   console.log('📊 Analytics page initialized');
@@ -34,6 +51,27 @@ document.addEventListener('DOMContentLoaded', function() {
     showError('Chart.js library failed to load. Please refresh the page.');
     return;
   }
+  
+  // Force remove sticky header if mobile landscape
+  if (isMobileLandscape()) {
+    forceRemoveStickyHeader();
+  }
+  
+  // Listen for orientation changes
+  window.addEventListener('orientationchange', function() {
+    setTimeout(() => {
+      if (isMobileLandscape()) {
+        forceRemoveStickyHeader();
+      }
+    }, 100);
+  });
+  
+  // Listen for resize events
+  window.addEventListener('resize', function() {
+    if (isMobileLandscape()) {
+      forceRemoveStickyHeader();
+    }
+  });
   
   // Check authentication
   checkAuth();

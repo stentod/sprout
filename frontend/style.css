@@ -4230,6 +4230,27 @@ body {
 
 /* Landscape mobile - Analytics page - much more compact */
 @media (max-width: 768px) and (orientation: landscape) {
+  /* Force remove sticky positioning with maximum specificity */
+  .analytics-container .analytics-header {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+    transform: none !important;
+    border-bottom: none !important;
+    background: var(--color-bg-secondary) !important;
+  }
+  
+  .analytics-container .analytics-header .header-content {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+  }
+  
+  .analytics-container .analytics-header * {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+  }
   .analytics-container {
     padding: var(--spacing-xs);
   }
