@@ -4383,6 +4383,15 @@ body {
     position: static !important;
     top: auto !important;
     z-index: auto !important;
+    transform: none !important;
+    border-bottom: none !important;
+  }
+  
+  /* Ensure header content also scrolls normally */
+  .analytics-header .header-content {
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
   }
   
   /* Also fix any other sticky elements in landscape */
