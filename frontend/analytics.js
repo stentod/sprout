@@ -799,7 +799,15 @@ function createCategoryChart(data, summary) {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          display: false // We'll create custom legend
+          display: window.innerWidth <= 768 && window.innerHeight > window.innerWidth, // Show built-in legend in vertical mobile
+          position: 'bottom',
+          labels: {
+            usePointStyle: true,
+            padding: 10,
+            font: {
+              size: 10
+            }
+          }
         },
         tooltip: {
           callbacks: {
@@ -821,19 +829,23 @@ function createCategoryChart(data, summary) {
   // Create chart
   categoryChart = new Chart(ctx, config);
   
-  // Create custom legend
-  createCategoryLegend(data, summary);
+  // Create custom legend only if not in vertical mobile view
+  if (!(window.innerWidth <= 768 && window.innerHeight > window.innerWidth)) {
+    createCategoryLegend(data, summary);
+  }
   
-  // Force ensure legend is visible in mobile
-  setTimeout(() => {
-    const legendEl = document.getElementById('categoryLegend');
-    if (legendEl) {
-      legendEl.style.display = 'block';
-      legendEl.style.visibility = 'visible';
-      legendEl.style.opacity = '1';
-      console.log('🔧 Forced legend visibility');
-    }
-  }, 100);
+  // Force ensure legend is visible in mobile (only for non-vertical mobile)
+  if (!(window.innerWidth <= 768 && window.innerHeight > window.innerWidth)) {
+    setTimeout(() => {
+      const legendEl = document.getElementById('categoryLegend');
+      if (legendEl) {
+        legendEl.style.display = 'block';
+        legendEl.style.visibility = 'visible';
+        legendEl.style.opacity = '1';
+        console.log('🔧 Forced legend visibility');
+      }
+    }, 100);
+  }
   
   console.log('🥧 Category chart created successfully');
 }

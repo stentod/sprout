@@ -2966,19 +2966,16 @@ body {
   margin-bottom: var(--spacing-lg);
 }
 
-/* Ensure category legend is visible in mobile vertical view */
+/* Hide category legend in mobile vertical view to prevent covering heatmap */
 @media (max-width: 768px) and (orientation: portrait) {
   .category-legend,
   #categoryLegend {
-    display: block !important;
-    visibility: visible !important;
-    margin-top: 4px;
-    margin-bottom: 8px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-    opacity: 1 !important;
-    position: relative !important;
-    z-index: 10 !important;
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
   }
   
   .legend-grid {
