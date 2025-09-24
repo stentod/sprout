@@ -2955,6 +2955,8 @@ body {
   margin-top: var(--spacing-lg);
   padding-top: var(--spacing-lg);
   border-top: 1px solid var(--color-border);
+  display: block !important;
+  visibility: visible !important;
 }
 
 .legend-grid {
@@ -2962,6 +2964,66 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: var(--spacing-md);
   margin-bottom: var(--spacing-lg);
+}
+
+/* Ensure category legend is visible in mobile vertical view */
+@media (max-width: 768px) and (orientation: portrait) {
+  .category-legend {
+    display: block !important;
+    visibility: visible !important;
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+  }
+  
+  .legend-grid {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+  }
+  
+  .legend-item {
+    display: flex !important;
+    visibility: visible !important;
+    align-items: center;
+    padding: var(--spacing-sm);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .legend-color {
+    display: block !important;
+    visibility: visible !important;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin-right: var(--spacing-sm);
+    flex-shrink: 0;
+  }
+  
+  .legend-details {
+    display: block !important;
+    visibility: visible !important;
+    flex: 1;
+  }
+  
+  .legend-category {
+    display: block !important;
+    visibility: visible !important;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    margin-bottom: 2px;
+  }
+  
+  .legend-stats {
+    display: block !important;
+    visibility: visible !important;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
 }
 
 .legend-item {
