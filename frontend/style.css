@@ -2779,36 +2779,7 @@ body {
     border-top: none !important;
   }
   
-  /* Add floating navigation buttons */
-  .analytics-container::before {
-    content: "← Back";
-    position: fixed;
-    top: 5px;
-    left: 5px;
-    background: var(--color-accent-primary);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 10px;
-    z-index: 1000;
-    text-decoration: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-  }
-  
-  .analytics-container::after {
-    content: "History";
-    position: fixed;
-    top: 5px;
-    right: 5px;
-    background: var(--color-accent-primary);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 10px;
-    z-index: 1000;
-    text-decoration: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-  }
+  /* Remove CSS pseudo-element buttons - will use JavaScript instead */
 }
 
 .analytics-header .header-content {

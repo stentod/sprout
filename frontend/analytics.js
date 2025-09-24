@@ -75,7 +75,7 @@ function restoreHeader() {
   }
 }
 
-// Create floating navigation buttons
+// Create functional floating back button
 function createFloatingNav() {
   // Remove existing floating nav if any
   const existingNav = document.querySelector('.floating-nav');
@@ -83,53 +83,46 @@ function createFloatingNav() {
     existingNav.remove();
   }
   
-  // Create floating navigation
-  const floatingNav = document.createElement('div');
-  floatingNav.className = 'floating-nav';
-  floatingNav.style.cssText = `
-    position: fixed;
-    top: 5px;
-    left: 5px;
-    right: 5px;
-    z-index: 1000;
-    display: flex;
-    justify-content: space-between;
-    pointer-events: none;
-  `;
-  
-  // Back button
+  // Create floating back button
   const backBtn = document.createElement('a');
   backBtn.href = '/';
   backBtn.textContent = '← Back';
+  backBtn.className = 'floating-nav';
   backBtn.style.cssText = `
+    position: fixed;
+    top: 5px;
+    left: 5px;
     background: var(--color-accent-primary);
     color: white;
-    padding: 4px 8px;
+    padding: 6px 10px;
     border-radius: 4px;
-    font-size: 10px;
+    font-size: 12px;
     text-decoration: none;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    pointer-events: auto;
+    z-index: 1000;
+    font-weight: 500;
+    transition: all 0.2s ease;
   `;
   
-  // History button
-  const historyBtn = document.createElement('a');
-  historyBtn.href = '/history.html';
-  historyBtn.textContent = 'History';
-  historyBtn.style.cssText = `
-    background: var(--color-accent-primary);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 10px;
-    text-decoration: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    pointer-events: auto;
-  `;
+  // Add hover effect for better UX
+  backBtn.addEventListener('mouseenter', function() {
+    this.style.background = 'var(--color-accent-hover)';
+    this.style.transform = 'translateY(-1px)';
+  });
   
-  floatingNav.appendChild(backBtn);
-  floatingNav.appendChild(historyBtn);
-  document.body.appendChild(floatingNav);
+  backBtn.addEventListener('mouseleave', function() {
+    this.style.background = 'var(--color-accent-primary)';
+    this.style.transform = 'translateY(0)';
+  });
+  
+  // Add click handler to ensure it works
+  backBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    window.location.href = '/';
+  });
+  
+  document.body.appendChild(backBtn);
+  console.log('🔧 Created functional floating back button');
 }
 
 // Continuous monitoring for mobile landscape
