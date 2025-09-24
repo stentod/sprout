@@ -2972,8 +2972,10 @@ body {
   #categoryLegend {
     display: block !important;
     visibility: visible !important;
-    margin-top: var(--spacing-md);
-    padding-top: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    padding-top: var(--spacing-sm);
+    padding-bottom: var(--spacing-sm);
     opacity: 1 !important;
     position: relative !important;
     z-index: 10 !important;
@@ -2982,28 +2984,28 @@ body {
   .legend-grid {
     display: grid !important;
     grid-template-columns: 1fr;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
   }
   
   .legend-item {
     display: flex !important;
     visibility: visible !important;
     align-items: center;
-    padding: var(--spacing-sm);
+    padding: var(--spacing-xs);
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     margin-bottom: var(--spacing-xs);
   }
   
   .legend-color {
     display: block !important;
     visibility: visible !important;
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
-    margin-right: var(--spacing-sm);
+    margin-right: var(--spacing-xs);
     flex-shrink: 0;
   }
   
@@ -3018,14 +3020,14 @@ body {
     visibility: visible !important;
     font-weight: 600;
     color: var(--color-text-primary);
-    font-size: var(--font-size-sm);
-    margin-bottom: 2px;
+    font-size: var(--font-size-xs);
+    margin-bottom: 1px;
   }
   
   .legend-stats {
     display: block !important;
     visibility: visible !important;
-    font-size: var(--font-size-xs);
+    font-size: 10px;
     color: var(--color-text-secondary);
   }
 }
