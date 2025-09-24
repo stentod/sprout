@@ -830,7 +830,13 @@ function createCategoryChart(data, summary) {
 // Create custom category legend
 function createCategoryLegend(data, summary) {
   const legendEl = document.getElementById('categoryLegend');
-  if (!legendEl) return;
+  if (!legendEl) {
+    console.error('❌ Category legend element not found!');
+    return;
+  }
+  
+  console.log('🔍 Creating category legend with data:', data);
+  console.log('🔍 Legend element found:', legendEl);
   
   if (!data || data.length === 0) {
     legendEl.innerHTML = '<p class="no-data">No spending data available for the selected period.</p>';
@@ -880,6 +886,12 @@ function createCategoryLegend(data, summary) {
   `;
   
   legendEl.innerHTML = legendHTML;
+  
+  console.log('🥧 Category legend created successfully');
+  console.log('🔍 Legend HTML content:', legendHTML);
+  console.log('🔍 Legend element after creation:', legendEl);
+  console.log('🔍 Legend element display style:', window.getComputedStyle(legendEl).display);
+  console.log('🔍 Legend element visibility:', window.getComputedStyle(legendEl).visibility);
 }
 
 // Load heatmap data

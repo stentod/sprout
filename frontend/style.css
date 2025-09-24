@@ -2973,6 +2973,9 @@ body {
     visibility: visible !important;
     margin-top: var(--spacing-md);
     padding-top: var(--spacing-md);
+    background: yellow !important; /* DEBUG: Make it visible */
+    border: 2px solid red !important; /* DEBUG: Make it visible */
+    min-height: 50px !important; /* DEBUG: Ensure it has height */
   }
   
   .legend-grid {
