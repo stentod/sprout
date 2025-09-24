@@ -2968,7 +2968,8 @@ body {
 
 /* Ensure category legend is visible in mobile vertical view */
 @media (max-width: 768px) and (orientation: portrait) {
-  .category-legend {
+  .category-legend,
+  #categoryLegend {
     display: block !important;
     visibility: visible !important;
     margin-top: var(--spacing-md);
@@ -2976,6 +2977,9 @@ body {
     background: yellow !important; /* DEBUG: Make it visible */
     border: 2px solid red !important; /* DEBUG: Make it visible */
     min-height: 50px !important; /* DEBUG: Ensure it has height */
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 10 !important;
   }
   
   .legend-grid {

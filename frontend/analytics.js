@@ -824,6 +824,17 @@ function createCategoryChart(data, summary) {
   // Create custom legend
   createCategoryLegend(data, summary);
   
+  // Force ensure legend is visible in mobile
+  setTimeout(() => {
+    const legendEl = document.getElementById('categoryLegend');
+    if (legendEl) {
+      legendEl.style.display = 'block';
+      legendEl.style.visibility = 'visible';
+      legendEl.style.opacity = '1';
+      console.log('🔧 Forced legend visibility');
+    }
+  }, 100);
+  
   console.log('🥧 Category chart created successfully');
 }
 
@@ -892,6 +903,16 @@ function createCategoryLegend(data, summary) {
   console.log('🔍 Legend element after creation:', legendEl);
   console.log('🔍 Legend element display style:', window.getComputedStyle(legendEl).display);
   console.log('🔍 Legend element visibility:', window.getComputedStyle(legendEl).visibility);
+  
+  // Force visibility with inline styles
+  legendEl.style.display = 'block';
+  legendEl.style.visibility = 'visible';
+  legendEl.style.opacity = '1';
+  legendEl.style.background = 'yellow';
+  legendEl.style.border = '2px solid red';
+  legendEl.style.minHeight = '50px';
+  
+  console.log('🔧 Applied forced visibility styles');
 }
 
 // Load heatmap data
