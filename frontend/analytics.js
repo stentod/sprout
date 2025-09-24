@@ -846,8 +846,7 @@ function createCategoryLegend(data, summary) {
     return;
   }
   
-  console.log('🔍 Creating category legend with data:', data);
-  console.log('🔍 Legend element found:', legendEl);
+  console.log('🔍 Creating category legend');
   
   if (!data || data.length === 0) {
     legendEl.innerHTML = '<p class="no-data">No spending data available for the selected period.</p>';
@@ -899,18 +898,11 @@ function createCategoryLegend(data, summary) {
   legendEl.innerHTML = legendHTML;
   
   console.log('🥧 Category legend created successfully');
-  console.log('🔍 Legend HTML content:', legendHTML);
-  console.log('🔍 Legend element after creation:', legendEl);
-  console.log('🔍 Legend element display style:', window.getComputedStyle(legendEl).display);
-  console.log('🔍 Legend element visibility:', window.getComputedStyle(legendEl).visibility);
   
   // Force visibility with inline styles
   legendEl.style.display = 'block';
   legendEl.style.visibility = 'visible';
   legendEl.style.opacity = '1';
-  legendEl.style.background = 'yellow';
-  legendEl.style.border = '2px solid red';
-  legendEl.style.minHeight = '50px';
   
   console.log('🔧 Applied forced visibility styles');
 }
