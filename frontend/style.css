@@ -2706,9 +2706,9 @@ body {
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
   }
   
-  /* DEBUG: Add a visible indicator that this CSS is working */
+  /* Remove debug border */
   .analytics-container {
-    border-top: 5px solid red !important;
+    border-top: none !important;
   }
 }
 
@@ -2738,9 +2738,9 @@ body {
     pointer-events: none !important;
   }
   
-  /* DEBUG: Blue border for this media query */
+  /* Remove debug border */
   .analytics-container {
-    border-top: 5px solid blue !important;
+    border-top: none !important;
   }
 }
 
@@ -2774,9 +2774,9 @@ body {
     pointer-events: none !important;
   }
   
-  /* DEBUG: Green border for this media query */
+  /* Remove debug border - header hiding is working */
   .analytics-container {
-    border-top: 5px solid green !important;
+    border-top: none !important;
   }
   
   /* Add floating navigation buttons */
