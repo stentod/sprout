@@ -3,7 +3,8 @@ import os
 import tempfile
 import psycopg2
 import psycopg2.extras
-from app import app, get_db_connection
+from app import app
+from utils import get_db_connection
 from dotenv import load_dotenv
 
 # Load test environment variables

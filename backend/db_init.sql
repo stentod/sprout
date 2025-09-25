@@ -1,7 +1,0 @@
-CREATE TABLE IF NOT EXISTS expenses (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER DEFAULT 0,
-  amount REAL NOT NULL,
-  description TEXT,
-  timestamp DATETIME NOT NULL
-); 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Performance Optimization Script - Phase 1
+Performance Optimization Script 
 Adds database indexes to improve query performance
 """
 
@@ -78,14 +78,14 @@ def add_performance_indexes():
     return True
 
 if __name__ == "__main__":
-    print("🚀 Sprout Budget Tracker - Performance Optimization Phase 1")
+    print("🚀 Sprout Budget Tracker - Performance Optimization")
     print("=" * 60)
     
     success = add_performance_indexes()
     
     if success:
-        print("\n✅ Phase 1 complete! Your app should now be faster.")
+        print("\n✅ Your app should now be faster.")
         print("💡 Next: Test the app to ensure everything works correctly.")
     else:
-        print("\n❌ Phase 1 failed. Check the error messages above.")
+        print("\n❌ failed. Check the error messages above.")
         sys.exit(1)
