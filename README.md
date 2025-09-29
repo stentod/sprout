@@ -7,43 +7,43 @@ A personal budget tracker designed to help you stay financially aware on a daily
 ## Features
 
 ### Core Budget Management
-- 💰 **Daily Budget Tracking** - Set and track your daily spending limit
-- 🔄 **Budget Rollover** - Unspent money rolls over to the next day (optional)
-- 📊 **Category-Based Budgeting** - Set individual budgets for different spending categories
-- 🎯 **Visual Progress Tracking** - Real-time budget status with intuitive gauges
+- **Daily Budget Tracking** - Set and track your daily spending limit
+- **Budget Rollover** - Unspent money rolls over to the next day (optional)
+- **Category-Based Budgeting** - Set individual budgets for different spending categories
+- **Visual Progress Tracking** - Real-time budget status with intuitive gauges
 
 ### User Experience
 - 🌱 **Visual Plant Status** - Watch your financial plant grow or wilt based on spending habits
-- 📱 **Responsive Design** - Works seamlessly on desktop and mobile devices
-- 🌙 **Dark Mode Support** - Easy on the eyes for daily use
-- ⚡ **Real-time Updates** - Instant feedback on spending and budget changes
+- **Responsive Design** - Works seamlessly on desktop and mobile devices
+- **Dark Mode Support** - Easy on the eyes for daily use
+- **Real-time Updates** - Instant feedback on spending and budget changes
 
 ### Authentication & Security
-- 🔐 **User Authentication** - Secure email/password login system
-- 📧 **Password Reset** - Email-based password recovery
-- 🛡️ **Session Management** - Secure session handling with configurable timeouts
-- 🔒 **Production Security** - Security headers and best practices
+- **User Authentication** - Secure email/password login system
+- **Password Reset** - Email-based password recovery
+- **Session Management** - Secure session handling with configurable timeouts
+- **Production Security** - Security headers and best practices
 
 ### Analytics & Insights
-- 📈 **Spending Analytics** - Comprehensive charts and visualizations
-- 📅 **7-Day History** - Review your spending patterns over the last week
-- 🔥 **Spending Heatmap** - Visual calendar showing daily spending intensity
-- 📊 **Category Breakdown** - See where your money goes by category
-- 📉 **Trend Analysis** - Track spending trends over time (7, 14, 30, 90 days)
+- **Spending Analytics** - Comprehensive charts and visualizations
+- **7-Day History** - Review your spending patterns over the last week
+- **Spending Heatmap** - Visual calendar showing daily spending intensity
+- **Category Breakdown** - See where your money goes by category
+- **Trend Analysis** - Track spending trends over time (7, 14, 30, 90 days)
 
 ### Advanced Features
-- 🏷️ **Expense Categories** - Organize expenses with customizable categories
-- 📝 **Expense Descriptions** - Add detailed notes to your transactions
-- ⏰ **Automatic Daily Reset** - Budget resets daily at midnight
-- 🎮 **Day Simulation** - Test different scenarios with date simulation
-- ⚙️ **User Preferences** - Customize daily limits, category requirements, and rollover settings
+- **Expense Categories** - Organize expenses with customizable categories
+- **Expense Descriptions** - Add detailed notes to your transactions
+- **Automatic Daily Reset** - Budget resets daily at midnight
+- **Day Simulation** - Test different scenarios with date simulation
+- **User Preferences** - Customize daily limits, category requirements, and rollover settings
 
 ### Technical Features
-- 🐳 **Production Ready** - Containerized with Docker for deployment
-- 🧪 **Comprehensive Testing** - Full test suite with coverage reporting
-- 📊 **Performance Optimized** - Database indexing and query optimization
-- 🔄 **API-First Design** - RESTful API for all functionality
-- 📱 **Progressive Web App** - Works offline and can be installed on devices
+- **Production Ready** - Containerized with Docker for deployment
+- **Comprehensive Testing** - Full test suite with coverage reporting
+- **Performance Optimized** - Database indexing and query optimization
+- **API-First Design** - RESTful API for all functionality
+- **Progressive Web App** - Works offline and can be installed on devices
 
 ## Tech Stack
 
@@ -68,6 +68,7 @@ A personal budget tracker designed to help you stay financially aware on a daily
 - **Docker** (for production builds)
 - **Python 3.x** (for development)
 - **Node.js** and **npm** (for frontend development server)
+- **PostgreSQL** (for database - see [POSTGRESQL_SETUP.md](backend/POSTGRESQL_SETUP.md) for setup)
 
 ## Initial Setup
 
@@ -119,9 +120,9 @@ EOF
 | `PORT` | Flask server port | `5001` | No |
 | `FLASK_ENV` | Flask environment | `development` | No |
 | `FLASK_DEBUG` | Enable debug mode | `true` | No |
-| `DATABASE_URL` | Database connection | Uses SQLite by default | No |
+| `DATABASE_URL` | PostgreSQL connection | Required for all environments | Yes |
 
-> **Note:** If no `.env` file exists, the app uses sensible defaults and SQLite for the database.
+> **Note:** PostgreSQL database connection is required. See [POSTGRESQL_SETUP.md](backend/POSTGRESQL_SETUP.md) for setup instructions.
 
 #### For Production (Render Platform)
 
@@ -197,7 +198,7 @@ docker run -p 10000:10000 \
 |--------|---------------------------|-------------------|
 | **Frontend** | live-server on port 8080 | Nginx on port 10000 |
 | **Backend** | Flask dev server on port 5001 | Gunicorn + Flask on port 5000 |
-| **Database** | SQLite (local file) | PostgreSQL (Render managed) |
+| **Database** | PostgreSQL (local) | PostgreSQL (Render managed) |
 | **Environment** | `.env` file or local vars | Render environment variables |
 | **Auto-reload** | ✅ Yes (both frontend/backend) | ❌ No (production stability) |
 | **Debug Mode** | ✅ Yes (detailed errors) | ❌ No (security) |
@@ -358,7 +359,7 @@ Sprout/
 - **Day Simulation**: Use `?dayOffset=N` in URL to test different days
 - **Auto-reload**: Both frontend and backend restart on file changes
 - **Debug Mode**: Detailed error messages and stack traces
-- **Local Database**: SQLite file for easy development testing
+- **Local Database**: PostgreSQL database for development testing
 
 ## Deployment
 
@@ -392,4 +393,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Built with ❤️ for better financial awareness**
+**Built for better financial awareness**
