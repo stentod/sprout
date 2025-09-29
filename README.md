@@ -1,26 +1,56 @@
 # Sprout Budget Tracker
 
-A minimalist personal budget tracker designed to help you stay financially aware on a daily basis. Built with Flask and PostgreSQL on the backend and vanilla JavaScript on the frontend, Sprout offers a clean interface and visual feedback to help users build better spending habits.
+A personal budget tracker designed to help you stay financially aware on a daily basis. Built with Flask and PostgreSQL on the backend and vanilla JavaScript on the frontend, Sprout offers a clean interface and visual feedback to help users build better spending habits.
 
 ![Sprout Budget Tracker](frontend/image.png)
 
 ## Features
 
+### Core Budget Management
 - 💰 **Daily Budget Tracking** - Set and track your daily spending limit
+- 🔄 **Budget Rollover** - Unspent money rolls over to the next day (optional)
+- 📊 **Category-Based Budgeting** - Set individual budgets for different spending categories
+- 🎯 **Visual Progress Tracking** - Real-time budget status with intuitive gauges
+
+### User Experience
 - 🌱 **Visual Plant Status** - Watch your financial plant grow or wilt based on spending habits
 - 📱 **Responsive Design** - Works seamlessly on desktop and mobile devices
-- 📈 **7-Day History** - Review your spending patterns over the last week
-- 🌙 **Automatic Reset** - Budget resets daily at midnight
-- 🎨 **Dark Mode Support** - Easy on the eyes for daily use
-- 🔒 **Production Ready** - Containerized with Docker for deployment
+- 🌙 **Dark Mode Support** - Easy on the eyes for daily use
+- ⚡ **Real-time Updates** - Instant feedback on spending and budget changes
+
+### Authentication & Security
+- 🔐 **User Authentication** - Secure email/password login system
+- 📧 **Password Reset** - Email-based password recovery
+- 🛡️ **Session Management** - Secure session handling with configurable timeouts
+- 🔒 **Production Security** - Security headers and best practices
+
+### Analytics & Insights
+- 📈 **Spending Analytics** - Comprehensive charts and visualizations
+- 📅 **7-Day History** - Review your spending patterns over the last week
+- 🔥 **Spending Heatmap** - Visual calendar showing daily spending intensity
+- 📊 **Category Breakdown** - See where your money goes by category
+- 📉 **Trend Analysis** - Track spending trends over time (7, 14, 30, 90 days)
+
+### Advanced Features
+- 🏷️ **Expense Categories** - Organize expenses with customizable categories
+- 📝 **Expense Descriptions** - Add detailed notes to your transactions
+- ⏰ **Automatic Daily Reset** - Budget resets daily at midnight
+- 🎮 **Day Simulation** - Test different scenarios with date simulation
+- ⚙️ **User Preferences** - Customize daily limits, category requirements, and rollover settings
+
+### Technical Features
+- 🐳 **Production Ready** - Containerized with Docker for deployment
+- 🧪 **Comprehensive Testing** - Full test suite with coverage reporting
+- 📊 **Performance Optimized** - Database indexing and query optimization
+- 🔄 **API-First Design** - RESTful API for all functionality
+- 📱 **Progressive Web App** - Works offline and can be installed on devices
 
 ## Tech Stack
 
 ### Backend
 - **Python 3.x** - Core backend language
 - **Flask** - Lightweight web framework
-- **PostgreSQL** - Production database
-- **SQLite** - Development database
+- **PostgreSQL** - Production/Development database
 - **Gunicorn** - WSGI HTTP Server
 
 ### Frontend
@@ -253,36 +283,76 @@ docker stop sprout-container && docker rm sprout-container
 ```
 Sprout/
 ├── backend/
-│   ├── app.py                   # Main Flask application
+│   ├── main.py                 # Main Flask application with blueprints
+│   ├── app.py                  # Development entry point
+│   ├── auth.py                 # Authentication routes and logic
+│   ├── expenses.py             # Expense management and analytics
+│   ├── categories.py           # Category management
+│   ├── preferences.py          # User preferences and settings
+│   ├── rollover_api.py         # Budget rollover functionality
+│   ├── rollover_service.py     # Rollover business logic
+│   ├── utils.py                # Shared utilities and helpers
 │   ├── setup_db.py             # Database setup script
 │   ├── schema_postgres.sql     # PostgreSQL schema
 │   ├── requirements.txt        # Python dependencies
+│   ├── run_tests.py            # Test runner script
+│   ├── pytest.ini             # Pytest configuration
+│   ├── conftest.py             # Test configuration
+│   ├── tests/                  # Comprehensive test suite
+│   │   ├── test_auth.py        # Authentication tests
+│   │   ├── test_expenses.py    # Expense management tests
+│   │   ├── test_categories.py  # Category management tests
+│   │   ├── test_preferences.py # User preferences tests
+│   │   └── test_summary.py     # Summary and analytics tests
 │   ├── POSTGRESQL_SETUP.md     # Database setup guide
-│   └── db_init.sql             # SQLite schema (development)
+│   ├── EMAIL_SETUP.md          # Email configuration guide
+│   └── TESTING.md              # Testing documentation
 ├── frontend/
-│   ├── index.html              # Main page
-│   ├── history.html            # History page
+│   ├── index.html              # Main dashboard
+│   ├── auth.html               # Authentication page
+│   ├── history.html            # Spending history
+│   ├── analytics.html          # Analytics dashboard
+│   ├── budgets.html            # Budget management
+│   ├── settings.html           # User settings
+│   ├── reset-password.html     # Password reset page
 │   ├── main.js                 # Main app logic
+│   ├── auth.js                 # Authentication logic
 │   ├── history.js              # History page logic
-│   ├── style.css              # Styling
-│   ├── logo.svg               # App logo
-│   └── image.png              # Screenshot for README
+│   ├── analytics.js            # Analytics and charts
+│   ├── budgets.js              # Budget management
+│   ├── settings.js             # Settings management
+│   ├── reset-password.js       # Password reset logic
+│   ├── style.css               # Styling and themes
+│   ├── logo.svg                # App logo
+│   └── image.png               # Screenshot for README
 ├── Dockerfile                  # Docker configuration
-├── nginx.conf                 # Nginx configuration
-├── start.sh                   # Development server script
-├── render.yaml                # Render deployment config
-├── gunicorn.conf.py           # Gunicorn WSGI config
-├── DEPLOYMENT.md              # Production deployment guide
-└── README.md                  # This file
+├── nginx.conf                  # Nginx configuration
+├── start.sh                    # Development server script
+├── render.yaml                 # Render deployment config
+├── gunicorn.conf.py            # Gunicorn WSGI config
+├── DEPLOYMENT.md               # Production deployment guide
+└── README.md                   # This file
 ```
 
 ## Usage
 
-1. **Set Your Budget**: Enter your daily spending limit at the top of the page
-2. **Track Expenses**: Add expenses throughout the day with optional descriptions
-3. **Monitor Progress**: Watch your plant visual change based on spending habits
-4. **Review History**: Use the history page to analyze your last 7 days
-5. **Daily Reset**: Your budget automatically resets at midnight
+### Getting Started
+1. **Create Account**: Sign up with your email address and secure password
+2. **Set Your Budget**: Configure your daily spending limit in settings
+3. **Enable Rollover** (Optional): Allow unspent money to carry over to the next day
+4. **Customize Categories**: Set up spending categories with individual budgets
+
+### Daily Usage
+1. **Track Expenses**: Add expenses throughout the day with descriptions and categories
+2. **Monitor Progress**: Watch your plant visual and budget gauge update in real-time
+3. **Check Analytics**: View detailed spending patterns and trends
+4. **Review History**: Analyze your spending over the last 7 days or longer periods
+
+### Advanced Features
+1. **Category Management**: Create custom categories and set individual budgets
+2. **Analytics Dashboard**: View comprehensive charts, heatmaps, and spending breakdowns
+3. **Settings Customization**: Adjust preferences, rollover settings, and category requirements
+4. **Day Simulation**: Test different scenarios using the day simulation feature
 
 ### Development Features
 - **Day Simulation**: Use `?dayOffset=N` in URL to test different days
