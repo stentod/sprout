@@ -8,6 +8,8 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     envVars:
+      # DATABASE_URL is automatically provided by Render when database service is linked
+      # Set it in Render dashboard instead of hard-coding here
       - key: DAILY_BUDGET
         value: "30.0"
       - key: FLASK_ENV
