@@ -26,7 +26,21 @@ logger = setup_logging()
 
 # Production fix - ensure proper session handling
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
+
+# Get secret key from environment
+secret_key = os.environ.get('SECRET_KEY')
+
+# In production, SECRET_KEY must be set
+if not secret_key:
+    if os.environ.get('FLASK_ENV') == 'production':
+        raise ValueError(
+            "SECRET_KEY environment variable must be set in production. "
+            "Generate a secure key with: python -c 'import secrets; print(secrets.token_hex(32))'"
+        )
+    # Only allow default for local development
+    secret_key = 'dev-secret-key-only-for-local-development'
+
+app.secret_key = secret_key
 
 # Enhanced session configuration for production
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
