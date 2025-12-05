@@ -23,17 +23,18 @@ def set_mail_instance(mail_instance):
     global mail
     mail = mail_instance
 
-def send_password_reset_email_sendgrid(user_email, username, reset_token):
+def send_password_reset_email_sendgrid(user_email, username, reset_token, base_url=None):
     """Send password reset email using SendGrid (Professional)"""
     try:
         # Get SendGrid API key from environment
         sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
         if not sendgrid_api_key:
             logger.info("SendGrid API key not configured, falling back to Gmail")
-            return send_password_reset_email_gmail(user_email, username, reset_token)
+            return send_password_reset_email_gmail(user_email, username, reset_token, base_url)
         
         # Create the reset URL (dynamic for production)
-        base_url = os.environ.get('BASE_URL', 'http://localhost:5001')
+        if not base_url:
+            base_url = os.environ.get('BASE_URL', 'http://localhost:5001')
         reset_url = f"{base_url}/reset-password.html?token={reset_token}"
         
         # Create SendGrid client
@@ -88,13 +89,14 @@ def send_password_reset_email_sendgrid(user_email, username, reset_token):
         return True
         
     except Exception as e:
-        return send_password_reset_email_gmail(user_email, username, reset_token)
+        return send_password_reset_email_gmail(user_email, username, reset_token, base_url)
 
-def send_password_reset_email_gmail(user_email, username, reset_token):
+def send_password_reset_email_gmail(user_email, username, reset_token, base_url=None):
     """Send password reset email using Gmail (Fallback)"""
     try:
         # Create the reset URL (dynamic for production)
-        base_url = os.environ.get('BASE_URL', 'http://localhost:5001')
+        if not base_url:
+            base_url = os.environ.get('BASE_URL', 'http://localhost:5001')
         reset_url = f"{base_url}/reset-password.html?token={reset_token}"
         
         # Create email message
@@ -124,14 +126,14 @@ This is an automated message. Please do not reply to this email."""
     except Exception as e:
         return False
 
-def send_password_reset_email(user_email, username, reset_token):
+def send_password_reset_email(user_email, username, reset_token, base_url=None):
     """Send password reset email (tries SendGrid first, falls back to Gmail)"""
     # Check environment variables
     sendgrid_api_key = os.environ.get('SENDGRID_API_KEY')
     mail_username = os.environ.get('MAIL_USERNAME')
     mail_password = os.environ.get('MAIL_PASSWORD')
     
-    return send_password_reset_email_sendgrid(user_email, username, reset_token)
+    return send_password_reset_email_sendgrid(user_email, username, reset_token, base_url)
 
 def require_auth(f):
     """Decorator to require authentication for protected routes"""
@@ -321,6 +323,18 @@ def forgot_password():
         if not validate_email(email):
             return jsonify({'error': 'Please enter a valid email address'}), 400
         
+        # Determine base URL from request
+        # Check for X-Forwarded-Proto and Host headers (from reverse proxy)
+        scheme = request.headers.get('X-Forwarded-Proto', request.scheme)
+        host = request.headers.get('X-Forwarded-Host', request.headers.get('Host', ''))
+        
+        # If we have both, construct the base URL
+        if host:
+            base_url = f"{scheme}://{host}"
+        else:
+            # Fallback to environment variable or default
+            base_url = os.environ.get('BASE_URL', 'http://localhost:5001')
+        
         # Check if user exists
         user = run_query(
             'SELECT id, email FROM users WHERE email = %s',
@@ -341,7 +355,7 @@ def forgot_password():
             run_query(sql, (user['id'], reset_token, expires_at), fetch_all=False)
             
             # Send email (use email as display name since no username)
-            email_sent = send_password_reset_email(user['email'], user['email'], reset_token)
+            email_sent = send_password_reset_email(user['email'], user['email'], reset_token, base_url)
         
         # Always return the same message for security
         return jsonify({
