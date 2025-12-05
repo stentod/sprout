@@ -2016,9 +2016,16 @@ body {
 }
 
 .auth-logo {
+  display: block;
   width: 120px;
   height: 120px;
   margin: 0 auto calc(var(--spacing-xl) * 2) auto;
+  transform: translateX(-8px); /* Shift 8px to the left for better centering */
+}
+
+.auth-logo .logo {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   filter: drop-shadow(var(--shadow-md));
 }
@@ -2196,6 +2203,7 @@ body {
     width: 100px;
     height: 100px;
     margin: 0 auto calc(var(--spacing-lg) * 2) auto;
+    transform: translateX(-6px); /* Shift 6px to the left for better centering */
   }
   
   .auth-title {
@@ -2220,6 +2228,7 @@ body {
     width: 120px;
     height: 120px;
     margin: 0 auto calc(var(--spacing-xl) * 2) auto;
+    transform: translateX(-8px); /* Shift 8px to the left for better centering */
   }
   
   .auth-title {
