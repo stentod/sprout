@@ -1,396 +1,148 @@
-# Sprout Budget Tracker
+# 🌱 Sprout Budget Tracker
 
-A personal budget tracker designed to help you stay financially aware on a daily basis. Built with Flask and PostgreSQL on the backend and vanilla JavaScript on the frontend, Sprout offers a clean interface and visual feedback to help users build better spending habits.
+> Sprout Budget Tracker helps you stay mindful of your daily spending through simple manual tracking and clear visual insights. By focusing on intentional daily input rather than automated syncing, Sprout builds lasting financial awareness without unnecessary complexity.
 
-![Sprout Budget Tracker](frontend/image.png)
+[![Live Demo](https://img.shields.io/badge/🌐%20Live%20Demo-Visit%20App-brightgreen)](https://go.mysprout.app/)
+[![Tech Stack](https://img.shields.io/badge/Stack-Flask%20%7C%20PostgreSQL%20%7C%20Vanilla%20JS-blue)](#tech-stack)
 
-## Features
+![Sprout Budget Tracker Dashboard](frontend/image.png)
 
-### Core Budget Management
-- **Daily Budget Tracking** - Set and track your daily spending limit
-- **Budget Rollover** - Unspent money rolls over to the next day (optional)
-- **Category-Based Budgeting** - Set individual budgets for different spending categories
-- **Visual Progress Tracking** - Real-time budget status with intuitive gauges
+**The Challenge:** Traditional budget apps overwhelm users with complex monthly tracking, leading to abandonment. Sprout solves this by focusing on simple daily limits with immediate visual feedback—making financial discipline achievable and rewarding.
 
-### User Experience
-- 🌱 **Visual Plant Status** - Watch your financial plant grow or wilt based on spending habits
-- **Responsive Design** - Works seamlessly on desktop and mobile devices
-- **Dark Mode Support** - Easy on the eyes for daily use
-- **Real-time Updates** - Instant feedback on spending and budget changes
+## 📋 Project Overview
 
-### Authentication & Security
-- **User Authentication** - Secure email/password login system
-- **Password Reset** - Email-based password recovery
-- **Session Management** - Secure session handling with configurable timeouts
-- **Production Security** - Security headers and best practices
+Sprout Budget Tracker is a full-stack budgeting app that makes daily expense tracking simple and stress free. It's powered by a fast Flask API with PostgreSQL for data storage and a lightweight vanilla JavaScript frontend that keeps the experience clean and intuitive.
 
-### Analytics & Insights
-- **Spending Analytics** - Comprehensive charts and visualizations
-- **7-Day History** - Review your spending patterns over the last week
-- **Spending Heatmap** - Visual calendar showing daily spending intensity
-- **Category Breakdown** - See where your money goes by category
-- **Trend Analysis** - Track spending trends over time (7, 14, 30, 90 days)
+**Key Highlights:**
+- ✅ **Production Deployed** - Live at [go.mysprout.app](https://go.mysprout.app/) on Render
+- ✅ **Full Authentication System** - Secure user registration, login, and password reset with email verification
+- ✅ **Comprehensive Testing** - Full test suite with pytest covering all major features
+- ✅ **Performance Optimized** - Database indexing and query optimization for scalability
+- ✅ **Modern DevOps** - Docker containerization, Nginx reverse proxy, and cloud deployment
 
-### Advanced Features
-- **Expense Categories** - Organize expenses with customizable categories
-- **Expense Descriptions** - Add detailed notes to your transactions
-- **Automatic Daily Reset** - Budget resets daily at midnight
-- **Day Simulation** - Test different scenarios with date simulation
-- **User Preferences** - Customize daily limits, category requirements, and rollover settings
+This project showcases my ability to architect, develop, test, and deploy a complete web application independently—demonstrating skills in backend development, database design, frontend engineering, and DevOps practices.
 
-### Technical Features
-- **Production Ready** - Containerized with Docker for deployment
-- **Comprehensive Testing** - Full test suite with coverage reporting
-- **Performance Optimized** - Database indexing and query optimization
-- **API-First Design** - RESTful API for all functionality
-- **Progressive Web App** - Works offline and can be installed on devices
+## ✨ Features
 
-## Tech Stack
+- **Sets/tracks daily spending limit** with plant growth visualization
+- **Sets/tracks daily spending limit** for specific expense categories
+- **Add Expenses** with amount, descriptions, and specific categories
+- **Create custom made expense categories** based on your needs
+- **Set a daily rollover overflow** if you do not go over your daily budget
+- **View history and statistics** of past expenses
+- **Filter past expenses** based on category and time of expense
+- **View long term spending** via weekly/monthly/yearly spending
+- **View different visual graphs/charts** for spending patterns
+
+## 🛠️ Tech Stack
 
 ### Backend
 - **Python 3.x** - Core backend language
-- **Flask** - Lightweight web framework
-- **PostgreSQL** - Production/Development database
-- **Gunicorn** - WSGI HTTP Server
+- **Flask** - Lightweight web framework with blueprint architecture
+- **PostgreSQL** - Production-ready relational database
+- **Gunicorn** - Production WSGI HTTP server
+- **SQLAlchemy** - Database ORM for data modeling
 
 ### Frontend
-- **HTML5/CSS3** - Modern web standards
-- **Vanilla JavaScript** - No framework dependencies
-- **Responsive Design** - Mobile-first approach
+- **HTML5/CSS3** - Modern web standards with responsive design
+- **Vanilla JavaScript** - No framework dependencies, demonstrating core JS skills
+- **Responsive Design** - Mobile-first approach with dark mode support
 
-### DevOps
-- **Docker** - Containerization
-- **Nginx** - Production web server
+### DevOps & Infrastructure
+- **Docker** - Containerization for consistent deployments
+- **Nginx** - Reverse proxy and static file serving in production
 - **Render** - Cloud deployment platform
+- **Git** - Version control
 
-## Prerequisites
+### Testing & Quality
+- **pytest** - Comprehensive test suite
+- **PostgreSQL Indexing** - Performance optimization
 
-- **Docker** (for production builds)
-- **Python 3.x** (for development)
-- **Node.js** and **npm** (for frontend development server)
-- **PostgreSQL** (for database - see [POSTGRESQL_SETUP.md](backend/POSTGRESQL_SETUP.md) for setup)
+## 🏗️ Architecture & Technical Highlights
 
-## Initial Setup
+### System Architecture
+- **RESTful API Design** - Clean separation between frontend and backend with well-defined endpoints
+- **Blueprint Architecture** - Modular Flask structure (auth, expenses, categories, preferences) for maintainability
+- **Database Schema** - Normalized PostgreSQL schema with proper relationships and constraints
+- **Session Management** - Secure session handling with configurable timeouts
+- **Error Handling** - Comprehensive error handling with custom exception classes
 
-### 1. Clone the Repository
+### Performance & Scalability
+- **Database Indexing** - Strategic indexes on frequently queried columns for optimal performance
+- **Query Optimization** - Efficient database queries to minimize response times
+- **Static Asset Serving** - Nginx serves static files directly for better performance
+- **Production WSGI** - Gunicorn with multiple workers for concurrent request handling
 
-```bash
-git clone https://github.com/yourusername/sprout-budget-tracker.git
-cd sprout-budget-tracker
-```
+### Security Best Practices
+- **Password Hashing** - Secure password storage using industry-standard hashing
+- **Security Headers** - Production security headers (CSP, XSS protection, etc.)
+- **Session Security** - Secure session cookies with proper configuration
+- **Input Validation** - Server-side validation for all user inputs
+- **SQL Injection Prevention** - Parameterized queries and ORM usage
 
-### 2. Development Setup
+### Development Practices
+- **Comprehensive Testing** - Full test suite covering authentication, expenses, categories, and preferences
+- **Environment Configuration** - Separate development and production configurations
+- **Docker Containerization** - Consistent deployment across environments
+- **Code Organization** - Clean separation of concerns with utility functions and service layers
 
-#### Backend Setup
-```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
+## 🚀 Getting Started
 
-#### Frontend Setup
-```bash
-npm install -g live-server
-```
+### Prerequisites
+- Python 3.x
+- PostgreSQL
 
-### 3. Environment Variables (Optional)
+### Setup
 
-The application works with default values, but you can customize behavior with environment variables.
+1. **Clone and install dependencies**
+   ```bash
+   git clone https://github.com/yourusername/sprout-budget-tracker.git
+   cd sprout-budget-tracker
+   cd backend
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt  # Installs Flask and all dependencies
+   ```
 
-#### For Development (Local)
+2. **Configure database**
+   
+   Create `.env` in `backend/`:
+   ```bash
+   DATABASE_URL=postgresql://localhost/sprout_budget
+   FLASK_ENV=development
+   ```
 
-Create a `.env` file in the `backend/` directory to customize settings:
+3. **Run**
+   ```bash
+   # From project root
+   ./start.sh
+   ```
+   
+   Access at http://localhost:8080
 
-```bash
-cd backend
-cat > .env << EOF
-DAILY_BUDGET=25.0
-PORT=5001
-FLASK_ENV=development
-FLASK_DEBUG=true
-DATABASE_URL=postgresql://localhost/sprout_budget
-EOF
-```
+For detailed setup, see [POSTGRESQL_SETUP.md](backend/POSTGRESQL_SETUP.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 
-**Available Development Variables:**
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `DAILY_BUDGET` | Daily budget amount | `30.0` | No |
-| `PORT` | Flask server port | `5001` | No |
-| `FLASK_ENV` | Flask environment | `development` | No |
-| `FLASK_DEBUG` | Enable debug mode | `true` | No |
-| `DATABASE_URL` | PostgreSQL connection | Required for all environments | Yes |
+## 🧪 Testing
 
-> **Note:** PostgreSQL database connection is required. See [POSTGRESQL_SETUP.md](backend/POSTGRESQL_SETUP.md) for setup instructions.
-
-#### For Production (Render Platform)
-
-Set these in your Render service's Environment Variables section:
-
-**Required Production Variables:**
-| Variable | Description | Example | Required |
-|----------|-------------|---------|----------|
-| `DATABASE_URL` | PostgreSQL connection | `postgresql://user:pass@host:5432/db` | ✅ Yes |
-| `FLASK_ENV` | Flask environment | `production` | ✅ Yes |
-| `DAILY_BUDGET` | Daily budget amount | `30.0` | No |
-| `PORT` | External port | `10000` | No (Render sets this) |
-
-**How to set in Render:**
-1. Go to your Render service dashboard
-2. Click "Environment" tab
-3. Add the variables above
-4. Deploy your service
-
-## How to Build
-
-### Development Build
-
-No build step required for development. The application runs directly from source files.
-
-### Production Build
-
-Build the Docker image for production deployment:
+Comprehensive test suite using pytest covering authentication, expenses, categories, and preferences.
 
 ```bash
-docker build -t sprout-budget-tracker .
+cd backend && source venv/bin/activate && pytest
 ```
 
-This creates a production container with Nginx + Flask using Gunicorn WSGI server.
+## 🚀 Deployment
 
-## How to Run
+Sprout is deployed and live at **[go.mysprout.app](https://go.mysprout.app/)** on Render.
 
-### Development Mode (Recommended for Local Development)
+The application is containerized with Docker and uses:
+- **Nginx** as reverse proxy and static file server
+- **Gunicorn** as production WSGI server
+- **PostgreSQL** for data storage
 
-#### Quick Start
-```bash
-./start.sh
-```
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
-**🌐 Access your app at: http://localhost:8080**
+## 📝 About
 
-#### Manual Start
-```bash
-# Terminal 1: Start backend
-cd backend
-source venv/bin/activate
-python app.py  # Starts on http://localhost:5001
+This is a portfolio project demonstrating full-stack web development skills including backend API design, database architecture, frontend development, and cloud deployment.
 
-# Terminal 2: Start frontend  
-cd frontend
-live-server --port=8080  # Starts on http://localhost:8080
-```
-
-### Production Mode (Docker)
-
-```bash
-docker run -p 10000:10000 \
-  -e FLASK_ENV=production \
-  -e DAILY_BUDGET=30.0 \
-  sprout-budget-tracker
-```
-
-**🌐 Access your app at: http://localhost:10000**
-
-### Development vs Production
-
-| Aspect | Development (`./start.sh`) | Production (Docker) |
-|--------|---------------------------|-------------------|
-| **Frontend** | live-server on port 8080 | Nginx on port 10000 |
-| **Backend** | Flask dev server on port 5001 | Gunicorn + Flask on port 5000 |
-| **Database** | PostgreSQL (local) | PostgreSQL (Render managed) |
-| **Environment** | `.env` file or local vars | Render environment variables |
-| **Auto-reload** | ✅ Yes (both frontend/backend) | ❌ No (production stability) |
-| **Debug Mode** | ✅ Yes (detailed errors) | ❌ No (security) |
-
-## How to Test
-
-### Test Development Environment
-
-#### 1. Start the Development Servers
-```bash
-./start.sh
-```
-
-#### 2. Test Backend API
-```bash
-curl http://localhost:5001/health
-```
-Expected response:
-```json
-{"status":"ok"}
-```
-
-#### 3. Test Frontend
-Open your browser to: http://localhost:8080
-
-#### 4. Test API Endpoints
-```bash
-# Get current budget status
-curl http://localhost:5001/api/budget
-
-# Add an expense
-curl -X POST http://localhost:5001/api/expenses \
-  -H "Content-Type: application/json" \
-  -d '{"amount": 15.50, "description": "Lunch"}'
-
-# Get expense history
-curl http://localhost:5001/api/expenses/history
-```
-
-### Test Production Environment
-
-#### 1. Build and Run Production Container
-```bash
-docker build -t sprout-test .
-docker run -d -p 10000:10000 -e FLASK_ENV=production --name sprout-container sprout-test
-```
-
-#### 2. Test Production Health
-```bash
-curl http://localhost:10000/health
-```
-Expected response:
-```json
-{"status":"ok"}
-```
-
-#### 3. Test Frontend
-Open your browser to: http://localhost:10000
-
-#### 4. Test Production API
-```bash
-# Test budget endpoint through Nginx
-curl http://localhost:10000/api/budget
-
-# Test adding expenses
-curl -X POST http://localhost:10000/api/expenses \
-  -H "Content-Type: application/json" \
-  -d '{"amount": 25.00, "description": "Dinner"}'
-```
-
-#### 5. Cleanup Test Container
-```bash
-docker stop sprout-container && docker rm sprout-container
-```
-
-### How It Works (Architecture)
-- **Port 10000** (External): Nginx serves frontend files and handles incoming requests
-- **Port 5000** (Internal): Flask backend API running with Gunicorn WSGI server
-- **Request Flow**: Browser → Nginx (10000) → Flask API (5000) → PostgreSQL
-
-## Project Structure
-
-```
-Sprout/
-├── backend/
-│   ├── main.py                 # Main Flask application with blueprints
-│   ├── app.py                  # Development entry point
-│   ├── auth.py                 # Authentication routes and logic
-│   ├── expenses.py             # Expense management and analytics
-│   ├── categories.py           # Category management
-│   ├── preferences.py          # User preferences and settings
-│   ├── rollover_api.py         # Budget rollover functionality
-│   ├── rollover_service.py     # Rollover business logic
-│   ├── utils.py                # Shared utilities and helpers
-│   ├── setup_db.py             # Database setup script
-│   ├── schema_postgres.sql     # PostgreSQL schema
-│   ├── requirements.txt        # Python dependencies
-│   ├── run_tests.py            # Test runner script
-│   ├── pytest.ini             # Pytest configuration
-│   ├── conftest.py             # Test configuration
-│   ├── tests/                  # Comprehensive test suite
-│   │   ├── test_auth.py        # Authentication tests
-│   │   ├── test_expenses.py    # Expense management tests
-│   │   ├── test_categories.py  # Category management tests
-│   │   ├── test_preferences.py # User preferences tests
-│   │   └── test_summary.py     # Summary and analytics tests
-│   ├── POSTGRESQL_SETUP.md     # Database setup guide
-│   ├── EMAIL_SETUP.md          # Email configuration guide
-│   └── TESTING.md              # Testing documentation
-├── frontend/
-│   ├── index.html              # Main dashboard
-│   ├── auth.html               # Authentication page
-│   ├── history.html            # Spending history
-│   ├── analytics.html          # Analytics dashboard
-│   ├── budgets.html            # Budget management
-│   ├── settings.html           # User settings
-│   ├── reset-password.html     # Password reset page
-│   ├── main.js                 # Main app logic
-│   ├── auth.js                 # Authentication logic
-│   ├── history.js              # History page logic
-│   ├── analytics.js            # Analytics and charts
-│   ├── budgets.js              # Budget management
-│   ├── settings.js             # Settings management
-│   ├── reset-password.js       # Password reset logic
-│   ├── style.css               # Styling and themes
-│   ├── logo.svg                # App logo
-│   └── image.png               # Screenshot for README
-├── Dockerfile                  # Docker configuration
-├── nginx.conf                  # Nginx configuration
-├── start.sh                    # Development server script
-├── render.yaml                 # Render deployment config
-├── gunicorn.conf.py            # Gunicorn WSGI config
-├── DEPLOYMENT.md               # Production deployment guide
-└── README.md                   # This file
-```
-
-## Usage
-
-### Getting Started
-1. **Create Account**: Sign up with your email address and secure password
-2. **Set Your Budget**: Configure your daily spending limit in settings
-3. **Enable Rollover** (Optional): Allow unspent money to carry over to the next day
-4. **Customize Categories**: Set up spending categories with individual budgets
-
-### Daily Usage
-1. **Track Expenses**: Add expenses throughout the day with descriptions and categories
-2. **Monitor Progress**: Watch your plant visual and budget gauge update in real-time
-3. **Check Analytics**: View detailed spending patterns and trends
-4. **Review History**: Analyze your spending over the last 7 days or longer periods
-
-### Advanced Features
-1. **Category Management**: Create custom categories and set individual budgets
-2. **Analytics Dashboard**: View comprehensive charts, heatmaps, and spending breakdowns
-3. **Settings Customization**: Adjust preferences, rollover settings, and category requirements
-4. **Day Simulation**: Test different scenarios using the day simulation feature
-
-### Development Features
-- **Day Simulation**: Use `?dayOffset=N` in URL to test different days
-- **Auto-reload**: Both frontend and backend restart on file changes
-- **Debug Mode**: Detailed error messages and stack traces
-- **Local Database**: PostgreSQL database for development testing
-
-## Deployment
-
-**Want to Deploy Online?** This app is designed for **Render** deployment using Docker containers.
-
-👉 **See [DEPLOYMENT.md](DEPLOYMENT.md) for complete step-by-step instructions including:**
-- Local Docker testing
-- Render account setup
-- PostgreSQL database creation
-- Environment variable configuration
-- Health monitoring and troubleshooting
-
-## About This Project
-
-This is a **personal portfolio project** demonstrating modern web development practices including containerization, cloud deployment, and responsive design.
-
-### For Learning & Reference
-- 📚 **Educational Use**: Feel free to study the code and architecture
-- 🔧 **Personal Use**: Clone and modify for your own budget tracking needs
-- 💡 **Learning Resource**: Demonstrates Flask, Docker, PostgreSQL, and Render deployment
-
-### Reporting Issues
-If you encounter bugs or have suggestions:
-- 🐛 Open an issue on GitHub with details
-- 💬 Describe the problem and steps to reproduce
-- 🔍 Include browser/environment information
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-**Built for better financial awareness**
+Built with attention to code quality, testing, and production best practices.
